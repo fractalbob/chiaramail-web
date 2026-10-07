@@ -42,41 +42,54 @@ to play sender and recipient.
 
 ## Set up Firebase (one time)
 
-1. In the [Firebase console](https://console.firebase.google.com), **create a
-   project** (e.g. `chiaramail`). Google Analytics isn't needed.
-2. **Build → Authentication → Get started → Sign-in method.** Enable:
-   - **Google**
-   - **Email/Password**, and inside it turn on **Email link (passwordless sign-in)**.
-3. **Upgrade to Blaze** (Usage and billing). On the free Spark plan Firebase
-   sends only **5 sign-in-link emails per day**. On Blaze, that becomes 25,000.
-   At ChiaraMail's scale this stays within the no-cost allowances. Setting a
-   budget alert (e.g. €5) is a good idea anyway. Google sign-in works on
-   either plan.
-4. **Build → Firestore Database → Create database** (production mode, region
-   `europe-west1` or `eur3`).
-5. **Project settings → Your apps → Add app → Web.** Copy the config values
-   into a new file `.env.local` (see `.env.example`).
-6. Connect this folder to the project:
+ChiaraMail web lives in the existing **ChiaraMail** project, `chiaramail-15119`,
+which is already on Blaze with a budget alert. That project also holds the old
+ChiaraMail pieces, which must keep working:
+
+- the **original website** (the chiaramail.com page with app links) on the
+  project's default Hosting site. The web app deploys to a **separate site,
+  `chiaramail-app`**, so it never touches that page.
+- the old Android app's **`users`** collection in Firestore. `firestore.rules`
+  keeps its original rule word for word, next to the new `messages` rules.
+- the Realtime Database, which this app doesn't use or deploy.
+
+Steps:
+
+1. **Authentication → Sign-in method.** Make sure **Google** is enabled, and
+   **Email/Password** with **Email link (passwordless sign-in)** turned on.
+2. **Settings → General → Your apps → Add app → Web.** Name it `chiaramail-web`
+   and leave "Firebase Hosting" unticked. Copy its config into `.env.local`
+   (see `.env.example`). For now, set
+   `VITE_PUBLIC_ORIGIN=https://chiaramail-app.web.app`.
+3. Log in and create the second Hosting site:
    ```
    npx firebase login
-   npx firebase use --add        # pick the project, alias "default"
+   npx firebase hosting:sites:create chiaramail-app
    ```
-7. Deploy (hosting + security rules + indexes):
+   (If that name is taken, pick another, and put it in `.firebaserc` in place of
+   `chiaramail-app`.)
+4. **Authentication → Settings → Authorized domains → Add domain:**
+   `chiaramail-app.web.app`.
+5. Test the rules (see below), then deploy:
    ```
    npm run deploy
    ```
-   The app is then live at `https://<project-id>.web.app`.
-8. **Custom domain: app.chiaramail.com.** chiaramail.com itself keeps its
-   existing page, so the app lives on a subdomain (like play.p3nto.com):
-   - Hosting → **Add custom domain** → `app.chiaramail.com`. Firebase shows
-     the DNS record(s) to add (a CNAME for a subdomain, sometimes a TXT to
-     verify ownership).
-   - Add them where chiaramail.com's DNS is managed. Leave every other record,
-     including any MX (mail) records, as it is.
-   - Authentication → Settings → **Authorized domains** → add
-     `app.chiaramail.com`, or sign-in links and Google sign-in won't work there.
-   - In `.env.local` set `VITE_PUBLIC_ORIGIN=https://app.chiaramail.com`, then
+   This deploys only the new site plus Firestore rules and indexes. The old
+   site and the Realtime Database are left alone.
+6. **app.chiaramail.com.** chiaramail.com keeps its existing page, so the app
+   gets a subdomain (like play.p3nto.com):
+   - Hosting → open the **chiaramail-app** site → **Add custom domain** →
+     `app.chiaramail.com`. Add the record(s) Firebase shows where
+     chiaramail.com's DNS is managed. Leave every other record, including any
+     MX (mail) records, as it is.
+   - Authentication → Settings → Authorized domains → add `app.chiaramail.com`.
+   - Set `VITE_PUBLIC_ORIGIN=https://app.chiaramail.com` in `.env.local`, then
      `npm run deploy` again so message links use that address.
+
+**Note on the old `users` rule.** It is `allow read,write: if true`, so anyone
+on the internet can read or overwrite those device registrations. It is kept
+unchanged so as not to break the old Android app. If that app is retired,
+delete that block (or tighten it) and redeploy.
 
 ## Check the security rules
 

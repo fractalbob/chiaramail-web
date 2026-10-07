@@ -1,0 +1,12 @@
+{
+  "projects": {
+    "default": "chiaramail-15119"
+  },
+  "targets": {
+    "chiaramail-15119": {
+      "hosting": {
+        "app": ["chiaramail-app"]
+      }
+    }
+  }
+}

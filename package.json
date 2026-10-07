@@ -10,7 +10,7 @@
     "lint": "eslint src",
     "emulators": "firebase emulators:start --only auth,firestore --project demo-chiaramail",
     "test:rules": "firebase emulators:exec --only firestore --project demo-chiaramail \"node --test tests/rules.test.js\"",
-    "deploy": "npm run build && firebase deploy --only hosting,firestore",
+    "deploy": "npm run build && firebase deploy --only hosting:app,firestore:rules,firestore:indexes",
     "dev:mock": "vite --mode mock",
     "build:mock": "vite build --mode mock"
   },

@@ -155,6 +155,12 @@ test('read receipts: recipient writes own, sender reads all', async () => {
   await assertSucceeds(getDoc(doc(ctx(BOB), 'messages/m1/reads/bob@example.com')));
 });
 
+test('old ChiaraMail users/ collection keeps its original open rules', async () => {
+  const anon = env.unauthenticatedContext().firestore();
+  await assertSucceeds(setDoc(doc(anon, 'users/device1'), { 'Device ID': 'abc' }));
+  await assertSucceeds(getDoc(doc(anon, 'users/device1')));
+});
+
 test('sender can delete the message', async () => {
   await seed();
   await assertSucceeds(deleteDoc(doc(ctx(ALICE), 'messages/m1')));
