@@ -66,10 +66,17 @@ to play sender and recipient.
    npm run deploy
    ```
    The app is then live at `https://<project-id>.web.app`.
-8. **Custom domain (optional):** Hosting → Add custom domain (e.g.
-   `chiaramail.com` or `mail.thefractalimagescompany.com`). Then add the same
-   domain under Authentication → Settings → **Authorized domains**, or sign-in
-   links won't work there.
+8. **Custom domain: app.chiaramail.com.** chiaramail.com itself keeps its
+   existing page, so the app lives on a subdomain (like play.p3nto.com):
+   - Hosting → **Add custom domain** → `app.chiaramail.com`. Firebase shows
+     the DNS record(s) to add (a CNAME for a subdomain, sometimes a TXT to
+     verify ownership).
+   - Add them where chiaramail.com's DNS is managed. Leave every other record,
+     including any MX (mail) records, as it is.
+   - Authentication → Settings → **Authorized domains** → add
+     `app.chiaramail.com`, or sign-in links and Google sign-in won't work there.
+   - In `.env.local` set `VITE_PUBLIC_ORIGIN=https://app.chiaramail.com`, then
+     `npm run deploy` again so message links use that address.
 
 ## Check the security rules
 
