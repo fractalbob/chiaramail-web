@@ -1,0 +1,97 @@
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import * as gmail from '@gmail';
+import { summarize } from '../gmail/mime.js';
+import { useMail } from './context.jsx';
+import { useI18n } from '../i18n.jsx';
+import { labelIdFor, isSystemFolder } from './folders.js';
+
+export default function ThreadList() {
+  const { folder } = useParams();
+  const [params] = useSearchParams();
+  const q = params.get('q') || '';
+  const mail = useMail();
+  const { t, formatShort } = useI18n();
+  const [pages, setPages] = useState(['']); // page tokens; last is current
+  const [state, setState] = useState({ key: null, rows: null, next: null, error: '' });
+  const key = `${folder}|${q}|${pages[pages.length - 1]}`;
+  const { handle } = mail;
+
+  const fetchPage = useCallback(async () => {
+    const pageToken = pages[pages.length - 1] || undefined;
+    const { ids, nextPageToken } = await gmail.listThreads({ labelId: labelIdFor(folder) || undefined, q, pageToken });
+    const threads = await gmail.getThreadsMeta(ids);
+    return { key, rows: threads.map((th) => summarize(th, mail.account)), next: nextPageToken, error: '' };
+  }, [folder, q, pages, key, mail.account]);
+
+  const load = useCallback((silent) => fetchPage().then(setState).catch((e) => {
+    if (!handle(e) && !silent) setState({ key, rows: null, next: null, error: e.message });
+  }), [fetchPage, handle, key]);
+
+  useEffect(() => {
+    let live = true;
+    fetchPage().then((r) => { if (live) setState(r); }).catch((e) => {
+      if (live && !handle(e)) setState({ key, rows: null, next: null, error: e.message });
+    });
+    return () => { live = false; };
+  }, [fetchPage, handle, key]);
+  // New mail: refresh the first page every minute.
+  useEffect(() => {
+    if (pages.length > 1) return;
+    const id = setInterval(() => load(true), 60_000);
+    return () => clearInterval(id);
+  }, [load, pages.length]);
+
+  const resetKey = `${folder}|${q}`;
+  const [lastReset, setLastReset] = useState(resetKey);
+  if (lastReset !== resetKey) { setLastReset(resetKey); setPages(['']); }
+
+  const rows = state.key === key ? state.rows : null;
+  const toggleStar = async (row) => {
+    setState((s) => ({ ...s, rows: s.rows.map((r) => (r.id === row.id ? { ...r, starred: !r.starred } : r)) }));
+    try { await gmail.modifyThread(row.id, row.starred ? [] : ['STARRED'], row.starred ? ['STARRED'] : []); } catch (e) { handle(e); load(true); }
+  };
+
+  const title = q ? t('searchResults', { q }) : isSystemFolder(folder) ? t(`folder_${folder}`) : (mail.labels.find((l) => l.id === folder)?.name || folder);
+
+  return (
+    <div className="threadlist">
+      <div className="list-head">
+        <h1 className="list-title">{title}</h1>
+        <div className="pager">
+          <button type="button" className="btn btn-quiet" onClick={() => load(false)}>{t('refresh')}</button>
+          <button type="button" className="btn btn-quiet" disabled={pages.length < 2} onClick={() => setPages(pages.slice(0, -1))}>{t('newer')}</button>
+          <button type="button" className="btn btn-quiet" disabled={!state.next || state.key !== key} onClick={() => setPages([...pages, state.next])}>{t('older')}</button>
+        </div>
+      </div>
+      {state.error && state.key === key && <p className="error" role="alert">{t('errorGeneric', { msg: state.error })}</p>}
+      {!rows && !(state.error && state.key === key) && <p className="loading">{t('loading')}</p>}
+      {rows && rows.length === 0 && <p className="empty">{q ? t('noResults') : t('emptyFolder')}</p>}
+      {rows && rows.length > 0 && (
+        <ul className="msglist">
+          {rows.map((r) => (
+            <li key={r.id} className={r.unread ? 'trow trow-unread' : 'trow'}>
+              <button type="button" className={r.starred ? 'star star-on' : 'star'} aria-pressed={r.starred}
+                aria-label={r.starred ? t('unstar') : t('star')} onClick={() => toggleStar(r)}>★</button>
+              <Link to={`/mail/${encodeURIComponent(folder)}/${r.id}${q ? `?q=${encodeURIComponent(q)}` : ''}`} className="trow-link">
+                <span className="row-people">
+                  {r.people.map((p) => (p === 'me' ? t('me') : p)).join(', ') || t('noSender')}
+                  {r.count > 1 && <span className="tcount"> {r.count}</span>}
+                </span>
+                <span className="row-subject">
+                  {r.live && <span className="live" title={t('liveTitle')}>{t('live')}</span>}
+                  <span className="subj">{r.subject || t('noSubject')}</span>
+                  <span className="snip"> · {r.snippet}</span>
+                </span>
+                <span className="row-meta">
+                  {r.hasAttachment && <span aria-label={t('hasAttachment')} title={t('hasAttachment')}>📎</span>}
+                  {formatShort(r.date)}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

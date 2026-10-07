@@ -36,6 +36,13 @@ export function onUserChanged(cb) {
   setTimeout(() => cb(currentUser()), 0);
   return () => userListeners.delete(cb);
 }
+// Test mode: the "token" is simply the address.
+export async function signInWithGoogleAccessToken(email) {
+  const u = { uid: uidFor(email.toLowerCase()), email: email.toLowerCase(), name: '', verified: true };
+  setUser(u);
+  return u;
+}
+export const currentMockUser = () => currentUser();
 export async function signInWithGoogle() {
   const email = window.prompt('Test mode — which Google address?');
   if (email) setUser({ uid: uidFor(email.toLowerCase()), email: email.toLowerCase(), name: '', verified: true });

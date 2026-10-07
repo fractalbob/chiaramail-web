@@ -4,7 +4,7 @@ import * as backend from '@backend';
 import { useI18n } from '../i18n.jsx';
 import { toParagraphs } from '../lib.js';
 
-function Readers({ message }) {
+export function Readers({ message }) {
   const { t, formatDate } = useI18n();
   const [reads, setReads] = useState({});
   useEffect(() => backend.watchReads(message.id, setReads, () => {}), [message.id]);
@@ -27,7 +27,7 @@ function Readers({ message }) {
   );
 }
 
-function Editions({ message }) {
+export function Editions({ message }) {
   const { t, formatDate } = useI18n();
   const [eds, setEds] = useState(null);
   useEffect(() => {

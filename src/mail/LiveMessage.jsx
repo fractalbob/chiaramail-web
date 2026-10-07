@@ -1,0 +1,140 @@
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import * as backend from '@backend';
+import { useAuth } from '../auth.jsx';
+import { useI18n } from '../i18n.jsx';
+import { Readers, Editions } from '../components/SenderTools.jsx';
+import PlainBody from './PlainBody.jsx';
+
+// The body of a ChiaraMail message: fetched live from ChiaraMail (the
+// original's FETCH CONTENT), editable in place by its sender (UPDATE CONTENT).
+export default function LiveMessage({ pointer, message, threadId }) {
+  const { user } = useAuth();
+  const { t, formatDate } = useI18n();
+  const [loaded, setLoaded] = useState({ id: null });
+  const [seen, setSeen] = useState({ id: null, edition: null });
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+  const receiptFor = useRef(null);
+
+  useEffect(() => backend.watchMessage(pointer,
+    (d) => setLoaded(d ? { id: pointer, status: 'ok', data: d } : { id: pointer, status: 'missing' }),
+    (e) => setLoaded({ id: pointer, status: e.code === 'permission-denied' ? 'denied' : 'error', error: e.message })), [pointer]);
+
+  const state = loaded.id === pointer ? loaded : { status: 'loading' };
+  const d = state.data;
+  const isSender = !!(d && user && d.senderUid === user.uid);
+  const lastSeen = seen.id === pointer ? seen.edition : null;
+  const edition = d?.edition;
+  const withdrawn = d?.withdrawn;
+
+  // Readers: remember the edition they'd seen, then record this read.
+  useEffect(() => {
+    if (!d || isSender || !user || withdrawn) return;
+    let live = true;
+    (async () => {
+      if (receiptFor.current !== pointer) {
+        receiptFor.current = pointer;
+        const r = await backend.getMyReceipt(pointer, user.email).catch(() => null);
+        if (live) setSeen({ id: pointer, edition: r ? r.editionSeen : 0 });
+      }
+      await backend.markRead(pointer, user.email, edition).catch(() => {});
+    })();
+    return () => { live = false; };
+  }, [pointer, edition, withdrawn, isSender, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (state.status === 'loading') return <p className="loading">{t('loading')}</p>;
+  if (state.status !== 'ok') {
+    return (
+      <div className="live-block live-unavailable">
+        <p className="notice-lead">{state.status === 'missing' ? t('liveDeleted') : t('liveNotForYou')}</p>
+        <PlainBody text={message.text} />
+      </div>
+    );
+  }
+
+  const fresh = !isSender && lastSeen > 0 && lastSeen < d.edition && !d.withdrawn;
+
+  const save = async () => {
+    if (!draft.trim()) return setError(t('needBody'));
+    setBusy(true); setError('');
+    try { await backend.saveEdition(pointer, d, { subject: d.subject, body: draft }); setEditing(false); setSaved(true); } catch (e) { setError(t('errorGeneric', { msg: e.message })); } finally { setBusy(false); }
+  };
+  const withdraw = async () => {
+    if (!window.confirm(t('withdrawConfirm'))) return;
+    try { await backend.withdraw(pointer); } catch (e) { setError(t('errorGeneric', { msg: e.message })); }
+  };
+
+  return (
+    <div className={fresh ? 'live-block live-fresh' : 'live-block'}>
+      <p className="edition">
+        <span className="live-badge">{t('live')}</span>
+        {!d.withdrawn && (
+          <>
+            <span className={fresh ? 'edition-mark edition-fresh' : 'edition-mark'}>
+              {d.edition === 1 ? t('firstEdition') : t('editionN', { n: d.edition })}
+            </span>
+            <span className="edition-date">
+              {d.edition === 1 ? t('sentOn', { date: formatDate(d.createdAt) }) : t('updatedOn', { date: formatDate(d.updatedAt) })}
+            </span>
+          </>
+        )}
+      </p>
+      {fresh && (
+        <p className="updated-banner" role="status">
+          <mark>{t('updatedSince')}</mark>
+          <span>{t('updatedSinceDetail', { seen: lastSeen, n: d.edition })}</span>
+        </p>
+      )}
+
+      {d.withdrawn ? (
+        <p className="notice">{isSender ? t('withdrawnMine', { date: formatDate(d.updatedAt) }) : t('withdrawnBy', { name: d.senderName || d.senderEmail, date: formatDate(d.updatedAt) })}</p>
+      ) : editing ? (
+        <div className="live-edit">
+          <label className="sr-only" htmlFor={`edit-${pointer}`}>{t('message')}</label>
+          <textarea id={`edit-${pointer}`} className="letter-input" rows={10} value={draft} onChange={(e) => setDraft(e.target.value)} />
+          <p className="help">{t('editNote')}</p>
+          <div className="actions">
+            <button type="button" className="btn btn-primary" disabled={busy} onClick={save}>{busy ? t('saving') : t('saveEdition')}</button>
+            <button type="button" className="btn btn-quiet" onClick={() => setEditing(false)}>{t('cancel')}</button>
+          </div>
+        </div>
+      ) : (
+        <div className="letter-body live-body"><PlainBody text={d.body} /></div>
+      )}
+
+      {!isSender && !d.withdrawn && <p className="fineprint">{t('readNotice')}</p>}
+
+      {isSender && (
+        <div className="live-tools">
+          {saved && !editing && (
+            <p className="note" role="status">
+              {t('editionSaved', { n: d.edition })}{' '}
+              <Link to={`/compose?thread=${threadId}&msg=${message.id}&mode=replyAll&note=updated`}>{t('letThemKnow')}</Link>
+            </p>
+          )}
+          {!d.withdrawn && !editing && (
+            <div className="actions">
+              <button type="button" className="btn btn-primary" onClick={() => { setDraft(d.body); setEditing(true); setSaved(false); }}>{t('edit')}</button>
+              <button type="button" className="btn btn-danger" onClick={withdraw}>{t('withdraw')}</button>
+            </div>
+          )}
+          <details className="live-details">
+            <summary>{t('readers')}</summary>
+            <Readers message={{ ...d, id: pointer }} />
+          </details>
+          {!d.withdrawn && (
+            <details className="live-details">
+              <summary>{t('history')}</summary>
+              <Editions message={{ ...d, id: pointer }} />
+            </details>
+          )}
+        </div>
+      )}
+      {error && <p className="error" role="alert">{error}</p>}
+    </div>
+  );
+}

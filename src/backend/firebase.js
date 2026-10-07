@@ -3,7 +3,7 @@ import { initializeApp } from 'firebase/app';
 import {
   getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup,
   sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
-  signOut as fbSignOut, connectAuthEmulator,
+  signOut as fbSignOut, connectAuthEmulator, signInWithCredential,
 } from 'firebase/auth';
 import {
   getFirestore, connectFirestoreEmulator, collection, doc, query, where,
@@ -57,6 +57,13 @@ export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   await signInWithPopup(auth, provider);
+}
+
+// Used by the mail client: the same Google sign-in that grants Gmail access
+// also signs in to ChiaraMail.
+export async function signInWithGoogleAccessToken(accessToken) {
+  const res = await signInWithCredential(auth, GoogleAuthProvider.credential(null, accessToken));
+  return toUser(res.user);
 }
 
 export async function sendSignInLink(email, returnPath) {

@@ -1,0 +1,157 @@
+// Real Gmail: Google sign-in for a Gmail access token (Google Identity
+// Services), then the Gmail REST API, straight from the browser. Nothing is
+// stored on any server except ChiaraMail's own changeable messages.
+import * as backend from '@backend';
+
+export const mode = 'gmail';
+const SCOPES = 'openid email profile https://www.googleapis.com/auth/gmail.modify';
+const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.modify';
+const BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
+const UPLOAD = 'https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=multipart';
+const TOKEN_KEY = 'chiaramail.gmailToken';
+const HINT_KEY = 'chiaramail.lastAccount';
+
+let token = null; // { accessToken, expiresAt, email }
+let gisLoaded = null;
+
+const reconnectError = () => Object.assign(new Error('Gmail access expired'), { code: 'reconnect' });
+
+function loadGis() {
+  if (gisLoaded) return gisLoaded;
+  gisLoaded = new Promise((resolve, reject) => {
+    if (window.google?.accounts?.oauth2) return resolve();
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => { gisLoaded = null; reject(new Error('Could not load Google sign-in')); };
+    document.head.appendChild(s);
+  });
+  return gisLoaded;
+}
+
+function saveToken(t) {
+  token = t;
+  try {
+    if (t) sessionStorage.setItem(TOKEN_KEY, JSON.stringify(t)); else sessionStorage.removeItem(TOKEN_KEY);
+  } catch { /* private mode */ }
+}
+
+/** Silent: reuse this tab's still-valid token. Returns the address or null. */
+export function restore() {
+  try {
+    const t = JSON.parse(sessionStorage.getItem(TOKEN_KEY));
+    if (t && t.expiresAt > Date.now() + 60_000) { token = t; return t.email; }
+  } catch { /* ignore */ }
+  return null;
+}
+
+export const lastAccount = () => { try { return localStorage.getItem(HINT_KEY) || ''; } catch { return ''; } };
+
+/** Opens Google's window (must be called from a click). */
+export async function connect() {
+  await loadGis();
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  if (!clientId) throw new Error('VITE_GOOGLE_CLIENT_ID is not set in .env.local');
+  const resp = await new Promise((resolve, reject) => {
+    const client = window.google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: SCOPES,
+      include_granted_scopes: true,
+      hint: lastAccount() || undefined,
+      callback: (r) => (r.error ? reject(Object.assign(new Error(r.error_description || r.error), { code: r.error })) : resolve(r)),
+      error_callback: (e) => reject(Object.assign(new Error(e.message || e.type), { code: e.type })),
+    });
+    client.requestAccessToken({ prompt: '' });
+  });
+  if (!window.google.accounts.oauth2.hasGrantedAllScopes(resp, GMAIL_SCOPE)) {
+    throw Object.assign(new Error('Gmail access was not granted'), { code: 'scope-denied' });
+  }
+  // Sign in to ChiaraMail (Firebase) with the same Google account.
+  const user = await backend.signInWithGoogleAccessToken(resp.access_token);
+  saveToken({ accessToken: resp.access_token, expiresAt: Date.now() + Number(resp.expires_in) * 1000, email: user.email });
+  try { localStorage.setItem(HINT_KEY, user.email); } catch { /* ignore */ }
+  return user.email;
+}
+
+export async function disconnect() {
+  const t = token?.accessToken;
+  saveToken(null);
+  try { if (t && window.google?.accounts?.oauth2) window.google.accounts.oauth2.revoke(t, () => {}); } catch { /* ignore */ }
+  await backend.signOut();
+}
+
+async function call(path, { method = 'GET', query, body, url } = {}) {
+  if (!token || token.expiresAt < Date.now() + 30_000) throw reconnectError();
+  const u = new URL(url || BASE + path);
+  if (query) Object.entries(query).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === '') return;
+    (Array.isArray(v) ? v : [v]).forEach((x) => u.searchParams.append(k, x));
+  });
+  const res = await fetch(u, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token.accessToken}`,
+      ...(body && typeof body === 'string' ? {} : body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body && typeof body !== 'string' && !(body instanceof Blob) ? JSON.stringify(body) : body,
+  });
+  if (res.status === 401) { saveToken(null); throw reconnectError(); }
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { msg = (await res.json()).error.message; } catch { /* ignore */ }
+    throw Object.assign(new Error(msg), { status: res.status });
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (i < items.length) { const k = i++; out[k] = await fn(items[k], k); }
+  }));
+  return out;
+}
+
+export const getProfile = () => call('/profile');
+export async function listLabels() { return (await call('/labels')).labels || []; }
+export const getLabel = (id) => call(`/labels/${encodeURIComponent(id)}`);
+
+export async function listThreads({ labelId, q, pageToken, max = 25 }) {
+  const r = await call('/threads', { query: { labelIds: labelId, q, pageToken, maxResults: max } });
+  return { ids: (r.threads || []).map((t) => t.id), nextPageToken: r.nextPageToken || null };
+}
+
+const META = ['From', 'To', 'Subject', 'Date', 'X-ChiaraMail-Content-Pointer'];
+export const getThreadsMeta = (ids) => mapLimit(ids, 6, (id) => call(`/threads/${id}`, { query: { format: 'metadata', metadataHeaders: META } }));
+export const getThread = (id) => call(`/threads/${id}`, { query: { format: 'full' } });
+export async function getAttachment(messageId, attachmentId) {
+  return (await call(`/messages/${messageId}/attachments/${attachmentId}`)).data;
+}
+export const modifyThread = (id, add = [], remove = []) => call(`/threads/${id}/modify`, { method: 'POST', body: { addLabelIds: add, removeLabelIds: remove } });
+export const trashThread = (id) => call(`/threads/${id}/trash`, { method: 'POST' });
+export const untrashThread = (id) => call(`/threads/${id}/untrash`, { method: 'POST' });
+
+/** Sends an RFC 2822 message (ASCII). Returns { id, threadId }. */
+export async function sendRaw(raw, threadId) {
+  if (raw.length < 4_000_000) {
+    const b64url = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return call('/messages/send', { method: 'POST', body: { raw: b64url, ...(threadId ? { threadId } : {}) } });
+  }
+  // Large messages (attachments) go through the upload endpoint.
+  const b = `cm_${Date.now()}`;
+  const body = [
+    `--${b}`, 'Content-Type: application/json; charset=UTF-8', '', JSON.stringify(threadId ? { threadId } : {}),
+    `--${b}`, 'Content-Type: message/rfc822', '', raw, `--${b}--`, '',
+  ].join('\r\n');
+  if (!token || token.expiresAt < Date.now() + 30_000) throw reconnectError();
+  const res = await fetch(UPLOAD, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token.accessToken}`, 'Content-Type': `multipart/related; boundary=${b}` },
+    body,
+  });
+  if (res.status === 401) { saveToken(null); throw reconnectError(); }
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error?.message || res.statusText);
+  return res.json();
+}

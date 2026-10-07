@@ -1,33 +1,25 @@
-# ChiaraMail (web)
+# ChiaraMail (web) — mail client for Gmail
 
-Email you can still change after you send it. This is the web successor to
-ChiaraMail 5.1 (Java, 2001–2009). It keeps the original's core invention: the
-message text lives on a server, not in the email, so the sender can change or
-withdraw it, and only the listed recipients can read it.
+A mail app for your Gmail account that brings back ChiaraMail 5.1's core idea:
+**messages you can change after sending.** Read, search, star, archive, delete,
+reply, forward and attach as in any mail app. Tick **Changeable message** when
+writing, and the text lives in ChiaraMail rather than in the email:
 
-**How it works**
+- The email carries an `X-ChiaraMail-Content-Pointer` header, as in 5.1.
+- Recipients who use ChiaraMail see the **current edition inline** in their
+  inbox, with "Updated since you last read it" when it changed.
+- The sender sees **Edit** and **Withdraw** right in the message, plus who has
+  read which edition, and every earlier edition.
+- Recipients without ChiaraMail get a short email with a link to the current
+  version (they sign in with the address it was sent to).
 
-1. The sender writes the message in ChiaraMail. It's stored in Firestore.
-2. ChiaraMail opens a ready-made email in the sender's own mail program
-   (or Gmail / Outlook.com, or copy-and-paste). The email holds a link to
-   the message.
-3. A recipient opens the link and signs in with the address it was sent to
-   (Google, or a one-click email link). Then they see the current edition.
-4. The sender can save new editions at any time. Every edition is kept
-   for the sender. Readers see a highlighted "Updated since you last read
-   it" when the text changed. The sender sees who has read which edition.
-   Withdrawing a message erases its text for everyone.
+Your mail stays in Gmail: the browser talks to Google's Gmail API directly.
+ChiaraMail stores only the changeable messages (Firestore, project
+`chiaramail-15119`).
 
-| Original (5.1)                        | Web version                              |
-|---------------------------------------|------------------------------------------|
-| `RECEIVE CONTENT` → content server    | `createMessage` → Firestore `messages/`  |
-| `X-ChiaraMail-Content-Pointer` header | link `/m/<id>` in the email              |
-| `FETCH CONTENT` + `isRecipient()`     | Firestore rules: verified recipient only |
-| `UPDATE CONTENT`                      | `saveEdition` (new edition, history kept)|
-| recipient needs ChiaraMail installed  | any browser, any device                  |
-
-Not carried over (deliberately): the IMAP/SMTP inbox, the spam filter and the
-category server.
+> **Option 1** (link-only, no mail client) is kept in git: branch `option-1`,
+> tag `v6-option1`. It is still live at https://chiaramail-app.web.app.
+> This version deploys to its own site, **chiaramail-mail.web.app**.
 
 ## Try it with no setup
 
@@ -36,94 +28,70 @@ npm install
 npm run dev:mock
 ```
 
-Test mode uses a stand-in backend in your browser. No Firebase is needed, and
-"sign-in links" sign you in immediately. Sign out and in as different addresses
-to play sender and recipient.
+Test mode simulates Gmail and ChiaraMail in your browser. Connect with any
+address (e.g. alice@example.com), send a changeable message to
+bob@example.com, sign out, connect as Bob, and so on.
 
-## Set up Firebase (one time)
+## One-time Google Cloud setup (for real Gmail)
 
-ChiaraMail web lives in the existing **ChiaraMail** project, `chiaramail-15119`,
-which is already on Blaze with a budget alert. That project also holds the old
-ChiaraMail pieces, which must keep working:
+All in the existing project **chiaramail-15119**, at https://console.cloud.google.com
+(pick the project at the top).
 
-- the **original website** (the chiaramail.com page with app links) on the
-  project's default Hosting site. The web app deploys to a **separate site,
-  `chiaramail-app`**, so it never touches that page.
-- the old Android app's **`users`** collection in Firestore. `firestore.rules`
-  keeps its original rule word for word, next to the new `messages` rules.
-- the Realtime Database, which this app doesn't use or deploy.
-
-Steps:
-
-1. **Authentication → Sign-in method.** Make sure **Google** is enabled, and
-   **Email/Password** with **Email link (passwordless sign-in)** turned on.
-2. **Settings → General → Your apps → Add app → Web.** Name it `chiaramail-web`
-   and leave "Firebase Hosting" unticked. Copy its config into `.env.local`
-   (see `.env.example`). For now, set
-   `VITE_PUBLIC_ORIGIN=https://chiaramail-app.web.app`.
-3. Log in and create the second Hosting site:
+1. **Enable the Gmail API.** APIs & Services → Library → search "Gmail API" →
+   Enable.
+2. **Consent screen** (Google Auth Platform → Branding / Audience / Data Access):
+   - Branding: app name **ChiaraMail**, your support email.
+   - Audience: **External**, leave it in **Testing**, and under **Test users**
+     add every Gmail address that should be able to use it (yours first, up to
+     100).
+   - Data Access → Add or remove scopes → tick
+     `https://www.googleapis.com/auth/gmail.modify` → Update → Save.
+3. **Allowed web addresses for sign-in.** APIs & Services → Credentials → OAuth
+   2.0 Client IDs → **Web client (auto created by Google Service)**. Under
+   **Authorized JavaScript origins** add:
+   - `https://chiaramail-mail.web.app`
+   - `http://localhost:5173` (for `npm run dev`)
+   - later, `https://app.chiaramail.com` if you put it there.
+   Save, and copy the **Client ID** into `.env.local` as `VITE_GOOGLE_CLIENT_ID`.
+4. **Firebase**: Authentication → Settings → Authorized domains → add
+   `chiaramail-mail.web.app`.
+5. **Second site and deploy:**
    ```
-   npx firebase login
-   npx firebase hosting:sites:create chiaramail-app
-   ```
-   (If that name is taken, pick another, and put it in `.firebaserc` in place of
-   `chiaramail-app`.)
-4. **Authentication → Settings → Authorized domains → Add domain:**
-   `chiaramail-app.web.app`.
-5. Test the rules (see below), then deploy:
-   ```
+   npx firebase hosting:sites:create chiaramail-mail
    npm run deploy
    ```
-   This deploys only the new site plus Firestore rules and indexes. The old
-   site and the Realtime Database are left alone.
-6. **app.chiaramail.com.** chiaramail.com keeps its existing page, so the app
-   gets a subdomain (like play.p3nto.com):
-   - Hosting → open the **chiaramail-app** site → **Add custom domain** →
-     `app.chiaramail.com`. Add the record(s) Firebase shows where
-     chiaramail.com's DNS is managed. Leave every other record, including any
-     MX (mail) records, as it is.
-   - Authentication → Settings → Authorized domains → add `app.chiaramail.com`.
-   - Set `VITE_PUBLIC_ORIGIN=https://app.chiaramail.com` in `.env.local`, then
-     `npm run deploy` again so message links use that address.
 
-**Note on the old `users` rule.** It is `allow read,write: if true`, so anyone
-on the internet can read or overwrite those device registrations. It is kept
-unchanged so as not to break the old Android app. If that app is retired,
-delete that block (or tighten it) and redeploy.
+While the app is in Testing, Google shows "Google hasn't verified this app" on
+the sign-in screen; test users click **Continue**. Opening it to everyone needs
+Google's verification of the restricted Gmail scope (and possibly a paid
+security assessment). That is only needed for the public, not for you and
+your testers.
 
-## Check the security rules
+Google's Gmail permission lasts about an hour per sign-in. After that,
+ChiaraMail asks you to click **Continue with Google** again (no password if
+you're already signed in to Google).
 
-`firestore.rules` is what keeps messages private. The tests in
-`tests/rules.test.js` cover: senders can't impersonate; only verified
-recipients can read (case-insensitive); outsiders can't read or list; only the
-sender can edit or withdraw; withdrawal is final; edition history is
-sender-only; read receipts can only be written by the reader. Run them (needs
-Java 11+, which the Firebase emulator uses):
+## Tests
 
-```
-npm run test:rules
-```
-
-## Other commands
-
-| Command              | What it does                                         |
-|----------------------|------------------------------------------------------|
-| `npm run dev`        | Local dev server against your real Firebase project  |
-| `npm run dev:mock`   | Local dev server in test mode                        |
-| `npm run lint`       | ESLint                                               |
-| `npm run build`      | Production build into `dist/`                        |
-| `node tests/e2e.mjs` | Browser walkthrough (after `npm run build:mock && npx vite preview`) |
+| Command | What it checks |
+|---|---|
+| `npm run test:unit` | building and reading MIME messages (accents, attachments, the ChiaraMail header) |
+| `npm run test:rules` | Firestore security rules (needs Java 21) |
+| `npm run build:mock`, `npx vite preview`, then `BASE=http://localhost:4173 node tests/e2e-mail.mjs shots` | full two-person walkthrough in a browser |
 
 ## Where things are
 
-- `src/backend/firebase.js`: all Firebase calls. `src/backend/mock.js` is the test-mode twin.
-- `src/components/`: screens (Landing, Home, Compose, MessagePage, Letter, SendPanel, SenderTools).
-- `src/i18n.jsx`: English and French text.
-- `firestore.rules`, `firestore.indexes.json`, `firebase.json`: Firebase config.
+- `src/gmail/mime.js` — build and parse email (pure, unit-tested)
+- `src/gmail/api.js` — Google sign-in token + Gmail REST API; `src/gmail/mock.js` is the test-mode twin
+- `src/mail/` — mail screens: layout & folders, thread list, thread view, safe HTML view, composer, `LiveMessage` (inline changeable text)
+- `src/backend/` — ChiaraMail's own storage (Firestore) and its test-mode twin
+- `src/components/MessagePage.jsx` — the web page a changeable message links to, for readers without ChiaraMail
+- `firestore.rules` — who may read and change changeable messages (also keeps the old Android app's `users` rule)
 
-Data model: `messages/{id}` holds `senderUid, senderEmail, senderName,
-recipients[], subject, body, createdAt, updatedAt, edition, withdrawn`. It has
-two subcollections: `editions/{n}`, visible to the sender only, and
-`reads/{email}`, the read receipts.
+## Not yet included
+
+Drafts, rich-text writing, applying labels, multi-select in lists, and
+non-Gmail accounts. HTML emails are shown with scripts removed and web images
+held back until you click "Show images".
 
 © The Fractal Images Company

@@ -1,7 +1,7 @@
 {
   "name": "chiaramail",
   "private": true,
-  "version": "6.0.0",
+  "version": "7.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,13 +10,16 @@
     "lint": "eslint src",
     "emulators": "firebase emulators:start --only auth,firestore --project demo-chiaramail",
     "test:rules": "firebase emulators:exec --only firestore --project demo-chiaramail \"node --test tests/rules.test.js\"",
-    "deploy": "npm run build && firebase deploy --only hosting:app,firestore:rules,firestore:indexes",
+    "deploy": "npm run build && firebase deploy --only hosting:mail,firestore:rules,firestore:indexes",
     "dev:mock": "vite --mode mock",
-    "build:mock": "vite build --mode mock"
+    "build:mock": "vite build --mode mock",
+    "test:unit": "node --test tests/mime.test.js",
+    "test:e2e": "npm run build:mock && echo \"Run: npx vite preview, then BASE=http://localhost:4173 node tests/e2e-mail.mjs shots\""
   },
   "dependencies": {
     "@fontsource-variable/literata": "^5.3.0",
     "@fontsource-variable/schibsted-grotesk": "^5.3.0",
+    "dompurify": "^3.4.16",
     "firebase": "^12.19.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
@@ -32,6 +35,7 @@
     "firebase-tools": "^15.32.1",
     "globals": "^17.13.0",
     "playwright": "^1.63.0",
+    "postal-mime": "^4.0.5",
     "vite": "^8.3.3"
   }
 }
