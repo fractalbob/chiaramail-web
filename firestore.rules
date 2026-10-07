@@ -1,0 +1,116 @@
+rules_version = '2';
+
+// ChiaraMail — the web successor of ChiaraMail 5.1's content server.
+// A message's text lives here, not in the email. Only the sender and the
+// listed recipients can read it (the old server's isRecipient() check),
+// and only the sender can change or withdraw it (UPDATE CONTENT).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    // A reader's address only counts once the sign-in provider has verified it
+    // (email-link and Google sign-in both do).
+    function verified() {
+      return signedIn()
+        && request.auth.token.email is string
+        && request.auth.token.email_verified == true;
+    }
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+    function isSender(data) {
+      return signedIn() && data.senderUid == request.auth.uid;
+    }
+    function isRecipient(data) {
+      return verified() && myEmail() in data.recipients;
+    }
+    function msg(id) {
+      return get(/databases/$(database)/documents/messages/$(id)).data;
+    }
+    // The message as it will be once the current batch commits — editions
+    // are written in the same batch as the message they belong to.
+    function msgAfter(id) {
+      return getAfter(/databases/$(database)/documents/messages/$(id)).data;
+    }
+
+    match /messages/{id} {
+      allow read: if isSender(resource.data) || isRecipient(resource.data);
+
+      allow create: if verified()
+        && request.resource.data.keys().hasOnly(
+             ['senderUid', 'senderEmail', 'senderName', 'recipients', 'subject',
+              'body', 'createdAt', 'updatedAt', 'edition', 'withdrawn'])
+        && request.resource.data.keys().hasAll(
+             ['senderUid', 'senderEmail', 'recipients', 'subject', 'body',
+              'createdAt', 'updatedAt', 'edition', 'withdrawn'])
+        && request.resource.data.senderUid == request.auth.uid
+        && request.resource.data.senderEmail == myEmail()
+        && (!('senderName' in request.resource.data)
+            || (request.resource.data.senderName is string
+                && request.resource.data.senderName.size() <= 120))
+        && request.resource.data.recipients is list
+        && request.resource.data.recipients.size() >= 1
+        && request.resource.data.recipients.size() <= 50
+        && request.resource.data.subject is string
+        && request.resource.data.subject.size() <= 300
+        && request.resource.data.body is string
+        && request.resource.data.body.size() >= 1
+        && request.resource.data.body.size() <= 100000
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.edition == 1
+        && request.resource.data.withdrawn == false;
+
+      // The sender may rewrite the subject and text (a new edition), or
+      // withdraw the message, which wipes its text for good. Recipients and
+      // authorship never change after sending.
+      allow update: if isSender(resource.data)
+        && resource.data.withdrawn == false
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['subject', 'body', 'updatedAt', 'edition', 'withdrawn'])
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.subject is string
+        && request.resource.data.subject.size() <= 300
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 100000
+        && (
+             (request.resource.data.withdrawn == false
+               && request.resource.data.body.size() >= 1
+               && request.resource.data.edition == resource.data.edition + 1)
+          || (request.resource.data.withdrawn == true
+               && request.resource.data.body == ''
+               && request.resource.data.edition == resource.data.edition)
+        );
+
+      allow delete: if isSender(resource.data);
+
+      // Every edition the sender saves is kept, for the sender's eyes only.
+      match /editions/{editionId} {
+        allow read: if isSender(msg(id));
+        allow create: if isSender(msgAfter(id))
+          && request.resource.data.keys().hasOnly(['edition', 'subject', 'body', 'savedAt'])
+          && request.resource.data.edition == msgAfter(id).edition
+          && editionId == string(msgAfter(id).edition)
+          && request.resource.data.subject is string
+          && request.resource.data.body is string
+          && request.resource.data.savedAt == request.time;
+        allow delete: if isSender(msg(id));
+      }
+
+      // Read receipts: each recipient records when they last opened the
+      // message and which edition they saw. The reader is told about this.
+      match /reads/{email} {
+        allow read: if isSender(msg(id))
+          || (verified() && email == myEmail());
+        allow create, update: if isRecipient(msg(id))
+          && email == myEmail()
+          && request.resource.data.keys().hasOnly(['lastReadAt', 'editionSeen'])
+          && request.resource.data.lastReadAt == request.time
+          && request.resource.data.editionSeen is int;
+        allow delete: if isSender(msg(id));
+      }
+    }
+  }
+}
