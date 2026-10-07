@@ -38,6 +38,8 @@ function Footer() {
       {gmail.mode === 'mock-gmail' && <p className="testmode">{t('testModeMail')}</p>}
       <p>
         ChiaraMail · The Fractal Images Company
+        <a className="footlink" href="/privacy.html">{t('privacy')}</a>
+        <a className="footlink" href="/terms.html">{t('terms')}</a>
         <button type="button" className="linklike" onClick={toggle}>{t('language')}</button>
       </p>
     </footer>
