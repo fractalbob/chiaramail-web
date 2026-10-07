@@ -9,7 +9,7 @@ function useList(kind, user) {
   const [state, setState] = useState({ kind: null, items: null, error: '' });
   useEffect(() => {
     const onItems = (items) => setState({ kind, items, error: '' });
-    const onErr = (e) => setState({ kind, items: null, error: e.message });
+    const onErr = (e) => setState({ kind, items: null, error: e.code === 'failed-precondition' ? 'indexBuilding' : e.message });
     return kind === 'sent'
       ? backend.watchSent(user.uid, onItems, onErr)
       : backend.watchReceived(user.email, onItems, onErr);
@@ -52,7 +52,8 @@ export default function Home() {
         ))}
       </div>
 
-      {error && <p className="error" role="alert">{t('errorGeneric', { msg: error })}</p>}
+      {error === 'indexBuilding' && <p className="notice" role="status">{t('indexBuilding')}</p>}
+      {error && error !== 'indexBuilding' && <p className="error" role="alert">{t('errorGeneric', { msg: error })}</p>}
       {!items && !error && <p className="loading">{t('loading')}</p>}
 
       {items && items.length === 0 && (
