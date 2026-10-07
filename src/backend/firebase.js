@@ -114,7 +114,7 @@ export function watchMessage(id, cb, onErr) {
   return onSnapshot(doc(messages, id), (s) => cb(s.exists() ? toMessage(s) : null), onErr);
 }
 
-export async function createMessage(user, { recipients, subject, body }) {
+export async function createMessage(user, { recipients, subject, body, allowForward = false }) {
   const ref = doc(messages);
   const batch = writeBatch(db);
   const data = {
@@ -127,6 +127,7 @@ export async function createMessage(user, { recipients, subject, body }) {
     updatedAt: serverTimestamp(),
     edition: 1,
     withdrawn: false,
+    allowForward: !!allowForward,
   };
   if (user.name) data.senderName = user.name.slice(0, 120);
   batch.set(ref, data);
@@ -143,6 +144,10 @@ export async function saveEdition(id, current, { subject, body }) {
   batch.set(doc(ref, 'editions', String(next)), { edition: next, subject, body, savedAt: serverTimestamp() });
   await batch.commit();
   return next;
+}
+
+export function setAllowForward(id, allow) {
+  return updateDoc(doc(messages, id), { allowForward: !!allow });
 }
 
 export function withdraw(id) {

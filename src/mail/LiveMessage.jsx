@@ -8,7 +8,7 @@ import PlainBody from './PlainBody.jsx';
 
 // The body of a ChiaraMail message: fetched live from ChiaraMail (the
 // original's FETCH CONTENT), editable in place by its sender (UPDATE CONTENT).
-export default function LiveMessage({ pointer, message, threadId }) {
+export default function LiveMessage({ pointer, message, threadId, onInfo }) {
   const { user } = useAuth();
   const { t, formatDate } = useI18n();
   const [loaded, setLoaded] = useState({ id: null });
@@ -19,6 +19,7 @@ export default function LiveMessage({ pointer, message, threadId }) {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const receiptFor = useRef(null);
+  const [fwdPending, setFwdPending] = useState(null); // { value, base } until the server confirms
 
   useEffect(() => backend.watchMessage(pointer,
     (d) => setLoaded(d ? { id: pointer, status: 'ok', data: d } : { id: pointer, status: 'missing' }),
@@ -30,6 +31,11 @@ export default function LiveMessage({ pointer, message, threadId }) {
   const lastSeen = seen.id === pointer ? seen.edition : null;
   const edition = d?.edition;
   const withdrawn = d?.withdrawn;
+
+  const allowForward = d?.allowForward === true;
+  useEffect(() => {
+    if (onInfo && d) onInfo({ isSender, allowForward, withdrawn: !!withdrawn });
+  }, [onInfo, d, isSender, allowForward, withdrawn]);
 
   // Readers: remember the edition they'd seen, then record this read.
   useEffect(() => {
@@ -121,6 +127,17 @@ export default function LiveMessage({ pointer, message, threadId }) {
               <button type="button" className="btn btn-primary" onClick={() => { setDraft(d.body); setEditing(true); setSaved(false); }}>{t('edit')}</button>
               <button type="button" className="btn btn-danger" onClick={withdraw}>{t('withdraw')}</button>
             </div>
+          )}
+          {!d.withdrawn && (
+            <label className="subtoggle">
+              <input type="checkbox" checked={fwdPending && fwdPending.base === allowForward ? fwdPending.value : allowForward}
+                onChange={(e) => {
+                  const value = e.target.checked;
+                  setFwdPending({ value, base: allowForward });
+                  backend.setAllowForward(pointer, value).catch((err) => { setFwdPending(null); setError(t('errorGeneric', { msg: err.message })); });
+                }} />
+              <span>{t('allowForwardSender')}</span>
+            </label>
           )}
           <details className="live-details">
             <summary>{t('readers')}</summary>

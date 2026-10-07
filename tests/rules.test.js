@@ -161,6 +161,18 @@ test('old ChiaraMail users/ collection keeps its original open rules', async () 
   await assertSucceeds(getDoc(doc(anon, 'users/device1')));
 });
 
+test('forwarding permission: set at sending, switched by the sender only', async () => {
+  await assertSucceeds(setDoc(doc(ctx(ALICE), 'messages/f1'), newMessage({ allowForward: false })));
+  await assertFails(setDoc(doc(ctx(ALICE), 'messages/f2'), newMessage({ allowForward: 'yes' })));
+  const ref = doc(ctx(ALICE), 'messages/f1');
+  await assertSucceeds(updateDoc(ref, { allowForward: true }));            // no new edition needed
+  await assertFails(updateDoc(ref, { allowForward: 1 }));
+  await assertFails(updateDoc(doc(ctx(BOB), 'messages/f1'), { allowForward: false }));
+  await assertFails(updateDoc(ref, { allowForward: false, body: 'sneaky' })); // can't slip an edit in
+  await assertSucceeds(updateDoc(ref, { withdrawn: true, body: '', updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(ref, { allowForward: false }));               // final once withdrawn
+});
+
 test('sender can delete the message', async () => {
   await seed();
   await assertSucceeds(deleteDoc(doc(ctx(ALICE), 'messages/m1')));

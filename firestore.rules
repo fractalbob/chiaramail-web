@@ -52,12 +52,14 @@ service cloud.firestore {
       allow create: if verified()
         && request.resource.data.keys().hasOnly(
              ['senderUid', 'senderEmail', 'senderName', 'recipients', 'subject',
-              'body', 'createdAt', 'updatedAt', 'edition', 'withdrawn'])
+              'body', 'createdAt', 'updatedAt', 'edition', 'withdrawn', 'allowForward'])
         && request.resource.data.keys().hasAll(
              ['senderUid', 'senderEmail', 'recipients', 'subject', 'body',
               'createdAt', 'updatedAt', 'edition', 'withdrawn'])
         && request.resource.data.senderUid == request.auth.uid
         && request.resource.data.senderEmail == myEmail()
+        && (!('allowForward' in request.resource.data)
+            || request.resource.data.allowForward is bool)
         && (!('senderName' in request.resource.data)
             || (request.resource.data.senderName is string
                 && request.resource.data.senderName.size() <= 120))
@@ -76,23 +78,28 @@ service cloud.firestore {
 
       // The sender may rewrite the subject and text (a new edition), or
       // withdraw the message, which wipes its text for good. Recipients and
-      // authorship never change after sending.
+      // authorship never change after sending. Separately, the sender may
+      // switch forwarding on or off without making a new edition.
       allow update: if isSender(resource.data)
         && resource.data.withdrawn == false
-        && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['subject', 'body', 'updatedAt', 'edition', 'withdrawn'])
-        && request.resource.data.updatedAt == request.time
-        && request.resource.data.subject is string
-        && request.resource.data.subject.size() <= 300
-        && request.resource.data.body is string
-        && request.resource.data.body.size() <= 100000
         && (
-             (request.resource.data.withdrawn == false
-               && request.resource.data.body.size() >= 1
-               && request.resource.data.edition == resource.data.edition + 1)
-          || (request.resource.data.withdrawn == true
-               && request.resource.data.body == ''
-               && request.resource.data.edition == resource.data.edition)
+             (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['allowForward'])
+               && request.resource.data.allowForward is bool)
+          || (request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['subject', 'body', 'updatedAt', 'edition', 'withdrawn'])
+               && request.resource.data.updatedAt == request.time
+               && request.resource.data.subject is string
+               && request.resource.data.subject.size() <= 300
+               && request.resource.data.body is string
+               && request.resource.data.body.size() <= 100000
+               && (
+                    (request.resource.data.withdrawn == false
+                      && request.resource.data.body.size() >= 1
+                      && request.resource.data.edition == resource.data.edition + 1)
+                 || (request.resource.data.withdrawn == true
+                      && request.resource.data.body == ''
+                      && request.resource.data.edition == resource.data.edition)
+               ))
         );
 
       allow delete: if isSender(resource.data);

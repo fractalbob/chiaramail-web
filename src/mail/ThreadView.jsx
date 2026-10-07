@@ -38,6 +38,8 @@ function Attachments({ message }) {
 
 function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
   const { t, formatDate } = useI18n();
+  const [live, setLive] = useState(null); // { isSender, allowForward, withdrawn } for changeable messages
+  const forwardBlocked = !!(m.pointer && live && !live.isSender && (live.withdrawn || !live.allowForward));
   const people = (list) => list.map((a) => (a.email.toLowerCase() === me ? t('me') : displayName(a))).join(', ');
   const replyBase = `/compose?thread=${threadId}&msg=${m.id}`;
   if (!expanded) {
@@ -66,15 +68,18 @@ function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
       </header>
       <div className="mbody">
         {m.pointer
-          ? <LiveMessage pointer={m.pointer} message={m} threadId={threadId} />
+          ? <LiveMessage pointer={m.pointer} message={m} threadId={threadId} onInfo={setLive} />
           : m.html ? <HtmlBody message={m} /> : <PlainBody text={m.text} />}
       </div>
       <Attachments message={m} />
       <div className="actions mactions">
         <Link className="btn" to={`${replyBase}&mode=reply`}>{t('reply')}</Link>
         {(m.to.length + m.cc.length > 1) && <Link className="btn" to={`${replyBase}&mode=replyAll`}>{t('replyAll')}</Link>}
-        <Link className="btn" to={`${replyBase}&mode=forward`}>{t('forward')}</Link>
+        {forwardBlocked
+          ? <button type="button" className="btn" disabled aria-describedby={`nofwd-${m.id}`}>{t('forward')}</button>
+          : <Link className="btn" to={`${replyBase}&mode=forward`}>{t('forward')}</Link>}
       </div>
+      {forwardBlocked && <p id={`nofwd-${m.id}`} className="help">{t('forwardBlocked')}</p>}
     </li>
   );
 }

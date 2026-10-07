@@ -90,7 +90,7 @@ export function watchMessage(id, cb, onErr) {
     cb(out(id, m));
   });
 }
-export async function createMessage(user, { recipients, subject, body }) {
+export async function createMessage(user, { recipients, subject, body, allowForward = false }) {
   await later();
   if (!me() || !me().verified || me().uid !== user.uid) throw denied();
   const db = load();
@@ -98,7 +98,7 @@ export async function createMessage(user, { recipients, subject, body }) {
   const now = Date.now();
   db.messages[id] = {
     senderUid: user.uid, senderEmail: user.email, senderName: user.name || '',
-    recipients, subject, body, createdAt: now, updatedAt: now, edition: 1, withdrawn: false,
+    recipients, subject, body, createdAt: now, updatedAt: now, edition: 1, withdrawn: false, allowForward: !!allowForward,
     editions: { 1: { edition: 1, subject, body, savedAt: now } }, reads: {},
   };
   save(db);
@@ -113,6 +113,13 @@ export async function saveEdition(id, current, { subject, body }) {
   m.editions[next] = { edition: next, subject, body, savedAt: now };
   save(db);
   return next;
+}
+export async function setAllowForward(id, allow) {
+  await later();
+  const db = load(); const m = db.messages[id];
+  if (!m || !isSender(m) || m.withdrawn) throw denied();
+  m.allowForward = !!allow;
+  save(db);
 }
 export async function withdraw(id) {
   await later();

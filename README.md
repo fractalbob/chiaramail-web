@@ -12,6 +12,10 @@ writing, and the text lives in ChiaraMail rather than in the email:
   read which edition, and every earlier edition.
 - Recipients without ChiaraMail get a short email with a link to the current
   version (they sign in with the address it was sent to).
+- **Forwarding** is off unless the sender ticks "Let recipients forward it"
+  (changeable at any time from the message). When it's off, recipients can't
+  forward it from ChiaraMail, and anyone they forward the email to can't open
+  the link. When it's on, a forward carries the text as it stood then.
 
 Your mail stays in Gmail: the browser talks to Google's Gmail API directly.
 ChiaraMail stores only the changeable messages (Firestore, project

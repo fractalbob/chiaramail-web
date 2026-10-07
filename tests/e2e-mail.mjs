@@ -75,6 +75,7 @@ await page.getByLabel('To', { exact: true }).fill('Bob <bob@example.com>, carol@
 await page.getByLabel('Subject', { exact: true }).fill('Committee meeting on Thursday');
 await page.getByLabel('Message', { exact: true }).fill('Hi both,\n\nThe committee meets on Thursday at 18:00 in the library.\n\nAlice');
 await must(page.getByLabel(/Changeable message/).isChecked(), 'changeable on by default for new mail');
+await must(!(await page.getByLabel(/Let recipients forward it/).isChecked()), 'forwarding off by default');
 await page.locator('input[type=file]').setInputFiles(`${SHOTS}/agenda.txt`);
 await shot('m04-compose');
 await send();
@@ -116,10 +117,25 @@ await send();
 await page.getByText('Thursday works for me.').waitFor();
 log('reply sent in the same conversation');
 
-// Bob forwards it to Dave (not a recipient)
+// Forwarding not allowed yet: Forward is greyed out on Alice's message
 await page.getByRole('link', { name: 'Back' }).click();
 await page.locator('.folder', { hasText: 'Inbox' }).click();
 await openRow('Committee meeting');
+await page.getByText('The sender doesn’t allow this message to be forwarded.').waitFor();
+await must(page.locator('.mcard').first().getByRole('button', { name: 'Forward' }).isDisabled(), 'forward disabled');
+log('forwarding blocked by default for recipients');
+
+// Alice allows forwarding
+await connectAs('alice@example.com');
+await openRow('Committee meeting');
+await page.getByLabel('Recipients may forward this message').check();
+await page.waitForTimeout(300);
+log('sender switches forwarding on');
+
+// Bob forwards it to Dave (not a recipient)
+await connectAs('bob@example.com');
+await openRow('Committee meeting');
+await must(!(await page.getByText('The sender doesn’t allow this message to be forwarded.').count()), 'forward now allowed');
 await page.getByRole('link', { name: 'Forward' }).first().click();
 await waitValue(page.getByLabel('Subject', { exact: true }), (v) => v.startsWith('Fwd:'), 'forward prefilled');
 await page.getByLabel('To', { exact: true }).fill('dave@example.com');

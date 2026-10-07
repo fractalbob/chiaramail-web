@@ -12,11 +12,11 @@ import { useMail } from './context.jsx';
 import { useI18n } from '../i18n.jsx';
 
 const MAX_TOTAL = 24 * 1024 * 1024;
-// The current text of a changeable message, if this reader may see it.
-const liveText = (pointer) => new Promise((resolve) => {
+// A changeable message as this reader may see it (null if they can't).
+const liveInfo = (pointer) => new Promise((resolve) => {
   let unsub = () => {};
   const done = (v) => { resolve(v); setTimeout(() => unsub(), 0); };
-  unsub = backend.watchMessage(pointer, (d) => done(d && !d.withdrawn ? d.body : null), () => done(null));
+  unsub = backend.watchMessage(pointer, (d) => done(d), () => done(null));
 });
 const fmtAddr = (a) => (a.name ? `${a.name} <${a.email}>` : a.email);
 const readFile = (file) => new Promise((resolve, reject) => {
@@ -46,6 +46,8 @@ export default function Composer() {
   const [body, setBody] = useState('');
   const [files, setFiles] = useState([]); // { name, type, size, file? , fwd? }
   const [changeable, setChangeable] = useState(mode === 'new' && !note);
+  const [allowFwd, setAllowFwd] = useState(false);
+  const [forwardBlocked, setForwardBlocked] = useState(false);
   const [orig, setOrig] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -59,8 +61,12 @@ export default function Composer() {
       const raw = th.messages.find((m) => m.id === msgParam) || th.messages[th.messages.length - 1];
       const m = parseMessage(raw);
       // Quote what the reader actually saw: the live text of a changeable message.
-      const current = m.pointer ? await liveText(m.pointer) : null;
+      const info = m.pointer ? await liveInfo(m.pointer) : null;
+      const current = info && !info.withdrawn ? info.body : null;
       if (!live) return;
+      if (mode === 'forward' && info && info.senderUid !== user.uid && (info.withdrawn || info.allowForward !== true)) {
+        setForwardBlocked(true);
+      }
       setOrig(m);
       const origText = current ?? (m.text || htmlToText(m.html));
       const notMe = (a) => a.email.toLowerCase() !== me;
@@ -120,7 +126,7 @@ export default function Composer() {
       if (changeable) {
         const recipients = [...new Set([...toL, ...ccL].map((a) => a.email.toLowerCase()))];
         if (recipients.length > 50) throw new Error(t('tooMany'));
-        pointer = await backend.createMessage(user, { recipients, subject: subject.trim(), body });
+        pointer = await backend.createMessage(user, { recipients, subject: subject.trim(), body, allowForward: allowFwd });
         headers[CONTENT_POINTER] = pointer;
         const link = messageUrl(pointer);
         text = `${t('liveFallback')}\n\n${link}\n\n${t('liveFallbackHint')}`;
@@ -190,6 +196,15 @@ export default function Composer() {
           <span className="help">{t('changeableHelp')}</span>
         </span>
       </label>
+      {changeable && (
+        <label className="subtoggle">
+          <input type="checkbox" checked={allowFwd} onChange={(e) => setAllowFwd(e.target.checked)} />
+          <span>
+            {t('allowForwardLabel')}
+            <span className="help">{t('allowForwardHelp')}</span>
+          </span>
+        </label>
+      )}
 
       <div className="field">
         <span className="field-label">{t('attachments')}</span>
@@ -210,9 +225,10 @@ export default function Composer() {
         </label>
       </div>
 
+      {forwardBlocked && <p className="error" role="alert">{t('forwardBlocked')}</p>}
       {error && <p className="error" role="alert">{error}</p>}
       <div className="actions">
-        <button type="submit" className="btn btn-primary" disabled={busy || preparing}>{busy ? t('sending') : preparing ? t('loading') : t('send')}</button>
+        <button type="submit" className="btn btn-primary" disabled={busy || preparing || forwardBlocked}>{busy ? t('sending') : preparing ? t('loading') : t('send')}</button>
         <button type="button" className="btn btn-quiet" onClick={() => nav(-1)}>{t('discard')}</button>
       </div>
     </form>
