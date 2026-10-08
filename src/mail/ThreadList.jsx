@@ -26,16 +26,16 @@ export default function ThreadList() {
   }, [folder, q, pages, key, mail.account]);
 
   const load = useCallback((silent) => fetchPage().then(setState).catch((e) => {
-    if (!handle(e) && !silent) setState({ key, rows: null, next: null, error: e.message });
-  }), [fetchPage, handle, key]);
+    if (!handle(e) && !silent) setState({ key, rows: null, next: null, error: e.code === 'rate-limit' ? t('rateLimited') : e.message });
+  }), [fetchPage, handle, key, t]);
 
   useEffect(() => {
     let live = true;
     fetchPage().then((r) => { if (live) setState(r); }).catch((e) => {
-      if (live && !handle(e)) setState({ key, rows: null, next: null, error: e.message });
+      if (live && !handle(e)) setState({ key, rows: null, next: null, error: e.code === 'rate-limit' ? t('rateLimited') : e.message });
     });
     return () => { live = false; };
-  }, [fetchPage, handle, key]);
+  }, [fetchPage, handle, key, t]);
   // New mail: refresh the first page every minute.
   useEffect(() => {
     if (pages.length > 1) return;
@@ -66,7 +66,7 @@ export default function ThreadList() {
           <button type="button" className="btn btn-quiet" disabled={!state.next || state.key !== key} onClick={() => setPages([...pages, state.next])}>{t('older')}</button>
         </div>
       </div>
-      {state.error && state.key === key && <p className="error" role="alert">{t('errorGeneric', { msg: state.error })}</p>}
+      {state.error && state.key === key && <p className="error" role="alert">{state.error === t('rateLimited') ? state.error : t('errorGeneric', { msg: state.error })}</p>}
       {!rows && !(state.error && state.key === key) && <p className="loading">{t('loading')}</p>}
       {rows && rows.length === 0 && <p className="empty">{q ? t('noResults') : t('emptyFolder')}</p>}
       {rows && rows.length > 0 && (

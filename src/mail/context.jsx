@@ -36,7 +36,10 @@ export function MailProvider({ children }) {
   // Build the recipient suggestions in the background as soon as Gmail is
   // connected, so they're ready by the time someone writes a message.
   useEffect(() => {
-    if (status === 'connected' && account) refreshContacts(account.toLowerCase()).catch(() => {});
+    if (status !== 'connected' || !account) return;
+    // Let the inbox load first.
+    const t = setTimeout(() => refreshContacts(account.toLowerCase()).catch(() => {}), 8000);
+    return () => clearTimeout(t);
   }, [status, account]);
 
   useEffect(() => {

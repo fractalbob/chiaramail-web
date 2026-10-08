@@ -5,7 +5,7 @@ import * as gmail from '@gmail';
 import { headerMap, parseAddressList } from '../gmail/mime.js';
 
 const KEY = (me) => `chiaramail.contacts.${me}`;
-const MAX_AGE = 6 * 3600 * 1000;
+const MAX_AGE = 24 * 3600 * 1000; // rebuilt at most once a day
 
 function load(me) {
   try { return JSON.parse(localStorage.getItem(KEY(me))) || { at: 0, people: {} }; } catch { return { at: 0, people: {} }; }
@@ -41,8 +41,8 @@ async function build(me) {
   const book = load(me);
   const people = {};
   const [sent, received] = await Promise.all([
-    gmail.recentAddresses('in:sent', 150),
-    gmail.recentAddresses('in:inbox -category:promotions -category:social', 100),
+    gmail.recentAddresses('in:sent', 80),
+    gmail.recentAddresses('in:inbox -category:promotions -category:social', 40),
   ]);
   sent.forEach(({ date, headers }) => {
     const h = headerMap(headers);

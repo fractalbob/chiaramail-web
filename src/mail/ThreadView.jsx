@@ -126,7 +126,7 @@ export default function ThreadView() {
   const { handle, refreshCounts } = mail;
 
   const fetchThread = useCallback(() => gmail.getThread(threadId).then((th) => ({ id: threadId, msgs: th.messages.map(parseMessage) })), [threadId]);
-  const fail = useCallback((e) => (handle(e) ? null : { id: threadId, error: e.status === 404 ? t('threadGone') : e.message }), [handle, threadId, t]);
+  const fail = useCallback((e) => (handle(e) ? null : { id: threadId, error: e.status === 404 ? t('threadGone') : e.code === 'rate-limit' ? t('rateLimited') : e.message }), [handle, threadId, t]);
   const load = useCallback(() => fetchThread().then(setState).catch((e) => { const s = fail(e); if (s) setState(s); }), [fetchThread, fail]);
 
   useEffect(() => {

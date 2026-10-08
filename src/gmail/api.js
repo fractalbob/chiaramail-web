@@ -81,7 +81,23 @@ export async function disconnect() {
   await backend.signOut();
 }
 
-async function call(path, { method = 'GET', query, body, url } = {}) {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Google limits how much an app may read per user per minute. When it says
+// "slow down", wait and try again a few times before giving up.
+const isRateLimit = (status, msg) => status === 429 || (status === 403 && /rate ?limit|quota/i.test(msg || ''));
+
+async function call(path, opts = {}) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await callOnce(path, opts);
+    } catch (e) {
+      if (!e.rateLimited || attempt >= 4) throw e;
+      await sleep(2000 * 2 ** attempt + Math.random() * 1000); // 2s, 4s, 8s, 16s
+    }
+  }
+}
+
+async function callOnce(path, { method = 'GET', query, body, url } = {}) {
   if (!token || token.expiresAt < Date.now() + 30_000) throw reconnectError();
   const u = new URL(url || BASE + path);
   if (query) Object.entries(query).forEach(([k, v]) => {
@@ -100,7 +116,7 @@ async function call(path, { method = 'GET', query, body, url } = {}) {
   if (!res.ok) {
     let msg = res.statusText;
     try { msg = (await res.json()).error.message; } catch { /* ignore */ }
-    throw Object.assign(new Error(msg), { status: res.status });
+    throw Object.assign(new Error(msg), { status: res.status, rateLimited: isRateLimit(res.status, msg), code: isRateLimit(res.status, msg) ? 'rate-limit' : undefined });
   }
   return res.status === 204 ? null : res.json();
 }
@@ -131,7 +147,8 @@ export const getThread = (id) => call(`/threads/${id}`, { query: { format: 'full
 export async function recentAddresses(q, max) {
   const r = await call('/messages', { query: { q, maxResults: max } });
   const ids = (r.messages || []).map((m) => m.id);
-  return mapLimit(ids, 6, (id) => call(`/messages/${id}`, { query: { format: 'metadata', metadataHeaders: ['From', 'To', 'Cc', 'Bcc'] } }))
+  // Gently: two at a time, so building suggestions never crowds out reading mail.
+  return mapLimit(ids, 2, (id) => call(`/messages/${id}`, { query: { format: 'metadata', metadataHeaders: ['From', 'To', 'Cc', 'Bcc'] } }))
     .then((msgs) => msgs.map((m) => ({ date: Number(m.internalDate), headers: m.payload?.headers || [] })));
 }
 export async function getAttachment(messageId, attachmentId) {
