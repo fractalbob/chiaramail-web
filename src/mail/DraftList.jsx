@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import * as gmail from '@gmail';
-import { headerMap, parseAddressList, displayName } from '../gmail/mime.js';
+import { headerMap, parseAddressList, displayName, decodeEntities } from '../gmail/mime.js';
 import { useMail } from './context.jsx';
 import { useI18n } from '../i18n.jsx';
 
@@ -24,7 +24,7 @@ export default function DraftList() {
         id: d.id,
         to: to.map(displayName).join(', '),
         subject: h.subject || '',
-        snippet: d.message?.snippet || '',
+        snippet: decodeEntities(d.message?.snippet),
         date: d.message?.internalDate ? new Date(Number(d.message.internalDate)) : null,
       };
     });

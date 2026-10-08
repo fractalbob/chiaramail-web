@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import PostalMime from 'postal-mime';
 import {
   buildRaw, parseAddressList, parseMessage, summarize, toB64url, utf8ToB64,
-  replySubject, forwardSubject, htmlToText, CONTENT_POINTER,
+  replySubject, forwardSubject, htmlToText, CONTENT_POINTER, decodeEntities,
 } from '../src/gmail/mime.js';
 
 test('parseAddressList handles names, quotes and separators', () => {
@@ -100,4 +100,11 @@ test('subject prefixes and html to text', () => {
   assert.equal(replySubject('RE: Plans'), 'RE: Plans');
   assert.equal(forwardSubject('Plans'), 'Fwd: Plans');
   assert.equal(htmlToText('<p>One</p><p>Two &amp; three</p>'), 'One\nTwo & three');
+});
+
+test('decodeEntities turns Gmail snippet codes back into characters', () => {
+  assert.equal(decodeEntities('I&#39;ll send it &amp; then &quot;call&quot; &lt;you&gt;'), 'I\'ll send it & then "call" <you>');
+  assert.equal(decodeEntities('caf&#xE9; &#8364;5 &apos;ok&apos;'), 'café €5 \'ok\'');
+  assert.equal(decodeEntities('&amp;#39; stays literal'), '&#39; stays literal');
+  assert.equal(decodeEntities(undefined), '');
 });

@@ -240,9 +240,13 @@ export function summarize(thread, me) {
 }
 const hasAttachment = (p) => !!p && ((p.filename && p.filename.length > 0) || (p.parts || []).some(hasAttachment));
 
-function decodeEntities(s) {
-  return s.replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+// Gmail's snippets are HTML-escaped (&#39; for an apostrophe, &amp; and so on).
+const NAMED = { quot: '"', apos: "'", lt: '<', gt: '>', nbsp: '\u00a0', amp: '&' };
+export function decodeEntities(s) {
+  return (s || '')
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&(quot|apos|lt|gt|nbsp|amp);/g, (_, k) => NAMED[k]);
 }
 
 // ---- replies and forwards ------------------------------------------------------
