@@ -23,10 +23,22 @@ function note(people, a, kind, date, me) {
   p.last = Math.max(p.last, date || 0);
 }
 
+// One build at a time per account: the mailbox starts it on connect, and the
+// composer joins it instead of starting another.
+const inflight = new Map();
+
 /** Refreshes the address book from Gmail if it's stale; returns the list. */
-export async function refreshContacts(me, force = false) {
+export function refreshContacts(me, force = false) {
   const book = load(me);
-  if (!force && Date.now() - book.at < MAX_AGE && Object.keys(book.people).length) return Object.values(book.people);
+  if (!force && Date.now() - book.at < MAX_AGE && Object.keys(book.people).length) return Promise.resolve(Object.values(book.people));
+  if (!inflight.has(me)) {
+    inflight.set(me, build(me).finally(() => inflight.delete(me)));
+  }
+  return inflight.get(me);
+}
+
+async function build(me) {
+  const book = load(me);
   const people = {};
   const [sent, received] = await Promise.all([
     gmail.recentAddresses('in:sent', 150),

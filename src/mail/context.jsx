@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as gmail from '@gmail';
 import * as backend from '@backend';
+import { refreshContacts } from './contacts.js';
 import { useAuth } from '../auth.jsx';
 
 const MailCtx = createContext(null);
@@ -31,6 +32,12 @@ export function MailProvider({ children }) {
   useEffect(() => {
     if (status === 'connected') backend.registerEcsUser(user);
   }, [status, user]);
+
+  // Build the recipient suggestions in the background as soon as Gmail is
+  // connected, so they're ready by the time someone writes a message.
+  useEffect(() => {
+    if (status === 'connected' && account) refreshContacts(account.toLowerCase()).catch(() => {});
+  }, [status, account]);
 
   useEffect(() => {
     if (status !== 'connected') return;
