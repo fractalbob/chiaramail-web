@@ -249,3 +249,12 @@ test('old content/ folder keeps its rule; it opens nothing else', async () => {
   await seedWithFile();
   await assertFails(store(EVE).ref('ecs/m1/0').getMetadata());
 });
+
+test('encrypted messages: enc flag must be 1 and can never change', async () => {
+  const db = ctx(ALICE);
+  const sealed = 'e1.' + 'A'.repeat(1200);
+  await assertSucceeds(setDoc(doc(db, 'messages/e1'), newMessage({ enc: 1, subject: sealed.slice(0, 900), body: sealed })));
+  await assertFails(setDoc(doc(db, 'messages/e2'), newMessage({ enc: 2 })));
+  await assertFails(setDoc(doc(db, 'messages/e3'), newMessage({ enc: true })));
+  await assertFails(updateDoc(doc(db, 'messages/e1'), { enc: 0 }));
+});

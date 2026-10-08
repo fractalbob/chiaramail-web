@@ -3,7 +3,7 @@ import { toParagraphs } from '../lib.js';
 import EcsAttachments from './EcsAttachments.jsx';
 
 // An ECS message, set like a letter, with its edition mark.
-export default function Letter({ message, myEmail, banner }) {
+export default function Letter({ message, myEmail, banner, ecsKey }) {
   const { t, formatDate } = useI18n();
   const m = message;
   const recips = m.recipients.map((e) => (e === myEmail ? `${e} (${t('you')})` : e)).join(', ');
@@ -40,7 +40,7 @@ export default function Letter({ message, myEmail, banner }) {
           ))}
         </div>
       )}
-      <EcsAttachments id={m.id} message={m} />
+      <EcsAttachments id={m.id} message={m} ecsKey={ecsKey} />
     </article>
   );
 }

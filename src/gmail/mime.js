@@ -2,6 +2,8 @@
 // so they're unit-tested in tests/mime.test.js.
 
 export const CONTENT_POINTER = 'X-ChiaraMail-Content-Pointer';
+// The ECS message's decryption key travels with the envelope (see src/ecsCrypto.js).
+export const CONTENT_KEY = 'X-ChiaraMail-Content-Key';
 
 // ---- base64 / base64url over UTF-8 ----------------------------------------
 
@@ -174,6 +176,7 @@ export function parseMessage(msg) {
     messageId: h['message-id'] || '',
     references: h.references || '',
     pointer: (h[CONTENT_POINTER.toLowerCase()] || '').trim() || null,
+    key: (h[CONTENT_KEY.toLowerCase()] || '').trim() || null,
     inReplyTo: h['in-reply-to'] || '',
     headers: h,
     text: '',

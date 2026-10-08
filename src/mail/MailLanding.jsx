@@ -26,6 +26,16 @@ export default function MailLanding() {
       <div className="signin">
         <h2 className="signin-title">{reconnecting ? t('reconnectTitle') : t('connectTitle')}</h2>
         <p className="help">{reconnecting ? t('reconnectHelp', { email: user.email }) : t('connectHelp')}</p>
+        {!reconnecting && (
+          <div className="before">
+            <h3 className="before-title">{t('beforeTitle')}</h3>
+            <ul>
+              <li>{t('before1')}</li>
+              <li>{t('before2')}</li>
+              <li>{t('before3')}</li>
+            </ul>
+          </div>
+        )}
         {isMock ? (
           <form className="signin-form" onSubmit={(e) => { e.preventDefault(); mail.connect(testAddr); }}>
             <label htmlFor="test-addr">{t('testAddress')}</label>

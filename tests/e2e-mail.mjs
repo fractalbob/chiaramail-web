@@ -33,6 +33,28 @@ const send = async () => {
   await page.locator('.mcard').first().waitFor();
 };
 const openRow = (text) => page.locator('.trow-link', { hasText: text }).first().click();
+// The pointer an ECS email with this subject carries, read from the test-mode mailbox.
+const pointerFor = (subject) => page.evaluate((subj) => {
+  const s = JSON.parse(localStorage.getItem('chiaramail.mock.gmail'));
+  for (const box of Object.values(s.boxes)) {
+    for (const m of Object.values(box.messages)) {
+      const h = Object.fromEntries(m.payload.headers.map((x) => [x.name.toLowerCase(), x.value]));
+      if (h.subject === subj && h['x-chiaramail-content-pointer']) return h['x-chiaramail-content-pointer'];
+    }
+  }
+  return null;
+}, subject);
+// The decryption key an ECS email carries, read from the test-mode mailbox.
+const keyFor = (ptr) => page.evaluate((p) => {
+  const s = JSON.parse(localStorage.getItem('chiaramail.mock.gmail'));
+  for (const box of Object.values(s.boxes)) {
+    for (const m of Object.values(box.messages)) {
+      const h = Object.fromEntries(m.payload.headers.map((x) => [x.name.toLowerCase(), x.value]));
+      if (h['x-chiaramail-content-pointer'] === p && h['x-chiaramail-content-key']) return h['x-chiaramail-content-key'];
+    }
+  }
+  return null;
+}, ptr);
 
 // ---- landing
 await page.goto(BASE + '/');
@@ -157,6 +179,12 @@ await must((await page.getByRole('button', { name: /agenda\.txt/ }).count()) ===
 const mailbox = await page.evaluate(() => localStorage.getItem('chiaramail.mock.gmail'));
 await must(!mailbox.includes('agenda.txt') && !mailbox.includes('Ordre du jour') && !mailbox.includes('T3JkcmUgZHUgam91c'), 'attachment not in the email');
 log('ECS message sent; sender sees live block with Edit and the stored attachment');
+const stored = await page.evaluate(() => (localStorage.getItem('chiaramail.mock.db') || '') + (localStorage.getItem('chiaramail.mock.files') || ''));
+for (const plain of ['committee meets', 'Committee meeting', 'agenda.txt', 'text/plain', 'T3JkcmUgZHUgam91c']) {
+  await must(!stored.includes(plain), `stored data must not contain "${plain}"`);
+}
+await must(stored.includes('"enc":1'), 'message marked as encrypted');
+log('ChiaraMail stores only ciphertext: no text, subject, file name, type or file content');
 
 // and an ordinary message
 await page.getByRole('link', { name: 'Compose' }).click();
@@ -266,6 +294,10 @@ await page.getByText('Edition 2 saved.').waitFor();
 await page.getByText('Edition 2', { exact: true }).waitFor();
 await shot('m07-alice-edited');
 log('sender edits in place → edition 2');
+await page.locator('.live-details summary', { hasText: 'Editions' }).click();
+await page.locator('.editions summary', { hasText: 'Edition 1' }).click();
+await page.locator('.editions').getByText('The committee meets on Thursday').waitFor();
+log('edition history decrypts for the sender');
 
 // ---- Bob sees the update
 await connectAs('bob@example.com');
@@ -289,9 +321,10 @@ await must(!(await page.getByText('Change of plan').count()), 'outsider must not
 await must(!(await page.locator('.live-block').count()), 'forward is an ordinary email');
 await page.getByRole('button', { name: /agenda\.txt/ }).waitFor();
 log('forward carries the stored attachment as a normal one');
-const pointer = await page.evaluate(() => Object.entries(JSON.parse(localStorage.getItem('chiaramail.mock.db')).messages)
-  .find(([, m]) => m.subject === 'Committee meeting on Thursday')[0]);
+const pointer = await pointerFor('Committee meeting on Thursday');
 const fallbackHref = `${BASE}/m/${pointer}`;
+const ecsKey = await keyFor(pointer);
+await must(ecsKey && ecsKey.length === 43, 'the email carries the key');
 await page.goto(fallbackHref);
 await page.getByText('This message isn’t addressed to dave@example.com.').waitFor();
 await must(!(await page.getByText('Change of plan').count()), 'outsider blocked on the web page too');
@@ -300,6 +333,10 @@ log('forwarded copy holds the text as forwarded; later edits and the live page s
 // fallback web page for a recipient (Carol) without ChiaraMail inbox view
 await connectAs('carol@example.com');
 await page.goto(fallbackHref);
+await page.getByText('This ECS message is encrypted. Open it with the “Read the message” button').waitFor();
+await must(!(await page.getByText('Change of plan').count()), 'no key, no content');
+log('web page without the key: content stays locked');
+await page.goto(`${fallbackHref}#k=${ecsKey}`);
 await page.getByText('Change of plan').waitFor();
 const [webDl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: /agenda\.txt/ }).click()]);
 await must(webDl.suggestedFilename() === 'agenda.txt', 'attachment on the web page');
@@ -313,12 +350,12 @@ await page.getByLabel('To', { exact: true }).fill('bob@example.com');
 await page.getByLabel('Subject', { exact: true }).fill('Hello from Eve');
 await page.getByLabel('Message', { exact: true }).fill('Please update your bank details here: https://evil.example');
 await send();
-const evePtr = await page.evaluate(() => Object.entries(JSON.parse(localStorage.getItem('chiaramail.mock.db')).messages)
-  .find(([, m]) => m.subject === 'Hello from Eve')[0]);
-await page.evaluate((ptr) => window.__mockGmail.sendRaw([
+const evePtr = await pointerFor('Hello from Eve');
+const eveKey = await keyFor(evePtr);
+await page.evaluate(([ptr, key]) => window.__mockGmail.sendRaw([
   'From: Alice <alice@example.com>', 'To: bob@example.com', 'Subject: Urgent: new bank details',
-  `X-ChiaraMail-Content-Pointer: ${ptr}`, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', '', 'Read the message in ChiaraMail.', '',
-].join('\r\n')), evePtr);
+  `X-ChiaraMail-Content-Pointer: ${ptr}`, `X-ChiaraMail-Content-Key: ${key}`, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', '', 'Read the message in ChiaraMail.', '',
+].join('\r\n')), [evePtr, eveKey]);
 await connectAs('bob@example.com');
 const forged = page.locator('.trow', { hasText: 'Urgent: new bank details' });
 await forged.locator('.subj-spoof').waitFor();

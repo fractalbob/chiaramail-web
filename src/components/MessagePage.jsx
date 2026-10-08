@@ -7,6 +7,8 @@ import Letter from './Letter.jsx';
 import SendPanel from './SendPanel.jsx';
 import SenderTools from './SenderTools.jsx';
 import SignIn from './SignIn.jsx';
+import { watchEcs } from '../ecs.js';
+import { keyFor } from '../ecsKeys.js';
 
 function Notice({ children }) {
   return <div className="notice">{children}</div>;
@@ -21,13 +23,19 @@ export default function MessagePage() {
   const [loaded, setLoaded] = useState({ id: null });
   const [seenState, setSeenState] = useState({ id: null, edition: null }); // edition seen before this visit
   const receiptLoadedFor = useRef(null);
+  const [key, setKey] = useState(() => keyFor(id)); // from the link's #k=…, kept across sign-in
+  useEffect(() => {
+    const onHash = () => setKey(keyFor(id));
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, [id]);
 
   useEffect(() => {
     if (!user) return;
-    return backend.watchMessage(id,
+    return watchEcs(id, key,
       (m) => setLoaded(m ? { id, status: 'ok', message: m } : { id, status: 'missing' }),
       (e) => setLoaded(e.code === 'permission-denied' ? { id, status: 'denied' } : { id, status: 'error', error: e.message }));
-  }, [id, user]);
+  }, [id, user, key]);
 
   const state = loaded.id === id ? loaded : { status: 'loading' };
   const lastSeen = seenState.id === id ? seenState.edition : null;
@@ -104,11 +112,12 @@ export default function MessagePage() {
       )}
       <div className="reading-grid">
         <div>
-          <Letter message={m} myEmail={user.email} banner={updatedBanner} />
+          {m.locked && !m.withdrawn && <Notice><p>{t('ecsLockedWeb')}</p></Notice>}
+          <Letter message={m} myEmail={user.email} banner={updatedBanner} ecsKey={key} />
           {withdrawnNote}
           {!isSender && !m.withdrawn && <p className="fineprint">{t('readNotice')}</p>}
         </div>
-        {isSender && <SenderTools message={m} onSendLink={() => { setParams({ send: 'new' }); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
+        {isSender && <SenderTools message={m} ecsKey={key} onSendLink={() => { setParams({ send: 'new' }); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
       </div>
     </div>
   );

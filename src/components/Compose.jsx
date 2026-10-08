@@ -4,6 +4,8 @@ import * as backend from '@backend';
 import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
 import { parseRecipients } from '../lib.js';
+import { watchEcs, saveEcsEdition } from '../ecs.js';
+import { keyFor } from '../ecsKeys.js';
 
 export default function Compose({ editing = false }) {
   const { user } = useAuth();
@@ -20,8 +22,8 @@ export default function Compose({ editing = false }) {
   useEffect(() => {
     if (!editing) return;
     let first = true;
-    return backend.watchMessage(id, (m) => {
-      if (!m || m.senderUid !== user.uid || m.withdrawn) { nav(`/m/${id}`, { replace: true }); return; }
+    return watchEcs(id, keyFor(id), (m) => {
+      if (!m || m.senderUid !== user.uid || m.withdrawn || m.locked) { nav(`/m/${id}`, { replace: true }); return; }
       setOriginal(m);
       if (first) { setSubject(m.subject); setBody(m.body); first = false; }
     }, () => nav(`/m/${id}`, { replace: true }));
@@ -35,7 +37,7 @@ export default function Compose({ editing = false }) {
       if (editing) {
         if (!original) return;
         setBusy(true);
-        await backend.saveEdition(id, original, { subject: subject.trim(), body });
+        await saveEcsEdition(id, original, { subject: subject.trim(), body }, keyFor(id));
         nav(`/m/${id}?send=updated`);
       } else {
         const { good, bad } = parseRecipients(to);

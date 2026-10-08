@@ -110,3 +110,21 @@ test('decodeEntities turns Gmail snippet codes back into characters', () => {
   assert.equal(decodeEntities('&amp;#39; stays literal'), '&#39; stays literal');
   assert.equal(decodeEntities(undefined), '');
 });
+
+test('ECS encryption round-trips text and bytes; wrong or missing key fails', async () => {
+  const { newKey, isKey, encryptText, decryptText, encryptBytes, decryptBytes, isEncrypted } = await import('../src/ecsCrypto.js');
+  const k = newKey();
+  assert.ok(isKey(k));
+  const c = await encryptText(k, 'Héllo — ECS ✉');
+  assert.ok(isEncrypted(c));
+  assert.ok(!c.includes('llo'));
+  assert.equal(await decryptText(k, c), 'Héllo — ECS ✉');
+  assert.notEqual(await encryptText(k, 'same'), await encryptText(k, 'same')); // fresh IV each time
+  assert.equal(await decryptText(k, 'plain old text'), 'plain old text');
+  await assert.rejects(decryptText(newKey(), c));
+  await assert.rejects(decryptText(undefined, c));
+  const bytes = new Uint8Array([1, 2, 3, 250]);
+  const eb = await encryptBytes(k, bytes);
+  assert.equal(eb.length, bytes.length + 12 + 16);
+  assert.deepEqual(await decryptBytes(k, eb), bytes);
+});

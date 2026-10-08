@@ -6,6 +6,7 @@ import { useI18n } from '../i18n.jsx';
 import { Readers, Editions } from '../components/SenderTools.jsx';
 import PlainBody from './PlainBody.jsx';
 import EcsAttachments from '../components/EcsAttachments.jsx';
+import { watchEcs, saveEcsEdition } from '../ecs.js';
 
 // The content of an ECS message (body and attachments): fetched live from
 // ChiaraMail (the original's FETCH CONTENT), editable in place by its sender
@@ -23,9 +24,10 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
   const receiptFor = useRef(null);
   const [fwdPending, setFwdPending] = useState(null); // { value, base } until the server confirms
 
-  useEffect(() => backend.watchMessage(pointer,
+  const key = message.key;
+  useEffect(() => watchEcs(pointer, key,
     (d) => setLoaded(d ? { id: pointer, status: 'ok', data: d } : { id: pointer, status: 'missing' }),
-    (e) => setLoaded({ id: pointer, status: e.code === 'permission-denied' ? 'denied' : 'error', error: e.message })), [pointer]);
+    (e) => setLoaded({ id: pointer, status: e.code === 'permission-denied' ? 'denied' : 'error', error: e.message })), [pointer, key]);
 
   const state = loaded.id === pointer ? loaded : { status: 'loading' };
   const d = state.data;
@@ -72,7 +74,7 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
   const save = async () => {
     if (!draft.trim()) return setError(t('needBody'));
     setBusy(true); setError('');
-    try { await backend.saveEdition(pointer, d, { subject: d.subject, body: draft }); setEditing(false); setSaved(true); } catch (e) { setError(t('errorGeneric', { msg: e.message })); } finally { setBusy(false); }
+    try { await saveEcsEdition(pointer, d, { subject: d.subject, body: draft }, key); setEditing(false); setSaved(true); } catch (e) { setError(t('errorGeneric', { msg: e.message })); } finally { setBusy(false); }
   };
   const withdraw = async () => {
     if (!window.confirm(t('withdrawConfirm'))) return;
@@ -108,7 +110,9 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
         </p>
       )}
 
-      {d.withdrawn ? (
+      {d.locked && !d.withdrawn ? (
+        <p className="notice">{t('ecsLocked')}</p>
+      ) : d.withdrawn ? (
         <p className="notice">{isSender ? t('withdrawnMine', { date: formatDate(d.updatedAt) }) : t('withdrawnBy', { name: d.senderName || d.senderEmail, date: formatDate(d.updatedAt) })}</p>
       ) : editing ? (
         <div className="live-edit">
@@ -123,7 +127,7 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
       ) : (
         <div className="letter-body live-body"><PlainBody text={d.body} /></div>
       )}
-      <EcsAttachments id={pointer} message={d} />
+      {!d.locked && <EcsAttachments id={pointer} message={d} ecsKey={key} />}
 
       {!isSender && !d.withdrawn && <p className="fineprint">{t('readNotice')}</p>}
 
@@ -137,7 +141,7 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
           )}
           {!d.withdrawn && !editing && (
             <div className="actions">
-              <button type="button" className="btn btn-primary" onClick={() => { setDraft(d.body); setEditing(true); setSaved(false); }}>{t('edit')}</button>
+              {!d.locked && <button type="button" className="btn btn-primary" onClick={() => { setDraft(d.body); setEditing(true); setSaved(false); }}>{t('edit')}</button>}
               <button type="button" className="btn btn-danger" onClick={withdraw}>{t('withdraw')}</button>
             </div>
           )}
@@ -159,7 +163,7 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
           {!d.withdrawn && (
             <details className="live-details">
               <summary>{t('history')}</summary>
-              <Editions message={{ ...d, id: pointer }} />
+              <Editions message={{ ...d, id: pointer }} ecsKey={key} />
             </details>
           )}
         </div>

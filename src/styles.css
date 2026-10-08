@@ -438,3 +438,8 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 }
 .spoof-alert p { margin: 0; }
 .spoof-alert .notice-lead { font-weight: 600; margin-bottom: 4px; }
+
+/* What happens when you connect — shown before Google's consent screen */
+.before { margin: 4px 0 14px; padding: 12px 14px; border-radius: var(--radius-s); background: var(--sky); font-size: 0.9375rem; }
+.before-title { margin: 0 0 6px; font: 600 0.9375rem/1.3 var(--sans); }
+.before ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }

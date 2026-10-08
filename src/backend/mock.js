@@ -90,7 +90,7 @@ export function watchMessage(id, cb, onErr) {
     cb(out(id, m));
   });
 }
-export async function createMessage(user, { recipients, subject, body, allowForward = false, attachments = [] }) {
+export async function createMessage(user, { recipients, subject, body, allowForward = false, attachments = [], enc = 0 }) {
   await later();
   if (!me() || !me().verified || me().uid !== user.uid) throw denied();
   const db = load();
@@ -101,6 +101,7 @@ export async function createMessage(user, { recipients, subject, body, allowForw
     recipients, subject, body, createdAt: now, updatedAt: now, edition: 1, withdrawn: false, allowForward: !!allowForward,
     editions: { 1: { edition: 1, subject, body, savedAt: now } }, reads: {},
   };
+  if (enc) db.messages[id].enc = 1;
   if (attachments.length) db.messages[id].attachments = attachments.map((f) => ({ name: f.name, type: f.type || 'application/octet-stream', size: f.size }));
   save(db);
   return id;

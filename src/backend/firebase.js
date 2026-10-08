@@ -125,7 +125,7 @@ export function watchMessage(id, cb, onErr) {
 const fileRef = (id, i) => sref(storage, `ecs/${id}/${i}`);
 const fileMeta = (files) => files.map((f) => ({ name: f.name, type: f.type || 'application/octet-stream', size: f.size }));
 
-export async function createMessage(user, { recipients, subject, body, allowForward = false, attachments = [] }) {
+export async function createMessage(user, { recipients, subject, body, allowForward = false, attachments = [], enc = 0 }) {
   const ref = doc(messages);
   const batch = writeBatch(db);
   const data = {
@@ -142,6 +142,7 @@ export async function createMessage(user, { recipients, subject, body, allowForw
   };
   if (user.name) data.senderName = user.name.slice(0, 120);
   if (attachments.length) data.attachments = fileMeta(attachments);
+  if (enc) data.enc = 1; // end-to-end encrypted: subject, body and attachment names are ciphertext
   batch.set(ref, data);
   batch.set(doc(ref, 'editions', '1'), { edition: 1, subject, body, savedAt: serverTimestamp() });
   await batch.commit();

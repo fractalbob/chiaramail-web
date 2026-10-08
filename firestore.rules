@@ -67,7 +67,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(
              ['senderUid', 'senderEmail', 'senderName', 'recipients', 'subject',
               'body', 'createdAt', 'updatedAt', 'edition', 'withdrawn', 'allowForward',
-              'attachments'])
+              'attachments', 'enc'])
         && request.resource.data.keys().hasAll(
              ['senderUid', 'senderEmail', 'recipients', 'subject', 'body',
               'createdAt', 'updatedAt', 'edition', 'withdrawn'])
@@ -75,6 +75,10 @@ service cloud.firestore {
         && request.resource.data.senderEmail == myEmail()
         && (!('allowForward' in request.resource.data)
             || request.resource.data.allowForward is bool)
+        // enc: 1 when the content is end-to-end encrypted (subject, body and
+        // attachment names are then ciphertext, readable only with the key
+        // that travels in the email). ChiaraMail itself can't read them.
+        && (!('enc' in request.resource.data) || request.resource.data.enc == 1)
         // Names, types and sizes of the files stored with it (see storage.rules).
         && (!('attachments' in request.resource.data)
             || (request.resource.data.attachments is list
@@ -87,10 +91,10 @@ service cloud.firestore {
         && request.resource.data.recipients.size() >= 1
         && request.resource.data.recipients.size() <= 50
         && request.resource.data.subject is string
-        && request.resource.data.subject.size() <= 300
+        && request.resource.data.subject.size() <= 2000
         && request.resource.data.body is string
         && request.resource.data.body.size() >= 1
-        && request.resource.data.body.size() <= 100000
+        && request.resource.data.body.size() <= 300000
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
         && request.resource.data.edition == 1
@@ -109,9 +113,9 @@ service cloud.firestore {
                 .hasOnly(['subject', 'body', 'updatedAt', 'edition', 'withdrawn'])
                && request.resource.data.updatedAt == request.time
                && request.resource.data.subject is string
-               && request.resource.data.subject.size() <= 300
+               && request.resource.data.subject.size() <= 2000
                && request.resource.data.body is string
-               && request.resource.data.body.size() <= 100000
+               && request.resource.data.body.size() <= 300000
                && (
                     (request.resource.data.withdrawn == false
                       && request.resource.data.body.size() >= 1

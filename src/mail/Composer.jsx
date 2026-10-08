@@ -4,9 +4,10 @@ import * as gmail from '@gmail';
 import * as backend from '@backend';
 import {
   buildRaw, parseMessage, parseAddressList, isEmail, replySubject, forwardSubject,
-  htmlToText, quote, bytesToB64, b64ToBytes, b64urlToB64, escapeHtml, CONTENT_POINTER, displayName,
+  htmlToText, quote, bytesToB64, b64ToBytes, b64urlToB64, escapeHtml, CONTENT_POINTER, CONTENT_KEY, displayName,
 } from '../gmail/mime.js';
 import { messageUrl } from '../lib.js';
+import { createEcs, openEcs, getEcsAttachment } from '../ecs.js';
 import { useAuth } from '../auth.jsx';
 import { useMail } from './context.jsx';
 import { useI18n } from '../i18n.jsx';
@@ -89,8 +90,8 @@ export default function Composer() {
       const raw = th.messages.find((m) => m.id === msgParam) || th.messages[th.messages.length - 1];
       const m = parseMessage(raw);
       // Quote what the reader actually saw: the current content of an ECS message.
-      const info = m.pointer ? await liveInfo(m.pointer) : null;
-      const current = info && !info.withdrawn ? info.body : null;
+      const info = m.pointer ? await openEcs(await liveInfo(m.pointer), m.key) : null;
+      const current = info && !info.withdrawn && !info.locked ? info.body : null;
       if (!live) return;
       if (mode === 'forward' && info && info.senderUid !== user.uid && (info.withdrawn || info.allowForward !== true)) {
         setForwardBlocked(true);
@@ -102,10 +103,10 @@ export default function Composer() {
       if (mode === 'forward') {
         setSubject(forwardSubject(m.subject));
         setBody(`\n\n${t('fwdHeader')}\n${t('from')}: ${m.from ? fmtAddr(m.from) : ''}\n${t('date')}: ${formatDate(m.date)}\n${t('subject')}: ${m.subject}\n${t('to')}: ${m.to.map(fmtAddr).join(', ')}\n\n${origText}`);
-        const stored = info && !info.withdrawn ? (info.attachments || []) : [];
+        const stored = info && !info.withdrawn && !info.locked ? (info.attachments || []) : [];
         setFiles([
           ...m.attachments.map((a) => ({ name: a.filename, type: a.mimeType, size: a.size, fwd: { messageId: m.id, attachmentId: a.attachmentId, data: a.data } })),
-          ...stored.map((a, i) => ({ name: a.name, type: a.type, size: a.size, ecs: { id: m.pointer, i } })),
+          ...stored.map((a, i) => ({ name: a.name, type: a.type, size: a.size, ecs: { id: m.pointer, i, message: info, key: m.key } })),
         ]);
       } else {
         const fromMe = m.from && m.from.email.toLowerCase() === me;
@@ -157,7 +158,7 @@ export default function Composer() {
     if (f.base64) return f.base64;
     if (b64Ref.current.has(f)) return b64Ref.current.get(f);
     const v = f.file ? await readFile(f.file)
-      : f.ecs ? bytesToB64(new Uint8Array(await (await backend.getAttachment(f.ecs.id, f.ecs.i)).arrayBuffer()))
+      : f.ecs ? bytesToB64(new Uint8Array(await (await getEcsAttachment(f.ecs.id, f.ecs.i, f.ecs.message, f.ecs.key)).arrayBuffer()))
         : b64urlToB64(f.fwd.data || await gmail.getAttachment(f.fwd.messageId, f.fwd.attachmentId));
     b64Ref.current.set(f, v);
     return v;
@@ -257,21 +258,19 @@ export default function Composer() {
       let html;
       const headers = {};
       if (changeable) {
-        // ECS: the body and attachments go to ChiaraMail; the email carries only the envelope.
+        // ECS: the body and attachments are encrypted here and go to ChiaraMail;
+        // the email carries only the envelope, the pointer and the key.
         const recipients = [...new Set([...toL, ...ccL].map((a) => a.email.toLowerCase()))];
         if (recipients.length > 50) throw new Error(t('tooMany'));
-        pointer = await backend.createMessage(user, {
-          recipients, subject: subject.trim(), body, allowForward: allowFwd,
-          attachments: files.map((f) => ({ name: f.name, type: f.type, size: f.size })),
-        });
-        if (files.length) {
-          const blobs = await Promise.all(files.map(async (f) => ({
-            name: f.name, type: f.type, bytes: f.file || b64ToBytes(await ensureB64(f)),
-          })));
-          await backend.uploadAttachments(pointer, blobs, (p) => setProgress(Math.round(p * 100)));
-        }
+        const blobs = await Promise.all(files.map(async (f) => ({
+          name: f.name, type: f.type, size: f.size, bytes: f.file || b64ToBytes(await ensureB64(f)),
+        })));
+        const made = await createEcs(user, { recipients, subject: subject.trim(), body, allowForward: allowFwd, files: blobs },
+          (p) => setProgress(Math.round(p * 100)));
+        pointer = made.id;
         headers[CONTENT_POINTER] = pointer;
-        const link = messageUrl(pointer);
+        headers[CONTENT_KEY] = made.key;
+        const link = `${messageUrl(pointer)}#k=${made.key}`;
         text = `${t('liveFallback')}\n\n${link}\n\n${t('liveFallbackHint')}`;
         html = `<div style="font-family:Georgia,serif;font-size:16px;line-height:1.5;color:#14313b">
 <p>${escapeHtml(t('liveFallback'))}</p>

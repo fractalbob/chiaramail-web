@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import * as backend from '@backend';
 import { useI18n } from '../i18n.jsx';
 import { toParagraphs } from '../lib.js';
+import { listEcsEditions } from '../ecs.js';
 
 export function Readers({ message }) {
   const { t, formatDate } = useI18n();
@@ -27,14 +28,14 @@ export function Readers({ message }) {
   );
 }
 
-export function Editions({ message }) {
+export function Editions({ message, ecsKey }) {
   const { t, formatDate } = useI18n();
   const [eds, setEds] = useState(null);
   useEffect(() => {
     let live = true;
-    backend.listEditions(message.id).then((x) => { if (live) setEds(x); }).catch(() => setEds([]));
+    listEcsEditions(message.id, ecsKey).then((x) => { if (live) setEds(x); }).catch(() => setEds([]));
     return () => { live = false; };
-  }, [message.id, message.edition]);
+  }, [message.id, message.edition, ecsKey]);
   if (!eds) return <p className="help">{t('editionsLoading')}</p>;
   return (
     <ol className="editions" reversed>
@@ -59,7 +60,7 @@ export function Editions({ message }) {
   );
 }
 
-export default function SenderTools({ message, onSendLink }) {
+export default function SenderTools({ message, onSendLink, ecsKey }) {
   const { t } = useI18n();
   const nav = useNavigate();
   const [busy, setBusy] = useState(false);
@@ -86,7 +87,7 @@ export default function SenderTools({ message, onSendLink }) {
       {!message.withdrawn && (
         <section>
           <h2 className="tools-title">{t('history')}</h2>
-          <Editions message={message} />
+          <Editions message={message} ecsKey={ecsKey} />
         </section>
       )}
       <div className="actions actions-danger">

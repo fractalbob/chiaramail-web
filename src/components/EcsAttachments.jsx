@@ -1,18 +1,18 @@
 import { useState } from 'react';
-import * as backend from '@backend';
 import { useI18n } from '../i18n.jsx';
 import { fmtSize } from '../lib.js';
+import { getEcsAttachment } from '../ecs.js';
 
 // Files stored with an ECS message's body (never in the email itself).
-export default function EcsAttachments({ id, message }) {
+export default function EcsAttachments({ id, message, ecsKey }) {
   const { t } = useI18n();
   const [error, setError] = useState('');
   const list = message.attachments || [];
-  if (!list.length || message.withdrawn) return null;
+  if (!list.length || message.withdrawn || message.locked) return null;
   const download = async (a, i) => {
     setError('');
     try {
-      const blob = await backend.getAttachment(id, i);
+      const blob = await getEcsAttachment(id, i, message, ecsKey);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url; link.download = a.name; link.click();
