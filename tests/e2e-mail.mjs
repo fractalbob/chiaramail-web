@@ -87,8 +87,9 @@ log('changeable message sent; sender sees live block with Edit');
 
 // and an ordinary message
 await page.getByRole('link', { name: 'Compose' }).click();
-// Recipient suggestions: Paul (from Sent mail) and Bob (written to just now)
+// Recipient chips and suggestions: Paul (from Sent mail) and Bob (written to just now)
 const toBox = page.getByRole('combobox', { name: 'To' });
+const chips = page.locator('.rfield', { has: page.locator('#to') }).locator('.rchip');
 await toBox.pressSequentially('pau');
 await page.getByRole('option', { name: /Paul Martin/ }).waitFor();
 await shot('m04b-suggestions');
@@ -97,12 +98,22 @@ await toBox.fill('');
 await toBox.pressSequentially('bo');
 await page.getByRole('option', { name: /bob@example\.com/ }).waitFor();
 await toBox.press('Enter');
-await waitValue(toBox, (v) => /^Bob <bob@example\.com>, $/.test(v), 'suggestion accepted');
+await chips.filter({ hasText: 'bob@example.com' }).waitFor();
+await must((await toBox.inputValue()) === '', 'input cleared after picking');
 await toBox.pressSequentially('pa');
 await page.getByRole('option', { name: /Paul Martin/ }).click();
-await waitValue(toBox, (v) => v === 'Bob <bob@example.com>, Paul Martin <paul@atelier.example>, ', 'second suggestion appended');
-await toBox.fill('bob@example.com');
-log('recipient suggestions from Sent mail and recent recipients');
+await chips.filter({ hasText: 'Paul Martin' }).waitFor();
+await toBox.pressSequentially('not-an-address,');
+await page.locator('.rchip-bad', { hasText: 'not-an-address' }).waitFor();
+await shot('m04c-chips');
+await toBox.press('Backspace');
+await must((await chips.count()) === 2, 'backspace removes last chip');
+await page.getByRole('button', { name: /Remove Paul Martin/ }).click();
+await must((await chips.count()) === 1, 'x removes a chip');
+await page.getByRole('button', { name: 'Bcc' }).click();
+await page.getByRole('combobox', { name: 'Bcc' }).waitFor();
+log('recipient chips: suggestions, Enter/click/comma to add, Backspace and × to remove, invalid flagged');
+
 await page.getByLabel(/Changeable message/).uncheck();
 await page.getByLabel('Subject', { exact: true }).fill('Ordinary note');
 await page.getByLabel('Message', { exact: true }).fill('Just a normal email.');
@@ -122,7 +133,7 @@ await page.getByText('The sender can see when you last opened this message.').wa
 await shot('m06-bob-reads-live');
 log('recipient sees live text inline, no edit controls');
 await page.getByRole('link', { name: 'Reply', exact: true }).last().click();
-await waitValue(page.getByLabel('To', { exact: true }), (v) => v.includes('alice@example.com'), 'reply to alice');
+await page.locator('.rfield', { has: page.locator('#to') }).locator('.rchip', { hasText: 'alice@example.com' }).waitFor();
 await must((await page.getByLabel('Subject', { exact: true }).inputValue()) === 'Re: Committee meeting on Thursday', 'reply subject');
 await must(!(await page.getByLabel(/Changeable message/).isChecked()), 'replies default to ordinary');
 await waitValue(page.getByLabel('Message', { exact: true }), (v) => v.includes('> The committee meets on Thursday'), 'reply quotes live text');

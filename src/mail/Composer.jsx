@@ -10,7 +10,7 @@ import { messageUrl } from '../lib.js';
 import { useAuth } from '../auth.jsx';
 import { useMail } from './context.jsx';
 import { useI18n } from '../i18n.jsx';
-import RecipientInput from './RecipientInput.jsx';
+import RecipientField from './RecipientField.jsx';
 import { cachedContacts, refreshContacts, rememberRecipients } from './contacts.js';
 
 const MAX_TOTAL = 24 * 1024 * 1024;
@@ -40,10 +40,11 @@ export default function Composer() {
   const { t, formatDate } = useI18n();
   const me = (mail.account || '').toLowerCase();
 
-  const [to, setTo] = useState(params.get('to') || '');
-  const [cc, setCc] = useState('');
-  const [bcc, setBcc] = useState('');
+  const [to, setTo] = useState(() => parseAddressList(params.get('to') || ''));
+  const [cc, setCc] = useState([]);
+  const [bcc, setBcc] = useState([]);
   const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [files, setFiles] = useState([]); // { name, type, size, file? , fwd? }
@@ -94,8 +95,8 @@ export default function Composer() {
           ccList = m.cc.filter(notMe);
         }
         const dedupe = (l) => l.filter((a, i) => l.findIndex((b) => b.email.toLowerCase() === a.email.toLowerCase()) === i);
-        setTo(dedupe(toList).map(fmtAddr).join(', '));
-        if (ccList.length) { setCc(dedupe(ccList).map(fmtAddr).join(', ')); setShowCc(true); }
+        setTo(dedupe(toList));
+        if (ccList.length) { setCc(dedupe(ccList)); setShowCc(true); }
         setSubject(replySubject(m.subject));
         const intro = note === 'updated' ? `${t('updateNoteBody')}\n` : '\n';
         setBody(`${intro}\n${t('wroteOn', { date: formatDate(m.date), name: displayName(m.from) })}\n${quote(origText)}`);
@@ -114,8 +115,7 @@ export default function Composer() {
   const send = async (ev) => {
     ev.preventDefault();
     setError('');
-    const parse = (s) => parseAddressList(s);
-    const toL = parse(to); const ccL = parse(cc); const bccL = changeable ? [] : parse(bcc);
+    const toL = to; const ccL = cc; const bccL = changeable ? [] : bcc;
     const bad = [...toL, ...ccL, ...bccL].filter((a) => !isEmail(a.email)).map(fmtAddr);
     if (bad.length) return setError(t('badAddresses', { list: bad.join(', ') }));
     if (!toL.length && !ccL.length && !bccL.length) return setError(t('needRecipient'));
@@ -169,28 +169,21 @@ export default function Composer() {
   return (
     <form className="compose" onSubmit={send}>
       <h1 className="page-title">{title}</h1>
-      <div className="field">
-        <label htmlFor="to">{t('to')}</label>
-        <RecipientInput id="to" value={to} onChange={setTo} contacts={contacts} describedBy="to-help" label={t('suggestions')} />
-        <p id="to-help" className="help">
-          {t('separateAddresses')}{' '}
-          {!showCc && <button type="button" className="linklike" onClick={() => setShowCc(true)}>{t('addCcBcc')}</button>}
-        </p>
+      <div className="rfields">
+        <RecipientField id="to" label={t('to')} recipients={to} onChange={setTo} contacts={contacts}
+          extra={(!showCc || !showBcc) && (
+            <>
+              {!showCc && <button type="button" className="linklike" onClick={() => setShowCc(true)}>{t('cc')}</button>}
+              {!showBcc && <button type="button" className="linklike" onClick={() => setShowBcc(true)}>{t('bcc')}</button>}
+            </>
+          )} />
+        {showCc && <RecipientField id="cc" label={t('cc')} recipients={cc} onChange={setCc} contacts={contacts} />}
+        {showBcc && (
+          <RecipientField id="bcc" label={t('bcc')} recipients={changeable ? [] : bcc} onChange={setBcc} contacts={contacts}
+            disabled={changeable} describedBy={changeable ? 'bcc-help' : undefined} />
+        )}
       </div>
-      {showCc && (
-        <>
-          <div className="field">
-            <label htmlFor="cc">{t('cc')}</label>
-            <RecipientInput id="cc" value={cc} onChange={setCc} contacts={contacts} label={t('suggestions')} />
-          </div>
-          <div className="field">
-            <label htmlFor="bcc">{t('bcc')}</label>
-            <RecipientInput id="bcc" value={changeable ? '' : bcc} onChange={setBcc} contacts={contacts} disabled={changeable}
-              describedBy={changeable ? 'bcc-help' : undefined} label={t('suggestions')} />
-            {changeable && <p id="bcc-help" className="help">{t('bccNotLive')}</p>}
-          </div>
-        </>
-      )}
+      {showBcc && changeable && <p id="bcc-help" className="help">{t('bccNotLive')}</p>}
       <div className="field">
         <label htmlFor="subject">{t('subject')}</label>
         <input id="subject" type="text" maxLength={300} value={subject} onChange={(e) => setSubject(e.target.value)} />

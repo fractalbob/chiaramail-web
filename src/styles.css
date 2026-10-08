@@ -339,16 +339,36 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .live-tools .subtoggle { margin: 0; }
 .subtoggle input { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--ink); }
 .subtoggle .help { display: block; }
-.combo { position: relative; }
-.combo-list {
-  position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none;
-  background: var(--paper); border: 1px solid var(--rule); border-radius: var(--radius-s);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 18%, transparent); max-height: 300px; overflow-y: auto;
+.rfields { border: 1px solid var(--rule); border-radius: var(--radius-m); background: var(--paper); }
+.rfield {
+  position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 6px 12px; min-height: 48px; cursor: text;
 }
-.combo-opt { display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline; padding: 8px 10px; border-radius: 4px; cursor: pointer; }
+.rfield + .rfield { border-top: 1px solid var(--rule); }
+.rfield:focus-within { box-shadow: inset 3px 0 0 var(--focus); }
+.rfield-disabled { opacity: 0.6; }
+.rfield-label { flex: none; width: 2.6em; padding-top: 9px; color: var(--slate); font-size: 0.9375rem; }
+.chips { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; list-style: none; margin: 0; padding: 4px 0; }
+.rfield-input { flex: 1; min-width: 12ch; }
+.rfield-input input { width: 100%; border: 0; padding: 6px 2px; background: transparent; box-shadow: none; font: 1rem/1.3 var(--sans); }
+.rfield-input input:focus { box-shadow: none; outline: none; }
+.rchip { cursor: default; padding: 3px 6px 3px 3px; gap: 6px; background: var(--paper); max-width: 100%; }
+.rchip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rchip-addr { color: var(--slate); }
+.rchip-bad { border-color: var(--danger); color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--paper)); }
+.rfield-extra { flex: none; display: flex; gap: 12px; padding-top: 9px; }
+.rfield-extra .linklike { padding: 0; color: var(--slate); text-decoration: none; }
+.rfield-extra .linklike:hover { color: var(--ink); text-decoration: underline; }
+.avatar { flex: none; display: inline-grid; place-items: center; border-radius: 50%; color: #fff; font-weight: 600; font-family: var(--sans); line-height: 1; }
+.combo-list {
+  position: absolute; z-index: 20; left: 12px; right: 12px; top: calc(100% - 2px); margin: 0; padding: 4px; list-style: none;
+  background: var(--paper); border: 1px solid var(--rule); border-radius: var(--radius-s);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 18%, transparent); max-height: 340px; overflow-y: auto;
+}
+.combo-opt { display: flex; gap: 12px; align-items: center; padding: 8px 10px; border-radius: 4px; cursor: pointer; }
 .combo-opt-on { background: color-mix(in srgb, var(--lumen) 40%, var(--paper)); }
-.combo-name { font-weight: 600; }
-.combo-email { color: var(--slate); font-size: 0.875rem; overflow-wrap: anywhere; }
+.combo-who { display: grid; min-width: 0; }
+.combo-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.combo-email { color: var(--slate); font-size: 0.875rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .field-label { font-size: 0.875rem; color: var(--slate); font-weight: 500; }
 .filebtn { justify-self: start; }
 .filebtn input { display: none; }
