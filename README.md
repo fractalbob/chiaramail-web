@@ -67,7 +67,7 @@ All in the existing project **chiaramail-15119**, at https://console.cloud.googl
    from it — in Google Cloud Shell:
    ```
    echo '[{"origin":["https://app.chiaramail.com","https://chiaramail-mail.web.app","http://localhost:5173"],"method":["GET"],"maxAgeSeconds":3600}]' > cors.json
-   gcloud storage buckets update gs://BUCKET-NAME --cors-file=cors.json
+   gcloud storage buckets update gs://chiaramail-15119.appspot.com --cors-file=cors.json
    ```
 6. **Second site and deploy:**
    ```

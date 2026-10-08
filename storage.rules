@@ -7,6 +7,16 @@ rules_version = '2';
 // add or remove them, and nobody can fetch them once it's withdrawn.
 service firebase.storage {
   match /b/{bucket}/o {
+
+    // ---- Old ChiaraMail (2020): its content/ folder. -------------------------
+    // Kept as it was (any signed-in user may read and write), but limited to
+    // content/ — the old rule matched every path, which would have let any
+    // signed-in user read ECS attachments too.
+    match /content/{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ---- ChiaraMail web: ECS attachments. ----------------------------------
     match /ecs/{id}/{file} {
       function msg() {
         return firestore.get(/databases/(default)/documents/messages/$(id)).data;

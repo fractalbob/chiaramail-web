@@ -240,3 +240,12 @@ test('ECS directory: list yourself only; look up one address; never browse', asy
   await assertFails(getDocs(collection(ctx(EVE), 'ecsUsers')));
   await assertFails(updateDoc(doc(ctx(EVE), 'ecsUsers/alice@example.com'), { since: serverTimestamp() }));
 });
+
+test('old content/ folder keeps its rule; it opens nothing else', async () => {
+  await assertSucceeds(store(EVE).ref('content/x').put(bytes));
+  await assertSucceeds(store(EVE).ref('content/x').getMetadata());
+  await assertFails(env.unauthenticatedContext().storage().ref('content/x').getMetadata());
+  await assertFails(store(EVE).ref('other/x').put(bytes));
+  await seedWithFile();
+  await assertFails(store(EVE).ref('ecs/m1/0').getMetadata());
+});
