@@ -227,3 +227,16 @@ test('withdrawn: nobody can fetch attachments; only the sender deletes them', as
   await assertFails(store(ALICE).ref('ecs/m1/0').getMetadata());
   await assertSucceeds(store(ALICE).ref('ecs/m1/0').delete());
 });
+
+// ---- ECS directory -----------------------------------------------------------
+
+test('ECS directory: list yourself only; look up one address; never browse', async () => {
+  await assertSucceeds(setDoc(doc(ctx(ALICE), 'ecsUsers/alice@example.com'), { since: serverTimestamp() }));
+  await assertFails(setDoc(doc(ctx(EVE), 'ecsUsers/bob@example.com'), { since: serverTimestamp() }));
+  await assertFails(setDoc(doc(ctx(BOB, false), 'ecsUsers/bob@example.com'), { since: serverTimestamp() }));
+  await assertFails(setDoc(doc(ctx(BOB), 'ecsUsers/bob@example.com'), { since: serverTimestamp(), extra: 1 }));
+  await assertSucceeds(getDoc(doc(ctx(EVE), 'ecsUsers/alice@example.com')));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'ecsUsers/alice@example.com')));
+  await assertFails(getDocs(collection(ctx(EVE), 'ecsUsers')));
+  await assertFails(updateDoc(doc(ctx(EVE), 'ecsUsers/alice@example.com'), { since: serverTimestamp() }));
+});

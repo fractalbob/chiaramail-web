@@ -35,9 +35,12 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
   const withdrawn = d?.withdrawn;
 
   const allowForward = d?.allowForward === true;
+  // Does the email's From match who really stored this content?
+  const claimed = (message.from?.email || '').toLowerCase();
+  const verified = !!d && !!claimed && claimed === (d.senderEmail || '').toLowerCase();
   useEffect(() => {
-    if (onInfo && d) onInfo({ isSender, allowForward, withdrawn: !!withdrawn });
-  }, [onInfo, d, isSender, allowForward, withdrawn]);
+    if (onInfo && d) onInfo({ isSender, allowForward, withdrawn: !!withdrawn, spoof: !verified });
+  }, [onInfo, d, isSender, allowForward, withdrawn, verified]);
 
   // Readers: remember the edition they'd seen, then record this read.
   useEffect(() => {
@@ -77,9 +80,16 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
   };
 
   return (
-    <div className={fresh ? 'live-block live-fresh' : 'live-block'}>
+    <div className={!verified ? 'live-block live-spoof' : fresh ? 'live-block live-fresh' : 'live-block'}>
+      {!verified && (
+        <div className="spoof-alert" role="alert">
+          <p className="notice-lead">{t('spoofHead')}</p>
+          <p>{t('spoofBody', { claimed: claimed || t('noSender'), real: d.senderEmail })}</p>
+        </div>
+      )}
       <p className="edition">
         <span className="live-badge">{t('live')}</span>
+        {verified && <span className="verified-mark" title={t('verifiedTitle')}>✓ {t('verifiedSender')}</span>}
         {!d.withdrawn && (
           <>
             <span className={fresh ? 'edition-mark edition-fresh' : 'edition-mark'}>

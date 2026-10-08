@@ -110,13 +110,18 @@ const FILES_KEY = 'chiaramail.mock.files';
 const loadFiles = () => { try { return JSON.parse(localStorage.getItem(FILES_KEY)) || {}; } catch { return {}; } };
 const saveFiles = (f) => localStorage.setItem(FILES_KEY, JSON.stringify(f));
 const toB64 = (bytes) => { let s = ''; bytes.forEach((b) => { s += String.fromCharCode(b); }); return btoa(s); };
-export async function uploadAttachments(id, files) {
+export async function uploadAttachments(id, files, onProgress) {
   await later();
   const m = load().messages[id];
   if (!m || !isSender(m) || m.withdrawn) throw denied();
   const all = loadFiles();
-  files.forEach((f, i) => { all[`${id}/${i}`] = { type: f.type, data: toB64(f.bytes) }; });
+  for (const [i, f] of files.entries()) {
+    const bytes = f.bytes instanceof Uint8Array ? f.bytes : new Uint8Array(await f.bytes.arrayBuffer());
+    if (bytes.length > 100 * 1024 * 1024) throw denied();
+    all[`${id}/${i}`] = { type: f.type, data: toB64(bytes) };
+  }
   saveFiles(all);
+  onProgress?.(1);
 }
 export async function getAttachment(id, i) {
   await later();
@@ -193,4 +198,20 @@ export function watchReads(id, cb, onErr) {
     Object.entries(m.reads).forEach(([k, r]) => { o[k] = { editionSeen: r.editionSeen, lastReadAt: new Date(r.lastReadAt) }; });
     cb(o);
   });
+}
+
+// ---- sender verification and the ECS directory ------------------------------
+export async function getSender(id) {
+  const m = load().messages[id];
+  return m && canRead(m) ? m.senderEmail.toLowerCase() : null;
+}
+export async function registerEcsUser(user) {
+  if (!user?.email || !user.verified) return;
+  const db = load();
+  db.ecsUsers = db.ecsUsers || {};
+  if (!db.ecsUsers[user.email]) { db.ecsUsers[user.email] = Date.now(); save(db); }
+}
+export async function isEcsUser(email) {
+  if (!me()) return false;
+  return !!(load().ecsUsers || {})[(email || '').toLowerCase()];
 }

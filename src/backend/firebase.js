@@ -11,7 +11,7 @@ import {
   getDocs, setDoc, updateDoc, deleteDoc,
 } from 'firebase/firestore';
 import {
-  getStorage, connectStorageEmulator, ref as sref, uploadBytes, getBlob, deleteObject,
+  getStorage, connectStorageEmulator, ref as sref, uploadBytesResumable, getBlob, deleteObject,
 } from 'firebase/storage';
 
 const app = initializeApp({
@@ -148,10 +148,17 @@ export async function createMessage(user, { recipients, subject, body, allowForw
   return ref.id;
 }
 
-// files: [{ name, type, bytes: Uint8Array }] in the same order as createMessage's attachments.
-export async function uploadAttachments(id, files) {
-  await Promise.all(files.map((f, i) => uploadBytes(fileRef(id, i), f.bytes, {
-    contentType: f.type || 'application/octet-stream',
+// files: [{ name, type, bytes: Blob | Uint8Array }] in the same order as
+// createMessage's attachments. onProgress gets the fraction uploaded (0–1).
+export async function uploadAttachments(id, files, onProgress) {
+  const total = files.reduce((n, f) => n + (f.bytes.size ?? f.bytes.length), 0) || 1;
+  const done = files.map(() => 0);
+  await Promise.all(files.map((f, i) => new Promise((resolve, reject) => {
+    const task = uploadBytesResumable(fileRef(id, i), f.bytes, { contentType: f.type || 'application/octet-stream' });
+    task.on('state_changed', (snap) => {
+      done[i] = snap.bytesTransferred;
+      onProgress?.(done.reduce((a, b) => a + b, 0) / total);
+    }, reject, resolve);
   })));
 }
 
@@ -223,4 +230,35 @@ export function watchReads(id, cb, onErr) {
     });
     cb(out);
   }, onErr);
+}
+
+// ---- sender verification and the ECS directory ------------------------------
+
+// Who really stored an ECS message (verified by their sign-in), or null if this
+// reader can't see it. Compared with the email's From to catch forgeries.
+const senderCache = new Map();
+export function getSender(id) {
+  if (!senderCache.has(id)) {
+    senderCache.set(id, getDoc(doc(messages, id))
+      .then((s) => (s.exists() ? (s.data().senderEmail || '').toLowerCase() : null))
+      .catch(() => null));
+  }
+  return senderCache.get(id);
+}
+
+// ecsUsers/{email}: addresses that have signed in to ChiaraMail. Anyone signed
+// in may look up one address; nobody can list them.
+const ecsUsers = collection(db, 'ecsUsers');
+export async function registerEcsUser(user) {
+  if (!user?.email || !user.verified) return;
+  const ref = doc(ecsUsers, user.email);
+  const s = await getDoc(ref).catch(() => null);
+  if (s && !s.exists()) await setDoc(ref, { since: serverTimestamp() }).catch(() => {});
+}
+const ecsCache = new Map();
+export function isEcsUser(email) {
+  const e = (email || '').toLowerCase();
+  if (!e) return Promise.resolve(false);
+  if (!ecsCache.has(e)) ecsCache.set(e, getDoc(doc(ecsUsers, e)).then((s) => s.exists()).catch(() => false));
+  return ecsCache.get(e);
 }

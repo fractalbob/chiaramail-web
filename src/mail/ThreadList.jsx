@@ -5,6 +5,7 @@ import { summarize } from '../gmail/mime.js';
 import { useMail } from './context.jsx';
 import { useI18n } from '../i18n.jsx';
 import { labelIdFor, isSystemFolder } from './folders.js';
+import { useEcsMarks } from './ecsCheck.js';
 
 export default function ThreadList() {
   const { folder } = useParams();
@@ -47,6 +48,7 @@ export default function ThreadList() {
   if (lastReset !== resetKey) { setLastReset(resetKey); setPages(['']); }
 
   const rows = state.key === key ? state.rows : null;
+  const marks = useEcsMarks(rows, (mail.account || '').toLowerCase());
   const toggleStar = async (row) => {
     setState((s) => ({ ...s, rows: s.rows.map((r) => (r.id === row.id ? { ...r, starred: !r.starred } : r)) }));
     try { await gmail.modifyThread(row.id, row.starred ? [] : ['STARRED'], row.starred ? ['STARRED'] : []); } catch (e) { handle(e); load(true); }
@@ -75,13 +77,24 @@ export default function ThreadList() {
                 aria-label={r.starred ? t('unstar') : t('star')} onClick={() => toggleStar(r)}>★</button>
               <Link to={`/mail/${encodeURIComponent(folder)}/${r.id}${q ? `?q=${encodeURIComponent(q)}` : ''}`} className="trow-link">
                 <span className="row-people">
-                  {r.people.map((p) => (p === 'me' ? t('me') : p)).join(', ') || t('noSender')}
+                  {r.people.length ? r.people.map((p, i) => (
+                    <span key={p.email + i}>
+                      {i > 0 && ', '}
+                      {marks.users.has(p.email) && marks.verdicts[r.id] !== 'spoof'
+                        ? <span className="ecs-user" title={t('ecsUserTitle')}>{p.label}</span>
+                        : (p.label === 'me' ? t('me') : p.label)}
+                    </span>
+                  )) : t('noSender')}
                   {r.count > 1 && <span className="tcount"> {r.count}</span>}
                   {r.draft && <span className="draft-tag draft-tag-inline">{t('draft')}</span>}
                 </span>
                 <span className="row-subject">
                   {r.live && <span className="live" title={t('liveTitle')}>{t('live')}</span>}
-                  <span className="subj">{r.subject || t('noSubject')}</span>
+                  {marks.verdicts[r.id] === 'spoof' && <span className="spoof-tag">{t('spoofTag')}</span>}
+                  <span className={marks.verdicts[r.id] === 'ok' ? 'subj subj-verified' : marks.verdicts[r.id] === 'spoof' ? 'subj subj-spoof' : 'subj'}
+                    title={marks.verdicts[r.id] === 'ok' ? t('verifiedTitle') : marks.verdicts[r.id] === 'spoof' ? t('spoofTitle') : undefined}>
+                    {r.subject || t('noSubject')}
+                  </span>
                   <span className="snip"> · {r.snippet}</span>
                 </span>
                 <span className="row-meta">

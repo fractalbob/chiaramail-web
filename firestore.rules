@@ -47,6 +47,19 @@ service cloud.firestore {
     }
 
     // ---- ChiaraMail web ------------------------------------------------------
+
+    // The ECS directory: addresses that have signed in to ChiaraMail, so mail
+    // from them can be marked as coming from an ECS user. One address can be
+    // looked up at a time; the list can't be browsed.
+    match /ecsUsers/{email} {
+      allow get: if signedIn();
+      allow create: if verified()
+        && email == myEmail()
+        && request.resource.data.keys().hasOnly(['since'])
+        && request.resource.data.since == request.time;
+      allow delete: if verified() && email == myEmail();
+    }
+
     match /messages/{id} {
       allow read: if isSender(resource.data) || isRecipient(resource.data);
 

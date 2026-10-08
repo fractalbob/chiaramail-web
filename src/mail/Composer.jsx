@@ -13,7 +13,9 @@ import { useI18n } from '../i18n.jsx';
 import RecipientField from './RecipientField.jsx';
 import { cachedContacts, refreshContacts, rememberRecipients } from './contacts.js';
 
-const MAX_TOTAL = 24 * 1024 * 1024;
+const MAX_TOTAL = 24 * 1024 * 1024; // what Gmail lets an ordinary email (or a draft) carry
+const MAX_ECS_FILE = 100 * 1024 * 1024; // ECS attachments skip the email: per-file limit (see storage.rules)
+const MAX_ECS_FILES = 20;
 // An ECS message's content as this reader may see it (null if they can't).
 const liveInfo = (pointer) => new Promise((resolve) => {
   let unsub = () => {};
@@ -67,6 +69,7 @@ export default function Composer() {
   const b64Ref = useRef(new WeakMap());
   const latestRef = useRef(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(null); // % of ECS attachments uploaded
   const [error, setError] = useState('');
   const bodyRef = useRef(null);
   const [contacts, setContacts] = useState(() => cachedContacts(me));
@@ -170,7 +173,7 @@ export default function Composer() {
     chainRef.current = chainRef.current.then(async () => {
       const v = latestRef.current;
       if (doneRef.current || v.snapshot === lastSavedRef.current) return;
-      if (v.files.reduce((n, f) => n + f.size, 0) > MAX_TOTAL) return;
+      if (v.files.reduce((n, f) => n + f.size, 0) > MAX_TOTAL) { setSaveState('tooBig'); return; }
       setSaveState('saving');
       try {
         const attachments = await Promise.all(v.files.map(async (f) => ({ filename: f.name, mimeType: f.type, base64: await ensureB64(f) })));
@@ -239,13 +242,17 @@ export default function Composer() {
     if (!toL.length && !ccL.length && !bccL.length) return setError(t('needRecipient'));
     if (changeable && !body.trim()) return setError(t('needBody'));
     const total = files.reduce((n, f) => n + f.size, 0);
-    if (total > MAX_TOTAL) return setError(t('tooBig'));
+    if (changeable) {
+      if (files.length > MAX_ECS_FILES) return setError(t('tooManyFiles', { n: MAX_ECS_FILES }));
+      if (files.some((f) => f.size > MAX_ECS_FILE)) return setError(t('tooBigEcs'));
+    } else if (total > MAX_TOTAL) return setError(t('tooBig'));
     setBusy(true);
     doneRef.current = true;
     await chainRef.current; // let any draft save in progress finish first
     let pointer = null;
     try {
-      let attachments = await Promise.all(files.map(async (f) => ({ filename: f.name, mimeType: f.type, base64: await ensureB64(f) })));
+      // ECS attachments go to ChiaraMail, not into the email.
+      let attachments = changeable ? [] : await Promise.all(files.map(async (f) => ({ filename: f.name, mimeType: f.type, base64: await ensureB64(f) })));
       let text = body;
       let html;
       const headers = {};
@@ -257,10 +264,12 @@ export default function Composer() {
           recipients, subject: subject.trim(), body, allowForward: allowFwd,
           attachments: files.map((f) => ({ name: f.name, type: f.type, size: f.size })),
         });
-        if (attachments.length) {
-          await backend.uploadAttachments(pointer, attachments.map((a) => ({ name: a.filename, type: a.mimeType, bytes: b64ToBytes(a.base64) })));
+        if (files.length) {
+          const blobs = await Promise.all(files.map(async (f) => ({
+            name: f.name, type: f.type, bytes: f.file || b64ToBytes(await ensureB64(f)),
+          })));
+          await backend.uploadAttachments(pointer, blobs, (p) => setProgress(Math.round(p * 100)));
         }
-        attachments = [];
         headers[CONTENT_POINTER] = pointer;
         const link = messageUrl(pointer);
         text = `${t('liveFallback')}\n\n${link}\n\n${t('liveFallbackHint')}`;
@@ -284,6 +293,7 @@ export default function Composer() {
       if (!mail.handle(e)) setError(t('errorGeneric', { msg: e.message }));
       doneRef.current = false;
       setBusy(false);
+      setProgress(null);
     }
   };
 
@@ -357,12 +367,13 @@ export default function Composer() {
       {forwardBlocked && <p className="error" role="alert">{t('forwardBlocked')}</p>}
       {error && <p className="error" role="alert">{error}</p>}
       <div className="actions">
-        <button type="submit" className="btn btn-primary" disabled={busy || preparing || forwardBlocked}>{busy ? t('sending') : preparing ? t('loading') : t('send')}</button>
+        <button type="submit" className="btn btn-primary" disabled={busy || preparing || forwardBlocked}>{busy ? (progress !== null && progress < 100 ? t('uploading', { n: progress }) : t('sending')) : preparing ? t('loading') : t('send')}</button>
         <button type="button" className="btn btn-quiet" onClick={discard}>{t('discard')}</button>
         <span className="savestate" role="status" aria-live="polite">
           {saveState === 'saving' && t('draftSaving')}
           {saveState === 'saved' && t('draftSaved')}
           {saveState === 'error' && t('draftSaveFailed')}
+          {saveState === 'tooBig' && t('draftTooBig')}
         </span>
       </div>
     </form>

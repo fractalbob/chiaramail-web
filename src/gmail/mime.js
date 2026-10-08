@@ -216,12 +216,16 @@ export function summarize(thread, me) {
   const last = msgs[msgs.length - 1];
   const lastH = last ? headerMap(last.payload?.headers) : {};
   const labels = new Set(msgs.flatMap((m) => m.labelIds || []));
-  const people = [];
+  const people = []; // [{ label, email }]
+  const ecs = []; // ECS messages in the thread: [{ pointer, from }] — to check who really sent them
   msgs.forEach((m) => {
-    const f = parseAddressList(headerMap(m.payload?.headers).from)[0];
+    const h = headerMap(m.payload?.headers);
+    const f = parseAddressList(h.from)[0];
+    const pointer = h[CONTENT_POINTER.toLowerCase()];
+    if (pointer) ecs.push({ pointer, from: (f?.email || '').toLowerCase() });
     if (!f) return;
     const label = f.email.toLowerCase() === (me || '').toLowerCase() ? 'me' : displayName(f);
-    if (!people.includes(label)) people.push(label);
+    if (!people.some((p) => p.label === label)) people.push({ label, email: f.email.toLowerCase() });
   });
   return {
     id: thread.id,
@@ -234,7 +238,8 @@ export function summarize(thread, me) {
     draft: labels.has('DRAFT'),
     starred: labels.has('STARRED'),
     important: labels.has('IMPORTANT'),
-    live: msgs.some((m) => headerMap(m.payload?.headers)[CONTENT_POINTER.toLowerCase()]),
+    live: ecs.length > 0,
+    ecs,
     hasAttachment: msgs.some((m) => hasAttachment(m.payload)),
   };
 }

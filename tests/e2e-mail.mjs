@@ -198,7 +198,10 @@ log('ordinary message sent');
 // ---- Bob reads it inline and replies
 await connectAs('bob@example.com');
 await page.locator('.trow', { hasText: 'Committee meeting' }).locator('.live').waitFor();
+await page.locator('.trow', { hasText: 'Committee meeting' }).locator('.subj-verified').waitFor();
+await page.locator('.trow', { hasText: 'Committee meeting' }).locator('.ecs-user').first().waitFor();
 await shot('m05-bob-inbox');
+log('inbox: green subject for a verified ECS message, magenta for an ECS user');
 await openRow('Committee meeting');
 await page.getByText('The committee meets on Thursday at 18:00').waitFor();
 await must(!(await page.getByRole('button', { name: 'Edit' }).count()), 'recipient has no Edit');
@@ -209,6 +212,9 @@ await must((await (await import('node:fs')).readFileSync(await ecsDl.path(), 'ut
 log('recipient downloads the attachment from ChiaraMail');
 await shot('m06-bob-reads-live');
 log('recipient sees live text inline, no edit controls');
+await page.locator('.verified-mark', { hasText: 'Verified sender' }).waitFor();
+await page.locator('.mfrom .ecs-user', { hasText: 'alice@example.com' }).waitFor();
+log('verified sender (green) and ECS user (magenta) in the message');
 await page.getByRole('link', { name: 'Reply', exact: true }).last().click();
 await page.locator('.rfield', { has: page.locator('#to') }).locator('.rchip', { hasText: 'alice@example.com' }).waitFor();
 await must((await page.getByLabel('Subject', { exact: true }).inputValue()) === 'Re: Committee meeting on Thursday', 'reply subject');
@@ -299,6 +305,35 @@ const [webDl] = await Promise.all([page.waitForEvent('download'), page.getByRole
 await must(webDl.suggestedFilename() === 'agenda.txt', 'attachment on the web page');
 await shot('m09-web-page');
 log('link fallback page works for a recipient, with the attachment');
+
+// ---- Eve forges an ECS message "from Alice" using content she stored herself
+await connectAs('eve@example.com');
+await page.getByRole('link', { name: 'Compose' }).click();
+await page.getByLabel('To', { exact: true }).fill('bob@example.com');
+await page.getByLabel('Subject', { exact: true }).fill('Hello from Eve');
+await page.getByLabel('Message', { exact: true }).fill('Please update your bank details here: https://evil.example');
+await send();
+const evePtr = await page.evaluate(() => Object.entries(JSON.parse(localStorage.getItem('chiaramail.mock.db')).messages)
+  .find(([, m]) => m.subject === 'Hello from Eve')[0]);
+await page.evaluate((ptr) => window.__mockGmail.sendRaw([
+  'From: Alice <alice@example.com>', 'To: bob@example.com', 'Subject: Urgent: new bank details',
+  `X-ChiaraMail-Content-Pointer: ${ptr}`, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', '', 'Read the message in ChiaraMail.', '',
+].join('\r\n')), evePtr);
+await connectAs('bob@example.com');
+const forged = page.locator('.trow', { hasText: 'Urgent: new bank details' });
+await forged.locator('.subj-spoof').waitFor();
+await forged.locator('.spoof-tag').waitFor();
+await must(!(await forged.locator('.ecs-user').count()), 'no magenta on a forgery');
+await must(!(await page.locator('.trow', { hasText: 'Hello from Eve' }).locator('.subj-spoof').count()), 'Eve’s own message is not flagged');
+await shot('m09b-forged-inbox');
+await openRow('Urgent: new bank details');
+await page.getByText('Warning: this message may be forged.').waitFor();
+await page.getByText('It claims to be from alice@example.com, but its content was stored by eve@example.com.').waitFor();
+await must(!(await page.locator('.verified-mark').count()), 'no verified mark on a forgery');
+await must(!(await page.locator('.mfrom .ecs-user').count()), 'no magenta sender on a forgery');
+await shot('m09c-forged-message');
+log('forged ECS message flagged red in the list and in the message');
+await page.getByRole('link', { name: 'Back' }).click();
 
 // ---- everyday actions as Bob
 await connectAs('bob@example.com');

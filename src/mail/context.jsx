@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as gmail from '@gmail';
+import * as backend from '@backend';
 import { useAuth } from '../auth.jsx';
 
 const MailCtx = createContext(null);
@@ -25,6 +26,11 @@ export function MailProvider({ children }) {
     .then(([inbox, spam, drafts]) => ({ inbox: inbox.threadsUnread || 0, spam: spam.threadsUnread || 0, drafts: drafts.messagesTotal || 0 }));
   const onErr = (e) => { if (e.code === 'reconnect') setExpired(true); };
   const refreshCounts = useCallback(() => fetchCounts().then(setUnread).catch(onErr), []);
+
+  // List this address in the ECS directory, so others see it uses ECS.
+  useEffect(() => {
+    if (status === 'connected') backend.registerEcsUser(user);
+  }, [status, user]);
 
   useEffect(() => {
     if (status !== 'connected') return;

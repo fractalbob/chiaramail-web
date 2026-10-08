@@ -89,9 +89,11 @@ test('parseMessage extracts bodies, attachments, inline images and the content p
 test('summarize flags unread, live and attachments', () => {
   const s = summarize({ id: 't1', messages: [gmailMessage] }, 'bob@example.com');
   assert.equal(s.subject, 'Plans');
-  assert.deepEqual(s.people, ['Alice A']);
+  assert.deepEqual(s.people.map((p) => p.label), ['Alice A']);
   assert.equal(s.unread, true);
   assert.equal(s.live, true);
+  assert.equal(s.ecs[0].pointer, 'ptr42');
+  assert.equal(s.ecs[0].from, s.people[0].email);
   assert.equal(s.hasAttachment, true);
 });
 

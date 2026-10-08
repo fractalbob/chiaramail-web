@@ -305,3 +305,6 @@ export async function sendRaw(raw, threadId) {
 }
 
 export const _debugAddresses = (str) => parseAddressList(str);
+
+// Test hook: lets the browser walkthrough deliver a hand-made (e.g. forged) email.
+if (typeof window !== 'undefined') window.__mockGmail = { sendRaw };

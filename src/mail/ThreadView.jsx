@@ -8,6 +8,7 @@ import HtmlBody from './HtmlBody.jsx';
 import LiveMessage from './LiveMessage.jsx';
 import PlainBody from './PlainBody.jsx';
 import { fmtSize } from '../lib.js';
+import { useIsEcsUser } from './ecsCheck.js';
 
 
 function Attachments({ message }) {
@@ -66,11 +67,14 @@ function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
   const forwardBlocked = !!(m.pointer && live && !live.isSender && (live.withdrawn || !live.allowForward));
   const people = (list) => list.map((a) => (a.email.toLowerCase() === me ? t('me') : displayName(a))).join(', ');
   const replyBase = `/compose?thread=${threadId}&msg=${m.id}`;
+  const fromEmail = (m.from?.email || '').toLowerCase();
+  const ecsSender = useIsEcsUser(fromEmail === me ? '' : fromEmail) && !live?.spoof;
+  const fromName = <span className={ecsSender ? 'ecs-user' : undefined} title={ecsSender ? t('ecsUserTitle') : undefined}>{displayName(m.from)}</span>;
   if (!expanded) {
     return (
       <li className="mcard mcard-collapsed">
         <button type="button" className="mcard-toggle" onClick={onToggle} aria-expanded="false">
-          <span className="mfrom">{m.from?.email.toLowerCase() === me ? t('me') : displayName(m.from)}</span>
+          <span className="mfrom">{fromEmail === me ? t('me') : fromName}</span>
           <span className="msnip">{m.pointer ? t('liveCollapsed') : m.snippet}</span>
           <span className="mdate">{formatDate(m.date)}</span>
         </button>
@@ -81,7 +85,7 @@ function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
     <li className="mcard">
       <header className="mhead">
         <button type="button" className="mcard-toggle mcard-toggle-open" onClick={onToggle} aria-expanded="true" disabled={isLast}>
-          <span className="mfrom">{displayName(m.from)} <span className="maddr">&lt;{m.from?.email}&gt;</span></span>
+          <span className="mfrom">{fromName} <span className="maddr">&lt;{m.from?.email}&gt;</span></span>
           <span className="mdate">{formatDate(m.date)}</span>
         </button>
         <p className="mto">
