@@ -95,6 +95,12 @@ function seed(s, b, addr) {
     text: 'Hi Bob,\n\nCould you send the final print sizes for the three Julia set pieces?\n\nPaul',
     labels: ['INBOX'], minutesAgo: 2000,
   });
+  const d = msgJson(s, b, {
+    from: `Me <${addr}>`, to: 'Paul Martin <paul@atelier.example>',
+    subject: 'Framing quote', text: 'Hi Paul,\n\nCould you also quote for',
+    labels: ['DRAFT'], minutesAgo: 600,
+  });
+  b.drafts = { r_seed: d.id };
   msgJson(s, b, {
     threadId: first.threadId, from: `Me <${addr}>`, to: 'Paul Martin <paul@atelier.example>',
     subject: 'Re: Print sizes for the exhibition',
@@ -125,8 +131,10 @@ function visible(msgs, labelId) {
 const text = (m) => JSON.stringify(m.payload.headers) + ' ' + m.snippet;
 export async function getLabel(id) {
   const s = load();
-  const threads = Object.values(threadsOf(mine(s))).filter((ms) => visible(ms, id));
-  return { id, threadsTotal: threads.length, threadsUnread: threads.filter((ms) => has(ms, 'UNREAD')).length };
+  const b = mine(s);
+  const threads = Object.values(threadsOf(b)).filter((ms) => visible(ms, id));
+  const messagesTotal = Object.values(b.messages).filter((m) => m.labelIds.includes(id)).length;
+  return { id, threadsTotal: threads.length, threadsUnread: threads.filter((ms) => has(ms, 'UNREAD')).length, messagesTotal };
 }
 export async function listThreads({ labelId, q, pageToken, max = 25 }) {
   await later();
@@ -170,6 +178,78 @@ function modify(id, add, remove) {
 export async function modifyThread(id, add = [], remove = []) { await later(); modify(id, add, remove); }
 export async function trashThread(id) { await later(); modify(id, ['TRASH'], ['INBOX']); }
 export async function untrashThread(id) { await later(); modify(id, ['INBOX'], ['TRASH']); }
+
+// ---- drafts ------------------------------------------------------------------------
+async function messageFromRaw(s, b, raw, labels, threadId) {
+  const p = await PostalMime.parse(raw);
+  const id = nextId(s);
+  const headers = p.headers.filter((h) => !['content-type', 'content-transfer-encoding', 'mime-version'].includes(h.key))
+    .map((h) => ({ name: h.key.replace(/(^|-)([a-z])/g, (_, d, c) => d + c.toUpperCase()), value: h.value }));
+  if (!headers.some((h) => h.name === 'From')) headers.unshift({ name: 'From', value: me });
+  const parts = [];
+  if (p.text) parts.push({ mimeType: 'text/plain', headers: [{ name: 'Content-Type', value: 'text/plain; charset=UTF-8' }], body: { data: toB64url(p.text), size: p.text.length } });
+  const atts = p.attachments.map((a) => {
+    const attId = 'att' + nextId(s);
+    const bytes = new Uint8Array(a.content);
+    b.attachments[attId] = b64ToB64url(bytesToB64(bytes));
+    return { mimeType: a.mimeType, filename: a.filename, headers: [{ name: 'Content-Disposition', value: `attachment; filename="${a.filename}"` }], body: { attachmentId: attId, size: bytes.length } };
+  });
+  b.messages[id] = {
+    id, threadId: threadId || id, labelIds: labels, snippet: (p.text || '').replace(/\s+/g, ' ').slice(0, 120),
+    internalDate: String(Date.now()),
+    payload: { mimeType: 'multipart/mixed', headers, parts: [{ mimeType: 'multipart/alternative', headers: [], parts }, ...atts] },
+  };
+  return b.messages[id];
+}
+export async function listDrafts() {
+  const s = load(); const b = mine(s);
+  const drafts = Object.entries(b.drafts || {})
+    .map(([id, mid]) => ({ id, message: { id: mid, threadId: b.messages[mid]?.threadId } }))
+    .filter((d) => b.messages[d.message.id])
+    .sort((x, y) => Number(b.messages[y.message.id].internalDate) - Number(b.messages[x.message.id].internalDate));
+  return { drafts, nextPageToken: null };
+}
+export async function getDraft(id) {
+  await later();
+  const s = load(); const b = mine(s);
+  const mid = (b.drafts || {})[id];
+  if (!mid || !b.messages[mid]) throw Object.assign(new Error('Draft not found'), { status: 404 });
+  return { id, message: JSON.parse(JSON.stringify(b.messages[mid])) };
+}
+export async function getDraftsMeta(ids) { return Promise.all(ids.map(getDraft)); }
+export async function createDraft(raw, threadId) {
+  await later();
+  const s = load(); const b = mine(s);
+  const m = await messageFromRaw(s, b, raw, ['DRAFT'], threadId);
+  const id = 'r' + nextId(s);
+  (b.drafts ||= {})[id] = m.id;
+  save(s);
+  return { id, message: { id: m.id, threadId: m.threadId } };
+}
+export async function updateDraft(id, raw, threadId) {
+  await later();
+  const s = load(); const b = mine(s);
+  const old = (b.drafts || {})[id];
+  if (!old) throw Object.assign(new Error('Draft not found'), { status: 404 });
+  const keepThread = threadId || b.messages[old]?.threadId;
+  delete b.messages[old];
+  const m = await messageFromRaw(s, b, raw, ['DRAFT'], keepThread);
+  b.drafts[id] = m.id;
+  save(s);
+  return { id, message: { id: m.id, threadId: m.threadId } };
+}
+export async function deleteDraft(id) {
+  await later();
+  const s = load(); const b = mine(s);
+  const mid = (b.drafts || {})[id];
+  if (mid) delete b.messages[mid];
+  delete (b.drafts || {})[id];
+  save(s);
+}
+export async function findDraftId(messageId) {
+  const s = load(); const b = mine(s);
+  return Object.entries(b.drafts || {}).find(([, mid]) => mid === messageId)?.[0] || null;
+}
 
 // ---- sending: parse the real RFC 2822 message and deliver it -------------------
 export async function sendRaw(raw, threadId) {

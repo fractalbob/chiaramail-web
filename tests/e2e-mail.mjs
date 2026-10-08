@@ -68,6 +68,76 @@ await must(dl.suggestedFilename() === 'liste.txt', 'download name');
 log('attachment downloads');
 await page.getByRole('link', { name: 'Back' }).click();
 
+// ---- Drafts
+const draftsFolder = page.locator('.folder', { hasText: 'Drafts' });
+await must((await draftsFolder.innerText()).includes('1'), 'drafts count 1');
+await draftsFolder.click();
+await page.locator('.trow', { hasText: 'Framing quote' }).locator('.draft-tag').waitFor();
+await page.locator('.trow-link', { hasText: 'Framing quote' }).click();
+await page.locator('.rchip', { hasText: 'paul@atelier.example' }).waitFor();
+await waitValue(page.getByLabel('Subject', { exact: true }), (v) => v === 'Framing quote', 'draft subject loaded');
+await waitValue(page.getByLabel('Message', { exact: true }), (v) => v.startsWith('Hi Paul'), 'draft body loaded');
+await page.getByLabel('Message', { exact: true }).press('End');
+await page.getByLabel('Message', { exact: true }).pressSequentially(' three oak frames, 60 x 90 cm.');
+await page.getByText('Draft saved').waitFor({ timeout: 10000 });
+log('draft resumed and auto-saved');
+await draftsFolder.click();
+await page.locator('.trow', { hasText: 'three oak frames' }).waitFor();
+await must((await page.locator('.trow').count()) === 1, 'still one draft after editing');
+
+// a new message, left unfinished
+await page.getByRole('link', { name: 'Compose' }).click();
+await page.getByRole('combobox', { name: 'To' }).fill('bob@example.com');
+await page.getByLabel('Subject', { exact: true }).fill('Unfinished thought');
+await page.getByLabel('Message', { exact: true }).fill('Half a sentence');
+await page.getByText('Draft saved').waitFor({ timeout: 10000 });
+await page.locator('.folder', { hasText: 'Inbox' }).click();
+await draftsFolder.click();
+await page.locator('.trow', { hasText: 'Unfinished thought' }).waitFor();
+await must((await draftsFolder.innerText()).includes('2'), 'drafts count 2');
+log('new message auto-saved as a draft when left');
+await page.locator('.trow-link', { hasText: 'Unfinished thought' }).click();
+await waitValue(page.getByLabel('Message', { exact: true }), (v) => v === 'Half a sentence', 'unfinished draft loaded');
+await must(page.getByLabel(/Changeable message/).isChecked(), 'draft remembers changeable');
+await page.getByRole('button', { name: 'Discard' }).click();
+await draftsFolder.click();
+await page.locator('.trow').first().waitFor();
+await must(!(await page.locator('.trow', { hasText: 'Unfinished thought' }).count()), 'discard deletes draft');
+log('discard deletes the draft');
+
+// send a draft
+await page.locator('.trow-link', { hasText: 'Framing quote' }).click();
+await waitValue(page.getByLabel('Subject', { exact: true }), (v) => v === 'Framing quote', 'draft loaded for sending');
+await page.getByLabel(/Changeable message/).uncheck();
+await send();
+await page.getByText('three oak frames').waitFor();
+await draftsFolder.click();
+await page.getByText('No drafts.').waitFor();
+log('sending a draft removes it from Drafts');
+
+// a reply left as a draft shows in the conversation
+await page.locator('.folder', { hasText: 'Inbox' }).click();
+await openRow('Paul Martin');
+await page.getByRole('link', { name: 'Reply', exact: true }).last().click();
+await page.locator('.rchip', { hasText: 'paul@atelier.example' }).waitFor();
+await page.getByLabel('Message', { exact: true }).press('Control+Home');
+await page.getByLabel('Message', { exact: true }).pressSequentially('Draft reply about sizes. ');
+await page.getByText('Draft saved').waitFor({ timeout: 10000 });
+await page.goBack();
+await page.locator('.mcard-draft').waitFor();
+await page.getByRole('button', { name: 'Continue editing' }).click();
+await waitValue(page.getByLabel('Message', { exact: true }), (v) => v.startsWith('Draft reply about sizes.'), 'reply draft resumed');
+await waitValue(page.getByLabel('Subject', { exact: true }), (v) => v.startsWith('Re: Print sizes'), 'reply subject kept');
+await shot('m04d-draft-reply');
+await page.getByRole('button', { name: 'Discard' }).click();
+await page.locator('.thread-subject').waitFor();
+await page.waitForTimeout(300);
+await page.reload();
+await page.locator('.thread-subject').waitFor();
+await must(!(await page.locator('.mcard-draft').count()), 'reply draft discarded');
+log('reply drafts appear in the conversation, resume and discard');
+await page.getByRole('link', { name: 'Back' }).click();
+
 // ---- Alice sends a changeable message with an attachment
 writeFileSync(`${SHOTS}/agenda.txt`, 'Ordre du jour\n1. Budget\n2. Exposition\n');
 await page.getByRole('link', { name: 'Compose' }).click();

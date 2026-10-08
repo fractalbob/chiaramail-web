@@ -4,6 +4,7 @@ import { useMail } from './context.jsx';
 import { useI18n } from '../i18n.jsx';
 import { FOLDERS } from './folders.js';
 import ThreadList from './ThreadList.jsx';
+import DraftList from './DraftList.jsx';
 import ThreadView from './ThreadView.jsx';
 import Composer from './Composer.jsx';
 
@@ -23,7 +24,7 @@ function SearchBox() {
 function Sidebar({ onNavigate }) {
   const { t } = useI18n();
   const mail = useMail();
-  const count = { inbox: mail.unread.inbox, spam: mail.unread.spam };
+  const count = { inbox: mail.unread.inbox, spam: mail.unread.spam, drafts: mail.unread.drafts };
   return (
     <nav className="sidebar" aria-label={t('folders')}>
       <Link to="/compose" className="btn btn-primary compose-btn" onClick={onNavigate}>{t('compose')}</Link>
@@ -72,6 +73,7 @@ export default function MailLayout() {
       <section className="mail-main">
         <Routes>
           <Route path="/" element={<Navigate to="/mail/inbox" replace />} />
+          <Route path="/mail/drafts" element={<DraftList />} />
           <Route path="/mail/:folder" element={<ThreadList />} />
           <Route path="/mail/:folder/:threadId" element={<ThreadView />} />
           <Route path="/compose" element={<Composer />} />

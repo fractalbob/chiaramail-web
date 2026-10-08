@@ -94,7 +94,7 @@ you're already signed in to Google).
 
 ## Not yet included
 
-Drafts, rich-text writing, applying labels, multi-select in lists, and
+Rich-text writing, applying labels, multi-select in lists, and
 non-Gmail accounts. HTML emails are shown with scripts removed and web images
 held back until you click "Show images".
 

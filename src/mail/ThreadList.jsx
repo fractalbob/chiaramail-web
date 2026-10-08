@@ -77,6 +77,7 @@ export default function ThreadList() {
                 <span className="row-people">
                   {r.people.map((p) => (p === 'me' ? t('me') : p)).join(', ') || t('noSender')}
                   {r.count > 1 && <span className="tcount"> {r.count}</span>}
+                  {r.draft && <span className="draft-tag draft-tag-inline">{t('draft')}</span>}
                 </span>
                 <span className="row-subject">
                   {r.live && <span className="live" title={t('liveTitle')}>{t('live')}</span>}

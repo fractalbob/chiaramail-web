@@ -3,6 +3,7 @@ export const FOLDERS = [
   { key: 'inbox', label: 'INBOX' },
   { key: 'starred', label: 'STARRED' },
   { key: 'sent', label: 'SENT' },
+  { key: 'drafts', label: 'DRAFT' },
   { key: 'all', label: null },
   { key: 'spam', label: 'SPAM' },
   { key: 'trash', label: 'TRASH' },

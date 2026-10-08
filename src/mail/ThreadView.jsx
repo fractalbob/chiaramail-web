@@ -36,6 +36,30 @@ function Attachments({ message }) {
   );
 }
 
+function DraftCard({ m }) {
+  const { t, formatDate } = useI18n();
+  const nav = useNavigate();
+  const { handle, refreshCounts } = useMail();
+  const [gone, setGone] = useState(false);
+  const open = async () => {
+    try { const id = await gmail.findDraftId(m.id); if (id) nav(`/compose?draft=${id}`); } catch (e) { handle(e); }
+  };
+  const remove = async () => {
+    try { const id = await gmail.findDraftId(m.id); if (id) await gmail.deleteDraft(id); setGone(true); refreshCounts(); } catch (e) { handle(e); }
+  };
+  if (gone) return null;
+  return (
+    <li className="mcard mcard-draft">
+      <p className="mdraft-head"><span className="draft-tag">{t('draft')}</span> <span className="mdate">{formatDate(m.date)}</span></p>
+      <p className="msnip">{m.text ? m.text.slice(0, 200) : m.snippet}</p>
+      <div className="actions">
+        <button type="button" className="btn btn-primary" onClick={open}>{t('continueEditing')}</button>
+        <button type="button" className="btn btn-quiet" onClick={remove}>{t('deleteDraft')}</button>
+      </div>
+    </li>
+  );
+}
+
 function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
   const { t, formatDate } = useI18n();
   const [live, setLive] = useState(null); // { isSender, allowForward, withdrawn } for changeable messages
@@ -124,7 +148,8 @@ export default function ThreadView() {
     try { await fn(); refreshCounts(); if (!mounted.current) return; if (leave) nav(back); else load(); } catch (e) { handle(e); }
   };
   const subject = msgs[0]?.subject || t('noSubject');
-  const isOpen = (m, i) => open[m.id] ?? (i === msgs.length - 1 || m.labelIds.includes('UNREAD') || !!m.pointer);
+  const lastReal = msgs.map((m) => m.labelIds.includes('DRAFT')).lastIndexOf(false);
+  const isOpen = (m, i) => open[m.id] ?? (i === lastReal || m.labelIds.includes('UNREAD') || !!m.pointer);
 
   return (
     <article className="thread">
@@ -146,10 +171,10 @@ export default function ThreadView() {
       </div>
       <h1 className="thread-subject">{subject}</h1>
       <ol className="mcards">
-        {msgs.map((m, i) => (
-          <MessageCard key={m.id} m={m} threadId={threadId} me={mail.account} isLast={i === msgs.length - 1}
+        {msgs.map((m, i) => (m.labelIds.includes('DRAFT') ? <DraftCard key={m.id} m={m} /> : (
+          <MessageCard key={m.id} m={m} threadId={threadId} me={mail.account} isLast={i === lastReal}
             expanded={isOpen(m, i)} onToggle={() => setOpen({ ...open, [m.id]: !isOpen(m, i) })} />
-        ))}
+        )))}
       </ol>
     </article>
   );

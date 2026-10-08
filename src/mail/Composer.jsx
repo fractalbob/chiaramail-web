@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import * as gmail from '@gmail';
 import * as backend from '@backend';
@@ -21,6 +21,9 @@ const liveInfo = (pointer) => new Promise((resolve) => {
   unsub = backend.watchMessage(pointer, (d) => done(d), () => done(null));
 });
 const fmtAddr = (a) => (a.name ? `${a.name} <${a.email}>` : a.email);
+const DRAFT_CHANGEABLE = 'X-ChiaraMail-Changeable';
+const DRAFT_ALLOW_FWD = 'X-ChiaraMail-Allow-Forward';
+const AUTOSAVE_MS = 2000;
 const readFile = (file) => new Promise((resolve, reject) => {
   const r = new FileReader();
   r.onload = () => resolve(bytesToB64(new Uint8Array(r.result)));
@@ -34,6 +37,7 @@ export default function Composer() {
   const threadParam = params.get('thread');
   const msgParam = params.get('msg');
   const note = params.get('note');
+  const draftParam = params.get('draft');
   const nav = useNavigate();
   const { user } = useAuth();
   const mail = useMail();
@@ -52,6 +56,16 @@ export default function Composer() {
   const [allowFwd, setAllowFwd] = useState(false);
   const [forwardBlocked, setForwardBlocked] = useState(false);
   const [orig, setOrig] = useState(null);
+  const [thread, setThread] = useState(null); // { threadId, inReplyTo, references } when replying
+  const [draftLoaded, setDraftLoaded] = useState(!draftParam);
+  const [saveState, setSaveState] = useState('idle'); // idle | saving | saved | error
+  const draftIdRef = useRef(draftParam);
+  const doneRef = useRef(false); // sent or discarded: stop saving
+  const baselineRef = useRef(null);
+  const lastSavedRef = useRef(null);
+  const chainRef = useRef(Promise.resolve());
+  const b64Ref = useRef(new WeakMap());
+  const latestRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const bodyRef = useRef(null);
@@ -66,7 +80,7 @@ export default function Composer() {
 
   // Prefill replies and forwards from the original message.
   useEffect(() => {
-    if (!threadParam || !msgParam) return;
+    if (!threadParam || !msgParam || draftParam) return;
     let live = true;
     gmail.getThread(threadParam).then(async (th) => {
       const raw = th.messages.find((m) => m.id === msgParam) || th.messages[th.messages.length - 1];
@@ -97,6 +111,7 @@ export default function Composer() {
         const dedupe = (l) => l.filter((a, i) => l.findIndex((b) => b.email.toLowerCase() === a.email.toLowerCase()) === i);
         setTo(dedupe(toList));
         if (ccList.length) { setCc(dedupe(ccList)); setShowCc(true); }
+        setThread({ threadId: m.threadId, inReplyTo: m.messageId, references: `${m.references} ${m.messageId}`.trim() });
         setSubject(replySubject(m.subject));
         const intro = note === 'updated' ? `${t('updateNoteBody')}\n` : '\n';
         setBody(`${intro}\n${t('wroteOn', { date: formatDate(m.date), name: displayName(m.from) })}\n${quote(origText)}`);
@@ -105,6 +120,103 @@ export default function Composer() {
     }).catch((e) => { if (!mail.handle(e)) setError(e.message); });
     return () => { live = false; };
   }, [threadParam, msgParam, mode, note]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Resume a draft: recipients, text, settings, attachments and reply threading.
+  useEffect(() => {
+    if (!draftParam) return;
+    let live = true;
+    gmail.getDraft(draftParam).then(async (d) => {
+      const m = parseMessage(d.message);
+      const files = await Promise.all(m.attachments.map(async (a) => ({
+        name: a.filename, type: a.mimeType, size: a.size,
+        base64: b64urlToB64(a.data || await gmail.getAttachment(m.id, a.attachmentId)),
+      })));
+      if (!live) return;
+      setTo(m.to); setCc(m.cc); setBcc(m.bcc);
+      if (m.cc.length) setShowCc(true);
+      if (m.bcc.length) setShowBcc(true);
+      setSubject(m.subject);
+      setBody(m.text || htmlToText(m.html));
+      setFiles(files);
+      setChangeable(m.headers[DRAFT_CHANGEABLE.toLowerCase()] === '1');
+      setAllowFwd(m.headers[DRAFT_ALLOW_FWD.toLowerCase()] === '1');
+      if (m.inReplyTo) setThread({ threadId: m.threadId, inReplyTo: m.inReplyTo, references: m.references });
+      setDraftLoaded(true);
+    }).catch((e) => { if (!mail.handle(e)) { setError(e.status === 404 ? t('draftGone') : e.message); } });
+    return () => { live = false; };
+  }, [draftParam]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const ensureB64 = async (f) => {
+    if (f.base64) return f.base64;
+    if (b64Ref.current.has(f)) return b64Ref.current.get(f);
+    const v = f.file ? await readFile(f.file) : b64urlToB64(f.fwd.data || await gmail.getAttachment(f.fwd.messageId, f.fwd.attachmentId));
+    b64Ref.current.set(f, v);
+    return v;
+  };
+
+  // ---- auto-save to Gmail Drafts ------------------------------------------------
+  const snapshot = useMemo(() => JSON.stringify({
+    to, cc, bcc, subject, body, changeable, allowFwd, files: files.map((f) => [f.name, f.size]),
+  }), [to, cc, bcc, subject, body, changeable, allowFwd, files]);
+  useEffect(() => { latestRef.current = { to, cc, bcc, subject, body, changeable, allowFwd, files, thread, snapshot }; });
+
+  const saveDraft = () => {
+    chainRef.current = chainRef.current.then(async () => {
+      const v = latestRef.current;
+      if (doneRef.current || v.snapshot === lastSavedRef.current) return;
+      if (v.files.reduce((n, f) => n + f.size, 0) > MAX_TOTAL) return;
+      setSaveState('saving');
+      try {
+        const attachments = await Promise.all(v.files.map(async (f) => ({ filename: f.name, mimeType: f.type, base64: await ensureB64(f) })));
+        const ok = (l) => l.filter((a) => isEmail(a.email));
+        const raw = buildRaw({
+          to: ok(v.to), cc: ok(v.cc), bcc: v.changeable ? [] : ok(v.bcc), subject: v.subject, text: v.body, attachments,
+          headers: { [DRAFT_CHANGEABLE]: v.changeable ? '1' : '0', [DRAFT_ALLOW_FWD]: v.allowFwd ? '1' : '0' },
+          inReplyTo: v.thread?.inReplyTo || undefined, references: v.thread?.references || undefined,
+        });
+        if (doneRef.current) return;
+        const res = draftIdRef.current
+          ? await gmail.updateDraft(draftIdRef.current, raw, v.thread?.threadId)
+          : await gmail.createDraft(raw, v.thread?.threadId);
+        draftIdRef.current = res.id;
+        lastSavedRef.current = v.snapshot;
+        setSaveState('saved');
+        // Keep the draft in the address, so a reload resumes it.
+        const u = new URL(window.location.href);
+        if (u.searchParams.get('draft') !== res.id) { u.searchParams.set('draft', res.id); window.history.replaceState(window.history.state, '', u.pathname + u.search); }
+        mail.refreshCounts();
+      } catch (e) {
+        if (!mail.handle(e)) setSaveState('error');
+      }
+    });
+    return chainRef.current;
+  };
+
+  const ready = draftLoaded && !(threadParam && msgParam && !draftParam && !orig);
+  useEffect(() => {
+    if (!ready || doneRef.current) return;
+    if (baselineRef.current === null) { baselineRef.current = snapshot; lastSavedRef.current = draftParam ? snapshot : null; return; }
+    if (snapshot === lastSavedRef.current || (snapshot === baselineRef.current && !draftIdRef.current)) return;
+    const timer = setTimeout(saveDraft, AUTOSAVE_MS);
+    return () => clearTimeout(timer);
+  }, [snapshot, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+
+  // Leaving the page with unsaved changes: save them.
+  useEffect(() => () => {
+    const v = latestRef.current;
+    if (!doneRef.current && baselineRef.current !== null && v.snapshot !== lastSavedRef.current
+      && (v.snapshot !== baselineRef.current || draftIdRef.current)) saveDraft();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const discard = async () => {
+    doneRef.current = true;
+    await chainRef.current;
+    if (draftIdRef.current) { await gmail.deleteDraft(draftIdRef.current).catch(() => {}); mail.refreshCounts(); }
+    if (mountedRef.current) nav(-1); // unless the writer has already gone elsewhere
+  };
 
   const addFiles = (list) => {
     // Copy the FileList now: the input is cleared right after, which empties it.
@@ -123,13 +235,11 @@ export default function Composer() {
     const total = files.reduce((n, f) => n + f.size, 0);
     if (total > MAX_TOTAL) return setError(t('tooBig'));
     setBusy(true);
+    doneRef.current = true;
+    await chainRef.current; // let any draft save in progress finish first
     let pointer = null;
     try {
-      const attachments = await Promise.all(files.map(async (f) => ({
-        filename: f.name,
-        mimeType: f.type,
-        base64: f.file ? await readFile(f.file) : b64urlToB64(f.fwd.data || await gmail.getAttachment(f.fwd.messageId, f.fwd.attachmentId)),
-      })));
+      const attachments = await Promise.all(files.map(async (f) => ({ filename: f.name, mimeType: f.type, base64: await ensureB64(f) })));
       let text = body;
       let html;
       const headers = {};
@@ -145,26 +255,27 @@ export default function Composer() {
 <p><a href="${link}" style="display:inline-block;padding:10px 18px;background:#14313b;color:#fbfdfe;border-radius:6px;text-decoration:none">${escapeHtml(t('liveFallbackButton'))}</a></p>
 <p style="color:#587079;font-size:14px">${escapeHtml(t('liveFallbackHint'))}</p></div>`;
       }
-      const isReply = (mode === 'reply' || mode === 'replyAll') && orig;
       const raw = buildRaw({
         to: toL, cc: ccL, bcc: bccL, subject: subject.trim(), text, html, attachments, headers,
-        inReplyTo: isReply ? orig.messageId : undefined,
-        references: isReply ? `${orig.references} ${orig.messageId}`.trim() : undefined,
+        inReplyTo: thread?.inReplyTo || undefined,
+        references: thread?.references || undefined,
       });
-      const res = await gmail.sendRaw(raw, isReply ? orig.threadId : undefined);
+      const res = await gmail.sendRaw(raw, thread?.threadId);
+      if (draftIdRef.current) await gmail.deleteDraft(draftIdRef.current).catch(() => {});
       rememberRecipients(me, [...toL, ...ccL, ...bccL]);
       mail.refreshCounts();
       nav(`/mail/sent/${res.threadId}`, { replace: true });
     } catch (e) {
       if (pointer) backend.deleteMessage(pointer).catch(() => {});
       if (!mail.handle(e)) setError(t('errorGeneric', { msg: e.message }));
+      doneRef.current = false;
       setBusy(false);
     }
   };
 
-  // Replies and forwards can't be sent until the original has been filled in.
-  const preparing = !!(threadParam && msgParam) && !orig && !error;
-  const title = { new: t('newMessage'), reply: t('reply'), replyAll: t('replyAll'), forward: t('forward') }[mode];
+  // Replies, forwards and drafts can't be sent until they've been filled in.
+  const preparing = !ready && !error;
+  const title = draftParam ? t('draft') : { new: t('newMessage'), reply: t('reply'), replyAll: t('replyAll'), forward: t('forward') }[mode];
 
   return (
     <form className="compose" onSubmit={send}>
@@ -233,7 +344,12 @@ export default function Composer() {
       {error && <p className="error" role="alert">{error}</p>}
       <div className="actions">
         <button type="submit" className="btn btn-primary" disabled={busy || preparing || forwardBlocked}>{busy ? t('sending') : preparing ? t('loading') : t('send')}</button>
-        <button type="button" className="btn btn-quiet" onClick={() => nav(-1)}>{t('discard')}</button>
+        <button type="button" className="btn btn-quiet" onClick={discard}>{t('discard')}</button>
+        <span className="savestate" role="status" aria-live="polite">
+          {saveState === 'saving' && t('draftSaving')}
+          {saveState === 'saved' && t('draftSaved')}
+          {saveState === 'error' && t('draftSaveFailed')}
+        </span>
       </div>
     </form>
   );

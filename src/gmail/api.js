@@ -141,6 +141,51 @@ export const modifyThread = (id, add = [], remove = []) => call(`/threads/${id}/
 export const trashThread = (id) => call(`/threads/${id}/trash`, { method: 'POST' });
 export const untrashThread = (id) => call(`/threads/${id}/untrash`, { method: 'POST' });
 
+// ---- drafts -------------------------------------------------------------------
+const b64url = (raw) => btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+async function upload(path, method, meta, raw) {
+  if (!token || token.expiresAt < Date.now() + 30_000) throw reconnectError();
+  const b = `cm_${Date.now()}`;
+  const res = await fetch(`https://gmail.googleapis.com/upload/gmail/v1/users/me${path}?uploadType=multipart`, {
+    method,
+    headers: { Authorization: `Bearer ${token.accessToken}`, 'Content-Type': `multipart/related; boundary=${b}` },
+    body: [`--${b}`, 'Content-Type: application/json; charset=UTF-8', '', JSON.stringify(meta),
+      `--${b}`, 'Content-Type: message/rfc822', '', raw, `--${b}--`, ''].join('\r\n'),
+  });
+  if (res.status === 401) { saveToken(null); throw reconnectError(); }
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error?.message || res.statusText);
+  return res.json();
+}
+export async function listDrafts({ pageToken, max = 25 } = {}) {
+  const r = await call('/drafts', { query: { pageToken, maxResults: max } });
+  return { drafts: r.drafts || [], nextPageToken: r.nextPageToken || null };
+}
+export const getDraft = (id) => call(`/drafts/${id}`, { query: { format: 'full' } });
+export const getDraftsMeta = (ids) => mapLimit(ids, 6, (id) => call(`/drafts/${id}`, { query: { format: 'metadata' } }));
+export async function createDraft(raw, threadId) {
+  const message = threadId ? { threadId } : {};
+  if (raw.length >= 4_000_000) return upload('/drafts', 'POST', { message }, raw);
+  return call('/drafts', { method: 'POST', body: { message: { ...message, raw: b64url(raw) } } });
+}
+export async function updateDraft(id, raw, threadId) {
+  const message = threadId ? { threadId } : {};
+  if (raw.length >= 4_000_000) return upload(`/drafts/${id}`, 'PUT', { id, message }, raw);
+  return call(`/drafts/${id}`, { method: 'PUT', body: { id, message: { ...message, raw: b64url(raw) } } });
+}
+export const deleteDraft = (id) => call(`/drafts/${id}`, { method: 'DELETE' });
+/** The draft ID for a draft message shown in a conversation. */
+export async function findDraftId(messageId) {
+  let pageToken;
+  for (let i = 0; i < 5; i += 1) {
+    const r = await call('/drafts', { query: { pageToken, maxResults: 100 } });
+    const hit = (r.drafts || []).find((d) => d.message?.id === messageId);
+    if (hit) return hit.id;
+    if (!r.nextPageToken) return null;
+    pageToken = r.nextPageToken;
+  }
+  return null;
+}
+
 /** Sends an RFC 2822 message (ASCII). Returns { id, threadId }. */
 export async function sendRaw(raw, threadId) {
   if (raw.length < 4_000_000) {

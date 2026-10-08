@@ -283,6 +283,14 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
   border-radius: 3px; padding: 1px 7px; margin-right: 8px; vertical-align: 1px;
 }
 .empty { color: var(--slate); padding: 40px 0; }
+.draft-tag { color: var(--danger); font-weight: 600; font-size: 0.875rem; }
+.draft-tag-inline { margin-left: 6px; }
+.rowdel { background: none; border: 0; cursor: pointer; padding: 8px 10px; opacity: 0.55; font-size: 1rem; }
+.rowdel:hover, .rowdel:focus-visible { opacity: 1; }
+.mcard-draft { border-style: dashed; }
+.mdraft-head { margin: 0 0 6px; display: flex; gap: 10px; align-items: baseline; }
+.mcard-draft .msnip { white-space: pre-wrap; margin: 0 0 12px; overflow: visible; }
+.savestate { color: var(--slate); font-size: 0.875rem; margin-left: auto; }
 
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--rule); }
 .star-btn.star-on { color: #b88a00; border-color: #d9a400; }

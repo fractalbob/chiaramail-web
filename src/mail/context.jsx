@@ -21,8 +21,8 @@ export function MailProvider({ children }) {
     else status = 'disconnected';
   }
 
-  const fetchCounts = () => Promise.all([gmail.getLabel('INBOX'), gmail.getLabel('SPAM')])
-    .then(([inbox, spam]) => ({ inbox: inbox.threadsUnread || 0, spam: spam.threadsUnread || 0 }));
+  const fetchCounts = () => Promise.all([gmail.getLabel('INBOX'), gmail.getLabel('SPAM'), gmail.getLabel('DRAFT')])
+    .then(([inbox, spam, drafts]) => ({ inbox: inbox.threadsUnread || 0, spam: spam.threadsUnread || 0, drafts: drafts.messagesTotal || 0 }));
   const onErr = (e) => { if (e.code === 'reconnect') setExpired(true); };
   const refreshCounts = useCallback(() => fetchCounts().then(setUnread).catch(onErr), []);
 
