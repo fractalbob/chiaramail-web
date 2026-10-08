@@ -144,6 +144,15 @@ const threadJson = (b, id) => {
   if (!msgs) throw Object.assign(new Error('Thread not found'), { status: 404 });
   return { id, messages: JSON.parse(JSON.stringify(msgs)) };
 };
+export async function recentAddresses(q, max) {
+  const s = load();
+  const want = /in:sent/.test(q) ? 'SENT' : 'INBOX';
+  return Object.values(mine(s).messages)
+    .filter((m) => m.labelIds.includes(want))
+    .sort((a, b) => Number(b.internalDate) - Number(a.internalDate))
+    .slice(0, max)
+    .map((m) => ({ date: Number(m.internalDate), headers: m.payload.headers }));
+}
 export async function getThreadsMeta(ids) { const s = load(); return ids.map((id) => threadJson(mine(s), id)); }
 export async function getThread(id) { await later(); const s = load(); return threadJson(mine(s), id); }
 export async function getAttachment(_messageId, attachmentId) { const s = load(); return mine(s).attachments[attachmentId]; }

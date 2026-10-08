@@ -87,7 +87,22 @@ log('changeable message sent; sender sees live block with Edit');
 
 // and an ordinary message
 await page.getByRole('link', { name: 'Compose' }).click();
-await page.getByLabel('To', { exact: true }).fill('bob@example.com');
+// Recipient suggestions: Paul (from Sent mail) and Bob (written to just now)
+const toBox = page.getByRole('combobox', { name: 'To' });
+await toBox.pressSequentially('pau');
+await page.getByRole('option', { name: /Paul Martin/ }).waitFor();
+await shot('m04b-suggestions');
+await toBox.press('Escape');
+await toBox.fill('');
+await toBox.pressSequentially('bo');
+await page.getByRole('option', { name: /bob@example\.com/ }).waitFor();
+await toBox.press('Enter');
+await waitValue(toBox, (v) => /^Bob <bob@example\.com>, $/.test(v), 'suggestion accepted');
+await toBox.pressSequentially('pa');
+await page.getByRole('option', { name: /Paul Martin/ }).click();
+await waitValue(toBox, (v) => v === 'Bob <bob@example.com>, Paul Martin <paul@atelier.example>, ', 'second suggestion appended');
+await toBox.fill('bob@example.com');
+log('recipient suggestions from Sent mail and recent recipients');
 await page.getByLabel(/Changeable message/).uncheck();
 await page.getByLabel('Subject', { exact: true }).fill('Ordinary note');
 await page.getByLabel('Message', { exact: true }).fill('Just a normal email.');

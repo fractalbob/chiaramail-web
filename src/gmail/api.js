@@ -126,6 +126,14 @@ export async function listThreads({ labelId, q, pageToken, max = 25 }) {
 const META = ['From', 'To', 'Subject', 'Date', 'X-ChiaraMail-Content-Pointer'];
 export const getThreadsMeta = (ids) => mapLimit(ids, 6, (id) => call(`/threads/${id}`, { query: { format: 'metadata', metadataHeaders: META } }));
 export const getThread = (id) => call(`/threads/${id}`, { query: { format: 'full' } });
+
+/** Address headers of recent messages matching a Gmail query (for recipient suggestions). */
+export async function recentAddresses(q, max) {
+  const r = await call('/messages', { query: { q, maxResults: max } });
+  const ids = (r.messages || []).map((m) => m.id);
+  return mapLimit(ids, 6, (id) => call(`/messages/${id}`, { query: { format: 'metadata', metadataHeaders: ['From', 'To', 'Cc', 'Bcc'] } }))
+    .then((msgs) => msgs.map((m) => ({ date: Number(m.internalDate), headers: m.payload?.headers || [] })));
+}
 export async function getAttachment(messageId, attachmentId) {
   return (await call(`/messages/${messageId}/attachments/${attachmentId}`)).data;
 }

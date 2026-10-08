@@ -10,6 +10,8 @@ import { messageUrl } from '../lib.js';
 import { useAuth } from '../auth.jsx';
 import { useMail } from './context.jsx';
 import { useI18n } from '../i18n.jsx';
+import RecipientInput from './RecipientInput.jsx';
+import { cachedContacts, refreshContacts, rememberRecipients } from './contacts.js';
 
 const MAX_TOTAL = 24 * 1024 * 1024;
 // A changeable message as this reader may see it (null if they can't).
@@ -52,6 +54,14 @@ export default function Composer() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const bodyRef = useRef(null);
+  const [contacts, setContacts] = useState(() => cachedContacts(me));
+
+  // Load suggestions from Gmail in the background (cached for a few hours).
+  useEffect(() => {
+    let live = true;
+    refreshContacts(me).then((c) => { if (live) setContacts(c); }).catch(() => {});
+    return () => { live = false; };
+  }, [me]);
 
   // Prefill replies and forwards from the original message.
   useEffect(() => {
@@ -142,6 +152,7 @@ export default function Composer() {
         references: isReply ? `${orig.references} ${orig.messageId}`.trim() : undefined,
       });
       const res = await gmail.sendRaw(raw, isReply ? orig.threadId : undefined);
+      rememberRecipients(me, [...toL, ...ccL, ...bccL]);
       mail.refreshCounts();
       nav(`/mail/sent/${res.threadId}`, { replace: true });
     } catch (e) {
@@ -160,7 +171,7 @@ export default function Composer() {
       <h1 className="page-title">{title}</h1>
       <div className="field">
         <label htmlFor="to">{t('to')}</label>
-        <input id="to" type="text" inputMode="email" autoComplete="off" value={to} onChange={(e) => setTo(e.target.value)} aria-describedby="to-help" />
+        <RecipientInput id="to" value={to} onChange={setTo} contacts={contacts} describedBy="to-help" label={t('suggestions')} />
         <p id="to-help" className="help">
           {t('separateAddresses')}{' '}
           {!showCc && <button type="button" className="linklike" onClick={() => setShowCc(true)}>{t('addCcBcc')}</button>}
@@ -170,12 +181,12 @@ export default function Composer() {
         <>
           <div className="field">
             <label htmlFor="cc">{t('cc')}</label>
-            <input id="cc" type="text" inputMode="email" autoComplete="off" value={cc} onChange={(e) => setCc(e.target.value)} />
+            <RecipientInput id="cc" value={cc} onChange={setCc} contacts={contacts} label={t('suggestions')} />
           </div>
           <div className="field">
             <label htmlFor="bcc">{t('bcc')}</label>
-            <input id="bcc" type="text" inputMode="email" autoComplete="off" value={changeable ? '' : bcc} disabled={changeable}
-              onChange={(e) => setBcc(e.target.value)} aria-describedby={changeable ? 'bcc-help' : undefined} />
+            <RecipientInput id="bcc" value={changeable ? '' : bcc} onChange={setBcc} contacts={contacts} disabled={changeable}
+              describedBy={changeable ? 'bcc-help' : undefined} label={t('suggestions')} />
             {changeable && <p id="bcc-help" className="help">{t('bccNotLive')}</p>}
           </div>
         </>

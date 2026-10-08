@@ -339,6 +339,16 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .live-tools .subtoggle { margin: 0; }
 .subtoggle input { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--ink); }
 .subtoggle .help { display: block; }
+.combo { position: relative; }
+.combo-list {
+  position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none;
+  background: var(--paper); border: 1px solid var(--rule); border-radius: var(--radius-s);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 18%, transparent); max-height: 300px; overflow-y: auto;
+}
+.combo-opt { display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline; padding: 8px 10px; border-radius: 4px; cursor: pointer; }
+.combo-opt-on { background: color-mix(in srgb, var(--lumen) 40%, var(--paper)); }
+.combo-name { font-weight: 600; }
+.combo-email { color: var(--slate); font-size: 0.875rem; overflow-wrap: anywhere; }
 .field-label { font-size: 0.875rem; color: var(--slate); font-weight: 500; }
 .filebtn { justify-self: start; }
 .filebtn input { display: none; }
