@@ -98,7 +98,7 @@ await must((await draftsFolder.innerText()).includes('2'), 'drafts count 2');
 log('new message auto-saved as a draft when left');
 await page.locator('.trow-link', { hasText: 'Unfinished thought' }).click();
 await waitValue(page.getByLabel('Message', { exact: true }), (v) => v === 'Half a sentence', 'unfinished draft loaded');
-await must(page.getByLabel(/Changeable message/).isChecked(), 'draft remembers changeable');
+await must(page.getByLabel(/^ECS message/).isChecked(), 'draft remembers changeable');
 await page.getByRole('button', { name: 'Discard' }).click();
 await draftsFolder.click();
 await page.locator('.trow').first().waitFor();
@@ -108,7 +108,7 @@ log('discard deletes the draft');
 // send a draft
 await page.locator('.trow-link', { hasText: 'Framing quote' }).click();
 await waitValue(page.getByLabel('Subject', { exact: true }), (v) => v === 'Framing quote', 'draft loaded for sending');
-await page.getByLabel(/Changeable message/).uncheck();
+await page.getByLabel(/^ECS message/).uncheck();
 await send();
 await page.getByText('three oak frames').waitFor();
 await draftsFolder.click();
@@ -138,13 +138,13 @@ await must(!(await page.locator('.mcard-draft').count()), 'reply draft discarded
 log('reply drafts appear in the conversation, resume and discard');
 await page.getByRole('link', { name: 'Back' }).click();
 
-// ---- Alice sends a changeable message with an attachment
+// ---- Alice sends an ECS message with an attachment
 writeFileSync(`${SHOTS}/agenda.txt`, 'Ordre du jour\n1. Budget\n2. Exposition\n');
 await page.getByRole('link', { name: 'Compose' }).click();
 await page.getByLabel('To', { exact: true }).fill('Bob <bob@example.com>, carol@example.com');
 await page.getByLabel('Subject', { exact: true }).fill('Committee meeting on Thursday');
 await page.getByLabel('Message', { exact: true }).fill('Hi both,\n\nThe committee meets on Thursday at 18:00 in the library.\n\nAlice');
-await must(page.getByLabel(/Changeable message/).isChecked(), 'changeable on by default for new mail');
+await must(page.getByLabel(/^ECS message/).isChecked(), 'ECS on by default for new mail');
 await must(!(await page.getByLabel(/Let recipients forward it/).isChecked()), 'forwarding off by default');
 await page.locator('input[type=file]').setInputFiles(`${SHOTS}/agenda.txt`);
 await shot('m04-compose');
@@ -152,8 +152,11 @@ await send();
 await page.locator('.live-block').waitFor();
 await page.getByText('First edition').waitFor();
 await page.getByRole('button', { name: 'Edit' }).waitFor();
-await page.getByRole('button', { name: /agenda\.txt/ }).waitFor();
-log('changeable message sent; sender sees live block with Edit');
+await page.locator('.live-block').getByRole('button', { name: /agenda\.txt/ }).waitFor();
+await must((await page.getByRole('button', { name: /agenda\.txt/ }).count()) === 1, 'attachment shown once, from ChiaraMail');
+const mailbox = await page.evaluate(() => localStorage.getItem('chiaramail.mock.gmail'));
+await must(!mailbox.includes('agenda.txt') && !mailbox.includes('Ordre du jour') && !mailbox.includes('T3JkcmUgZHUgam91c'), 'attachment not in the email');
+log('ECS message sent; sender sees live block with Edit and the stored attachment');
 
 // and an ordinary message
 await page.getByRole('link', { name: 'Compose' }).click();
@@ -184,7 +187,7 @@ await page.getByRole('button', { name: 'Bcc' }).click();
 await page.getByRole('combobox', { name: 'Bcc' }).waitFor();
 log('recipient chips: suggestions, Enter/click/comma to add, Backspace and × to remove, invalid flagged');
 
-await page.getByLabel(/Changeable message/).uncheck();
+await page.getByLabel(/^ECS message/).uncheck();
 await page.getByLabel('Subject', { exact: true }).fill('Ordinary note');
 await page.getByLabel('Message', { exact: true }).fill('Just a normal email.');
 await send();
@@ -200,12 +203,16 @@ await openRow('Committee meeting');
 await page.getByText('The committee meets on Thursday at 18:00').waitFor();
 await must(!(await page.getByRole('button', { name: 'Edit' }).count()), 'recipient has no Edit');
 await page.getByText('The sender can see when you last opened this message.').waitFor();
+const [ecsDl] = await Promise.all([page.waitForEvent('download'), page.locator('.live-block').getByRole('button', { name: /agenda\.txt/ }).click()]);
+await must(ecsDl.suggestedFilename() === 'agenda.txt', 'ECS attachment download name');
+await must((await (await import('node:fs')).readFileSync(await ecsDl.path(), 'utf8')).startsWith('Ordre du jour'), 'ECS attachment content');
+log('recipient downloads the attachment from ChiaraMail');
 await shot('m06-bob-reads-live');
 log('recipient sees live text inline, no edit controls');
 await page.getByRole('link', { name: 'Reply', exact: true }).last().click();
 await page.locator('.rfield', { has: page.locator('#to') }).locator('.rchip', { hasText: 'alice@example.com' }).waitFor();
 await must((await page.getByLabel('Subject', { exact: true }).inputValue()) === 'Re: Committee meeting on Thursday', 'reply subject');
-await must(!(await page.getByLabel(/Changeable message/).isChecked()), 'replies default to ordinary');
+await must(!(await page.getByLabel(/^ECS message/).isChecked()), 'replies default to ordinary');
 await waitValue(page.getByLabel('Message', { exact: true }), (v) => v.includes('> The committee meets on Thursday'), 'reply quotes live text');
 await page.getByLabel('Message', { exact: true }).press('Control+Home');
 await page.getByLabel('Message', { exact: true }).type('Thursday works for me. ');
@@ -234,6 +241,7 @@ await openRow('Committee meeting');
 await must(!(await page.getByText('The sender doesn’t allow this message to be forwarded.').count()), 'forward now allowed');
 await page.getByRole('link', { name: 'Forward' }).first().click();
 await waitValue(page.getByLabel('Subject', { exact: true }), (v) => v.startsWith('Fwd:'), 'forward prefilled');
+await page.locator('.compose .chip', { hasText: 'agenda.txt' }).waitFor();
 await page.getByLabel('To', { exact: true }).fill('dave@example.com');
 await send();
 await page.locator('.mcard').first().waitFor();
@@ -273,6 +281,8 @@ await openRow('Committee meeting');
 await page.getByText('The committee meets on Thursday').first().waitFor();
 await must(!(await page.getByText('Change of plan').count()), 'outsider must not see later live edits');
 await must(!(await page.locator('.live-block').count()), 'forward is an ordinary email');
+await page.getByRole('button', { name: /agenda\.txt/ }).waitFor();
+log('forward carries the stored attachment as a normal one');
 const pointer = await page.evaluate(() => Object.entries(JSON.parse(localStorage.getItem('chiaramail.mock.db')).messages)
   .find(([, m]) => m.subject === 'Committee meeting on Thursday')[0]);
 const fallbackHref = `${BASE}/m/${pointer}`;
@@ -285,7 +295,10 @@ log('forwarded copy holds the text as forwarded; later edits and the live page s
 await connectAs('carol@example.com');
 await page.goto(fallbackHref);
 await page.getByText('Change of plan').waitFor();
-log('link fallback page works for a recipient');
+const [webDl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: /agenda\.txt/ }).click()]);
+await must(webDl.suggestedFilename() === 'agenda.txt', 'attachment on the web page');
+await shot('m09-web-page');
+log('link fallback page works for a recipient, with the attachment');
 
 // ---- everyday actions as Bob
 await connectAs('bob@example.com');
@@ -320,6 +333,8 @@ await connectAs('bob@example.com');
 await openRow('Committee meeting');
 await page.getByText(/withdrew this message on/).waitFor();
 await must(!(await page.getByText('Change of plan').count()), 'withdrawn text gone');
+await must(!(await page.getByRole('button', { name: /agenda\.txt/ }).count()), 'withdrawn attachment gone');
+await must(!(await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('chiaramail.mock.files') || '{}')).length)), 'stored files erased on withdraw');
 log('withdraw erases the live text for readers');
 
 // French + mobile dark

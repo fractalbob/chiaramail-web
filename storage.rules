@@ -1,0 +1,40 @@
+rules_version = '2';
+
+// ChiaraMail — attachments of ECS messages (Envelope-Content Splitting).
+// They are stored with the message body instead of travelling in the email,
+// at ecs/{messageId}/{index}. Access follows the message in Firestore:
+// only its sender and listed recipients can fetch them, only the sender can
+// add or remove them, and nobody can fetch them once it's withdrawn.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /ecs/{id}/{file} {
+      function msg() {
+        return firestore.get(/databases/(default)/documents/messages/$(id)).data;
+      }
+      function signedIn() {
+        return request.auth != null;
+      }
+      function verified() {
+        return signedIn()
+          && request.auth.token.email is string
+          && request.auth.token.email_verified == true;
+      }
+      function isSender() {
+        return signedIn() && msg().senderUid == request.auth.uid;
+      }
+      function isRecipient() {
+        return verified() && request.auth.token.email.lower() in msg().recipients;
+      }
+
+      allow get: if (isSender() || isRecipient()) && msg().withdrawn == false;
+
+      allow create: if isSender()
+        && msg().withdrawn == false
+        && file.matches('[0-9]{1,2}')
+        && int(file) < msg().get('attachments', []).size()
+        && request.resource.size <= 25 * 1024 * 1024;
+
+      allow delete: if isSender();
+    }
+  }
+}

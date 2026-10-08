@@ -5,9 +5,11 @@ import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
 import { Readers, Editions } from '../components/SenderTools.jsx';
 import PlainBody from './PlainBody.jsx';
+import EcsAttachments from '../components/EcsAttachments.jsx';
 
-// The body of a ChiaraMail message: fetched live from ChiaraMail (the
-// original's FETCH CONTENT), editable in place by its sender (UPDATE CONTENT).
+// The content of an ECS message (body and attachments): fetched live from
+// ChiaraMail (the original's FETCH CONTENT), editable in place by its sender
+// (UPDATE CONTENT).
 export default function LiveMessage({ pointer, message, threadId, onInfo }) {
   const { user } = useAuth();
   const { t, formatDate } = useI18n();
@@ -111,6 +113,7 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
       ) : (
         <div className="letter-body live-body"><PlainBody text={d.body} /></div>
       )}
+      <EcsAttachments id={pointer} message={d} />
 
       {!isSender && !d.withdrawn && <p className="fineprint">{t('readNotice')}</p>}
 

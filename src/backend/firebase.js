@@ -10,19 +10,25 @@ import {
   orderBy, onSnapshot, writeBatch, serverTimestamp, increment, getDoc,
   getDocs, setDoc, updateDoc, deleteDoc,
 } from 'firebase/firestore';
+import {
+  getStorage, connectStorageEmulator, ref as sref, uploadBytes, getBlob, deleteObject,
+} from 'firebase/storage';
 
 const app = initializeApp({
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
 });
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 if (import.meta.env.VITE_USE_EMULATORS === '1') {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  connectStorageEmulator(storage, '127.0.0.1', 9199);
 }
 
 const EMAIL_KEY = 'chiaramail.emailForSignIn';
@@ -114,7 +120,12 @@ export function watchMessage(id, cb, onErr) {
   return onSnapshot(doc(messages, id), (s) => cb(s.exists() ? toMessage(s) : null), onErr);
 }
 
-export async function createMessage(user, { recipients, subject, body, allowForward = false }) {
+// An ECS message's attachments travel with its body, not with the email:
+// they're stored at ecs/{messageId}/{index} and only its readers can fetch them.
+const fileRef = (id, i) => sref(storage, `ecs/${id}/${i}`);
+const fileMeta = (files) => files.map((f) => ({ name: f.name, type: f.type || 'application/octet-stream', size: f.size }));
+
+export async function createMessage(user, { recipients, subject, body, allowForward = false, attachments = [] }) {
   const ref = doc(messages);
   const batch = writeBatch(db);
   const data = {
@@ -130,11 +141,27 @@ export async function createMessage(user, { recipients, subject, body, allowForw
     allowForward: !!allowForward,
   };
   if (user.name) data.senderName = user.name.slice(0, 120);
+  if (attachments.length) data.attachments = fileMeta(attachments);
   batch.set(ref, data);
   batch.set(doc(ref, 'editions', '1'), { edition: 1, subject, body, savedAt: serverTimestamp() });
   await batch.commit();
   return ref.id;
 }
+
+// files: [{ name, type, bytes: Uint8Array }] in the same order as createMessage's attachments.
+export async function uploadAttachments(id, files) {
+  await Promise.all(files.map((f, i) => uploadBytes(fileRef(id, i), f.bytes, {
+    contentType: f.type || 'application/octet-stream',
+  })));
+}
+
+export function getAttachment(id, i) {
+  return getBlob(fileRef(id, i));
+}
+
+const removeFiles = (id, count) => Promise.all(
+  Array.from({ length: count }, (_, i) => deleteObject(fileRef(id, i)).catch(() => {})),
+);
 
 export async function saveEdition(id, current, { subject, body }) {
   const ref = doc(messages, id);
@@ -150,12 +177,16 @@ export function setAllowForward(id, allow) {
   return updateDoc(doc(messages, id), { allowForward: !!allow });
 }
 
-export function withdraw(id) {
-  return updateDoc(doc(messages, id), { withdrawn: true, body: '', updatedAt: serverTimestamp() });
+export async function withdraw(id) {
+  const snap = await getDoc(doc(messages, id));
+  await updateDoc(doc(messages, id), { withdrawn: true, body: '', updatedAt: serverTimestamp() });
+  await removeFiles(id, snap.data()?.attachments?.length || 0);
 }
 
-export async function deleteMessage(id) {
+export async function deleteMessage(id, fileCount) {
   const ref = doc(messages, id);
+  const count = fileCount ?? ((await getDoc(ref).catch(() => null))?.data()?.attachments?.length || 0);
+  await removeFiles(id, count);
   const [eds, reads] = await Promise.all([
     getDocs(collection(ref, 'editions')),
     getDocs(collection(ref, 'reads')),

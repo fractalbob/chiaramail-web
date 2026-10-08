@@ -1,6 +1,7 @@
 rules_version = '2';
 
-// ChiaraMail — the web successor of ChiaraMail 5.1's content server.
+// ChiaraMail — the web successor of ChiaraMail 5.1's content server, which
+// keeps the content of ECS (Envelope-Content Splitting) messages.
 // A message's text lives here, not in the email. Only the sender and the
 // listed recipients can read it (the old server's isRecipient() check),
 // and only the sender can change or withdraw it (UPDATE CONTENT).
@@ -52,7 +53,8 @@ service cloud.firestore {
       allow create: if verified()
         && request.resource.data.keys().hasOnly(
              ['senderUid', 'senderEmail', 'senderName', 'recipients', 'subject',
-              'body', 'createdAt', 'updatedAt', 'edition', 'withdrawn', 'allowForward'])
+              'body', 'createdAt', 'updatedAt', 'edition', 'withdrawn', 'allowForward',
+              'attachments'])
         && request.resource.data.keys().hasAll(
              ['senderUid', 'senderEmail', 'recipients', 'subject', 'body',
               'createdAt', 'updatedAt', 'edition', 'withdrawn'])
@@ -60,6 +62,11 @@ service cloud.firestore {
         && request.resource.data.senderEmail == myEmail()
         && (!('allowForward' in request.resource.data)
             || request.resource.data.allowForward is bool)
+        // Names, types and sizes of the files stored with it (see storage.rules).
+        && (!('attachments' in request.resource.data)
+            || (request.resource.data.attachments is list
+                && request.resource.data.attachments.size() >= 1
+                && request.resource.data.attachments.size() <= 20))
         && (!('senderName' in request.resource.data)
             || (request.resource.data.senderName is string
                 && request.resource.data.senderName.size() <= 120))

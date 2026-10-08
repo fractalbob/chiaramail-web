@@ -1,6 +1,6 @@
 // Real Gmail: Google sign-in for a Gmail access token (Google Identity
 // Services), then the Gmail REST API, straight from the browser. Nothing is
-// stored on any server except ChiaraMail's own changeable messages.
+// stored on any server except the content of ChiaraMail's own ECS messages.
 import * as backend from '@backend';
 
 export const mode = 'gmail';

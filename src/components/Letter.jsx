@@ -1,7 +1,8 @@
 import { useI18n } from '../i18n.jsx';
 import { toParagraphs } from '../lib.js';
+import EcsAttachments from './EcsAttachments.jsx';
 
-// A ChiaraMail message, set like a letter, with its edition mark.
+// An ECS message, set like a letter, with its edition mark.
 export default function Letter({ message, myEmail, banner }) {
   const { t, formatDate } = useI18n();
   const m = message;
@@ -39,6 +40,7 @@ export default function Letter({ message, myEmail, banner }) {
           ))}
         </div>
       )}
+      <EcsAttachments id={m.id} message={m} />
     </article>
   );
 }

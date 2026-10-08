@@ -90,7 +90,7 @@ export function watchMessage(id, cb, onErr) {
     cb(out(id, m));
   });
 }
-export async function createMessage(user, { recipients, subject, body, allowForward = false }) {
+export async function createMessage(user, { recipients, subject, body, allowForward = false, attachments = [] }) {
   await later();
   if (!me() || !me().verified || me().uid !== user.uid) throw denied();
   const db = load();
@@ -101,9 +101,37 @@ export async function createMessage(user, { recipients, subject, body, allowForw
     recipients, subject, body, createdAt: now, updatedAt: now, edition: 1, withdrawn: false, allowForward: !!allowForward,
     editions: { 1: { edition: 1, subject, body, savedAt: now } }, reads: {},
   };
+  if (attachments.length) db.messages[id].attachments = attachments.map((f) => ({ name: f.name, type: f.type || 'application/octet-stream', size: f.size }));
   save(db);
   return id;
 }
+// Stand-in for Firebase Storage: ecs/{id}/{i} kept as base64 in localStorage.
+const FILES_KEY = 'chiaramail.mock.files';
+const loadFiles = () => { try { return JSON.parse(localStorage.getItem(FILES_KEY)) || {}; } catch { return {}; } };
+const saveFiles = (f) => localStorage.setItem(FILES_KEY, JSON.stringify(f));
+const toB64 = (bytes) => { let s = ''; bytes.forEach((b) => { s += String.fromCharCode(b); }); return btoa(s); };
+export async function uploadAttachments(id, files) {
+  await later();
+  const m = load().messages[id];
+  if (!m || !isSender(m) || m.withdrawn) throw denied();
+  const all = loadFiles();
+  files.forEach((f, i) => { all[`${id}/${i}`] = { type: f.type, data: toB64(f.bytes) }; });
+  saveFiles(all);
+}
+export async function getAttachment(id, i) {
+  await later();
+  const m = load().messages[id];
+  if (!m || !canRead(m) || m.withdrawn) throw denied();
+  const f = loadFiles()[`${id}/${i}`];
+  if (!f) throw Object.assign(new Error('File not found.'), { code: 'storage/object-not-found' });
+  return new Blob([Uint8Array.from(atob(f.data), (c) => c.charCodeAt(0))], { type: f.type });
+}
+const removeFiles = (id) => {
+  const all = loadFiles();
+  Object.keys(all).filter((k) => k.startsWith(`${id}/`)).forEach((k) => delete all[k]);
+  saveFiles(all);
+};
+
 export async function saveEdition(id, current, { subject, body }) {
   await later();
   const db = load(); const m = db.messages[id];
@@ -127,6 +155,7 @@ export async function withdraw(id) {
   if (!m || !isSender(m) || m.withdrawn) throw denied();
   Object.assign(m, { withdrawn: true, body: '', updatedAt: Date.now() });
   save(db);
+  removeFiles(id);
 }
 export async function deleteMessage(id) {
   await later();
@@ -134,6 +163,7 @@ export async function deleteMessage(id) {
   if (!m || !isSender(m)) throw denied();
   delete db.messages[id];
   save(db);
+  removeFiles(id);
 }
 export async function listEditions(id) {
   await later();

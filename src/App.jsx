@@ -61,7 +61,7 @@ function Routed() {
   if (user === undefined) return <p className="loading">{t('loading')}</p>;
   return (
     <Routes>
-      {/* The web page a changeable message links to, for readers without ChiaraMail. */}
+      {/* The web page an ECS message links to, for readers without ChiaraMail. */}
       <Route path="/m/:id" element={<MessagePage />} />
       <Route path="/m/:id/edit" element={user ? <Compose editing /> : <MessagePage />} />
       <Route path="/*" element={<MailRoot />} />

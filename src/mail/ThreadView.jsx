@@ -7,8 +7,8 @@ import { useI18n } from '../i18n.jsx';
 import HtmlBody from './HtmlBody.jsx';
 import LiveMessage from './LiveMessage.jsx';
 import PlainBody from './PlainBody.jsx';
+import { fmtSize } from '../lib.js';
 
-const fmtSize = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
 function Attachments({ message }) {
   const { t } = useI18n();
@@ -62,7 +62,7 @@ function DraftCard({ m }) {
 
 function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
   const { t, formatDate } = useI18n();
-  const [live, setLive] = useState(null); // { isSender, allowForward, withdrawn } for changeable messages
+  const [live, setLive] = useState(null); // { isSender, allowForward, withdrawn } for ECS messages
   const forwardBlocked = !!(m.pointer && live && !live.isSender && (live.withdrawn || !live.allowForward));
   const people = (list) => list.map((a) => (a.email.toLowerCase() === me ? t('me') : displayName(a))).join(', ');
   const replyBase = `/compose?thread=${threadId}&msg=${m.id}`;

@@ -55,3 +55,5 @@ export function peopleLabel(t, list, myEmail) {
   if (names.length <= 2) return names.join(', ');
   return t('andN', { first: names[0], n: names.length - 1 });
 }
+
+export const fmtSize = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);

@@ -4,7 +4,7 @@ import * as gmail from '@gmail';
 import * as backend from '@backend';
 import {
   buildRaw, parseMessage, parseAddressList, isEmail, replySubject, forwardSubject,
-  htmlToText, quote, bytesToB64, b64urlToB64, escapeHtml, CONTENT_POINTER, displayName,
+  htmlToText, quote, bytesToB64, b64ToBytes, b64urlToB64, escapeHtml, CONTENT_POINTER, displayName,
 } from '../gmail/mime.js';
 import { messageUrl } from '../lib.js';
 import { useAuth } from '../auth.jsx';
@@ -14,14 +14,14 @@ import RecipientField from './RecipientField.jsx';
 import { cachedContacts, refreshContacts, rememberRecipients } from './contacts.js';
 
 const MAX_TOTAL = 24 * 1024 * 1024;
-// A changeable message as this reader may see it (null if they can't).
+// An ECS message's content as this reader may see it (null if they can't).
 const liveInfo = (pointer) => new Promise((resolve) => {
   let unsub = () => {};
   const done = (v) => { resolve(v); setTimeout(() => unsub(), 0); };
   unsub = backend.watchMessage(pointer, (d) => done(d), () => done(null));
 });
 const fmtAddr = (a) => (a.name ? `${a.name} <${a.email}>` : a.email);
-const DRAFT_CHANGEABLE = 'X-ChiaraMail-Changeable';
+const DRAFT_CHANGEABLE = 'X-ChiaraMail-Changeable'; // header name kept so existing drafts still load
 const DRAFT_ALLOW_FWD = 'X-ChiaraMail-Allow-Forward';
 const AUTOSAVE_MS = 2000;
 const readFile = (file) => new Promise((resolve, reject) => {
@@ -85,7 +85,7 @@ export default function Composer() {
     gmail.getThread(threadParam).then(async (th) => {
       const raw = th.messages.find((m) => m.id === msgParam) || th.messages[th.messages.length - 1];
       const m = parseMessage(raw);
-      // Quote what the reader actually saw: the live text of a changeable message.
+      // Quote what the reader actually saw: the current content of an ECS message.
       const info = m.pointer ? await liveInfo(m.pointer) : null;
       const current = info && !info.withdrawn ? info.body : null;
       if (!live) return;
@@ -99,7 +99,11 @@ export default function Composer() {
       if (mode === 'forward') {
         setSubject(forwardSubject(m.subject));
         setBody(`\n\n${t('fwdHeader')}\n${t('from')}: ${m.from ? fmtAddr(m.from) : ''}\n${t('date')}: ${formatDate(m.date)}\n${t('subject')}: ${m.subject}\n${t('to')}: ${m.to.map(fmtAddr).join(', ')}\n\n${origText}`);
-        setFiles(m.attachments.map((a) => ({ name: a.filename, type: a.mimeType, size: a.size, fwd: { messageId: m.id, attachmentId: a.attachmentId, data: a.data } })));
+        const stored = info && !info.withdrawn ? (info.attachments || []) : [];
+        setFiles([
+          ...m.attachments.map((a) => ({ name: a.filename, type: a.mimeType, size: a.size, fwd: { messageId: m.id, attachmentId: a.attachmentId, data: a.data } })),
+          ...stored.map((a, i) => ({ name: a.name, type: a.type, size: a.size, ecs: { id: m.pointer, i } })),
+        ]);
       } else {
         const fromMe = m.from && m.from.email.toLowerCase() === me;
         let toList = fromMe ? m.to : [sender];
@@ -149,7 +153,9 @@ export default function Composer() {
   const ensureB64 = async (f) => {
     if (f.base64) return f.base64;
     if (b64Ref.current.has(f)) return b64Ref.current.get(f);
-    const v = f.file ? await readFile(f.file) : b64urlToB64(f.fwd.data || await gmail.getAttachment(f.fwd.messageId, f.fwd.attachmentId));
+    const v = f.file ? await readFile(f.file)
+      : f.ecs ? bytesToB64(new Uint8Array(await (await backend.getAttachment(f.ecs.id, f.ecs.i)).arrayBuffer()))
+        : b64urlToB64(f.fwd.data || await gmail.getAttachment(f.fwd.messageId, f.fwd.attachmentId));
     b64Ref.current.set(f, v);
     return v;
   };
@@ -239,14 +245,22 @@ export default function Composer() {
     await chainRef.current; // let any draft save in progress finish first
     let pointer = null;
     try {
-      const attachments = await Promise.all(files.map(async (f) => ({ filename: f.name, mimeType: f.type, base64: await ensureB64(f) })));
+      let attachments = await Promise.all(files.map(async (f) => ({ filename: f.name, mimeType: f.type, base64: await ensureB64(f) })));
       let text = body;
       let html;
       const headers = {};
       if (changeable) {
+        // ECS: the body and attachments go to ChiaraMail; the email carries only the envelope.
         const recipients = [...new Set([...toL, ...ccL].map((a) => a.email.toLowerCase()))];
         if (recipients.length > 50) throw new Error(t('tooMany'));
-        pointer = await backend.createMessage(user, { recipients, subject: subject.trim(), body, allowForward: allowFwd });
+        pointer = await backend.createMessage(user, {
+          recipients, subject: subject.trim(), body, allowForward: allowFwd,
+          attachments: files.map((f) => ({ name: f.name, type: f.type, size: f.size })),
+        });
+        if (attachments.length) {
+          await backend.uploadAttachments(pointer, attachments.map((a) => ({ name: a.filename, type: a.mimeType, bytes: b64ToBytes(a.base64) })));
+        }
+        attachments = [];
         headers[CONTENT_POINTER] = pointer;
         const link = messageUrl(pointer);
         text = `${t('liveFallback')}\n\n${link}\n\n${t('liveFallbackHint')}`;
@@ -266,7 +280,7 @@ export default function Composer() {
       mail.refreshCounts();
       nav(`/mail/sent/${res.threadId}`, { replace: true });
     } catch (e) {
-      if (pointer) backend.deleteMessage(pointer).catch(() => {});
+      if (pointer) backend.deleteMessage(pointer, files.length).catch(() => {});
       if (!mail.handle(e)) setError(t('errorGeneric', { msg: e.message }));
       doneRef.current = false;
       setBusy(false);

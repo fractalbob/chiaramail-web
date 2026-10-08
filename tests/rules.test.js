@@ -1,4 +1,4 @@
-// Firestore security-rule tests — run with `npm run test:rules`.
+// Firestore and Storage security-rule tests — run with `npm run test:rules`.
 import { test, before, after, beforeEach } from 'node:test';
 import { readFileSync } from 'node:fs';
 import {
@@ -28,10 +28,11 @@ before(async () => {
   env = await initializeTestEnvironment({
     projectId: 'demo-chiaramail',
     firestore: { rules: readFileSync('firestore.rules', 'utf8') },
+    storage: { rules: readFileSync('storage.rules', 'utf8') },
   });
 });
 after(async () => { await env.cleanup(); });
-beforeEach(async () => { await env.clearFirestore(); });
+beforeEach(async () => { await env.clearFirestore(); await env.clearStorage(); });
 
 async function seed() {
   await assertSucceeds(setDoc(doc(ctx(ALICE), 'messages/m1'), newMessage()));
@@ -176,4 +177,53 @@ test('forwarding permission: set at sending, switched by the sender only', async
 test('sender can delete the message', async () => {
   await seed();
   await assertSucceeds(deleteDoc(doc(ctx(ALICE), 'messages/m1')));
+});
+
+// ---- ECS attachments --------------------------------------------------------
+
+const FILES = [{ name: 'agenda.txt', type: 'text/plain', size: 5 }];
+const bytes = new Uint8Array([104, 101, 108, 108, 111]);
+const store = (u, verified = true) =>
+  env.authenticatedContext(u.uid, { email: u.email, email_verified: verified }).storage();
+
+test('a message may list its attachments, within limits, and never change them', async () => {
+  const db = ctx(ALICE);
+  await assertSucceeds(setDoc(doc(db, 'messages/m1'), newMessage({ attachments: FILES })));
+  await assertFails(setDoc(doc(db, 'messages/m2'), newMessage({ attachments: 'x' })));
+  await assertFails(setDoc(doc(db, 'messages/m3'), newMessage({ attachments: [] })));
+  await assertFails(setDoc(doc(db, 'messages/m4'), newMessage({ attachments: Array(21).fill(FILES[0]) })));
+  await assertFails(updateDoc(doc(db, 'messages/m1'), { attachments: [...FILES, ...FILES] }));
+});
+
+async function seedWithFile() {
+  await assertSucceeds(setDoc(doc(ctx(ALICE), 'messages/m1'), newMessage({ attachments: FILES })));
+  await assertSucceeds(store(ALICE).ref('ecs/m1/0').put(bytes, { contentType: 'text/plain' }));
+}
+
+test('only the sender uploads, and only the files the message lists', async () => {
+  await assertSucceeds(setDoc(doc(ctx(ALICE), 'messages/m1'), newMessage({ attachments: FILES })));
+  await assertFails(store(BOB).ref('ecs/m1/0').put(bytes));
+  await assertFails(store(ALICE).ref('ecs/m1/1').put(bytes));
+  await assertFails(store(ALICE).ref('ecs/m1/x').put(bytes));
+  await assertFails(store(ALICE).ref('ecs/nope/0').put(bytes));
+  await assertSucceeds(store(ALICE).ref('ecs/m1/0').put(bytes));
+});
+
+test('sender and verified recipients can fetch attachments; others cannot', async () => {
+  await seedWithFile();
+  await assertSucceeds(store(ALICE).ref('ecs/m1/0').getMetadata());
+  await assertSucceeds(store(BOB).ref('ecs/m1/0').getMetadata());
+  await assertFails(store(BOB, false).ref('ecs/m1/0').getMetadata());
+  await assertFails(store(EVE).ref('ecs/m1/0').getMetadata());
+  await assertFails(env.unauthenticatedContext().storage().ref('ecs/m1/0').getMetadata());
+});
+
+test('withdrawn: nobody can fetch attachments; only the sender deletes them', async () => {
+  await seedWithFile();
+  await assertFails(store(BOB).ref('ecs/m1/0').delete());
+  await assertSucceeds(updateDoc(doc(ctx(ALICE), 'messages/m1'),
+    { withdrawn: true, body: '', updatedAt: serverTimestamp() }));
+  await assertFails(store(BOB).ref('ecs/m1/0').getMetadata());
+  await assertFails(store(ALICE).ref('ecs/m1/0').getMetadata());
+  await assertSucceeds(store(ALICE).ref('ecs/m1/0').delete());
 });
