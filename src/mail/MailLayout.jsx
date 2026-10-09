@@ -3,6 +3,7 @@ import { NavLink, Link, Navigate, Route, Routes, useNavigate, useSearchParams, u
 import { useMail } from './context.jsx';
 import { useI18n } from '../i18n.jsx';
 import { FOLDERS } from './folders.js';
+import { useAlwaysImages, setAlwaysImages } from './prefs.js';
 import ThreadList from './ThreadList.jsx';
 import DraftList from './DraftList.jsx';
 import ThreadView from './ThreadView.jsx';
@@ -24,6 +25,7 @@ function SearchBox() {
 function Sidebar({ onNavigate }) {
   const { t } = useI18n();
   const mail = useMail();
+  const alwaysImages = useAlwaysImages();
   const count = { inbox: mail.unread.inbox, spam: mail.unread.spam, drafts: mail.unread.drafts };
   return (
     <nav className="sidebar" aria-label={t('folders')}>
@@ -52,6 +54,12 @@ function Sidebar({ onNavigate }) {
           </ul>
         </>
       )}
+      <h2 className="sidebar-title">{t('settings')}</h2>
+      <label className="setting">
+        <input type="checkbox" checked={alwaysImages} onChange={(e) => setAlwaysImages(e.target.checked)} />
+        <span>{t('alwaysShowImages')}</span>
+      </label>
+      {alwaysImages && <p className="setting-note">{t('alwaysImagesNote')}</p>}
     </nav>
   );
 }

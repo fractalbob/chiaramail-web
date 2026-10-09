@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify';
 import * as gmail from '@gmail';
 import { b64urlToB64 } from '../gmail/mime.js';
 import { useI18n } from '../i18n.jsx';
+import { useAlwaysImages, setAlwaysImages } from './prefs.js';
 
 // Sanitises an HTML email and shows it in a sandboxed frame (no scripts).
 // Remote images are held back until the reader asks, so senders can't track
@@ -33,7 +34,10 @@ function clean(html, allowRemote, inlineSrc) {
 
 export default function HtmlBody({ message }) {
   const { t } = useI18n();
-  const [allow, setAllow] = useState(false);
+  const [shown, setShown] = useState(false);
+  const always = useAlwaysImages();
+  // Like Gmail: with "always show images" on, mail in Spam still asks first.
+  const allow = shown || (always && !(message.labelIds || []).includes('SPAM'));
   const [inline, setInline] = useState({});
   const frame = useRef(null);
 
@@ -76,7 +80,8 @@ export default function HtmlBody({ message }) {
       {blocked > 0 && !allow && (
         <p className="imgbar">
           {t('imagesHidden')}{' '}
-          <button type="button" className="linklike" onClick={() => setAllow(true)}>{t('showImages')}</button>
+          <button type="button" className="linklike" onClick={() => setShown(true)}>{t('showImages')}</button>
+          {!always && <>{' · '}<button type="button" className="linklike" onClick={() => setAlwaysImages(true)}>{t('alwaysShowImages')}</button></>}
         </p>
       )}
       <iframe ref={frame} title={t('messageBody')} sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" srcDoc={doc} />

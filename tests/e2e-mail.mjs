@@ -77,9 +77,24 @@ const frame = page.frameLocator('.htmlbody iframe');
 await frame.getByText('Read the digest').waitFor();
 await must((await frame.locator('img').first().getAttribute('src')) === null, 'remote image should be blocked');
 await shot('m03-html-mail');
-await page.getByRole('button', { name: 'Show images' }).click();
+await page.getByRole('button', { name: 'Show images', exact: true }).click();
 await must((await frame.locator('img').first().getAttribute('src'))?.startsWith('https://'), 'image shown after click');
 log('HTML mail sanitised, remote images blocked until asked');
+// "Always show images": reopening shows them without asking; unticking the setting hides them again
+await page.getByRole('link', { name: 'Back' }).click();
+await openRow('Fractal Forums Digest');
+await page.getByText('Images from the web are hidden').waitFor(); // a one-off "Show images" isn't remembered
+await page.locator('.imgbar').getByRole('button', { name: 'Always show images' }).click();
+await page.locator('.imgbar').waitFor({ state: 'detached' });
+await must((await frame.locator('img').first().getAttribute('src'))?.startsWith('https://'), 'image shown once always is on');
+await page.getByRole('link', { name: 'Back' }).click();
+await openRow('Fractal Forums Digest');
+await frame.getByText('Read the digest').waitFor();
+await must(!(await page.locator('.imgbar').count()), 'no prompt with always-show on');
+await must((await frame.locator('img').first().getAttribute('src'))?.startsWith('https://'), 'image shown automatically');
+await page.getByRole('checkbox', { name: 'Always show images' }).uncheck();
+await page.getByText('Images from the web are hidden').waitFor();
+log('"Always show images" remembered; untick in Settings to ask again');
 await page.getByRole('link', { name: 'Back' }).click();
 await must(!(await page.locator('.trow-unread', { hasText: 'Fractal Forums Digest' }).count()), 'opening marks read');
 

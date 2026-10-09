@@ -264,6 +264,9 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .folder-on { background: color-mix(in srgb, var(--lumen) 40%, var(--paper)); font-weight: 600; }
 .count { font-weight: 600; font-size: 0.875rem; }
 .sidebar-title { font: 600 0.8125rem/1 var(--sans); color: var(--slate); margin: 8px 14px 0; }
+.setting { display: flex; gap: 8px; align-items: flex-start; margin: 0 14px; font: 0.9375rem/1.35 var(--sans); color: var(--ink); cursor: pointer; }
+.setting input { margin-top: 3px; accent-color: var(--ink); }
+.setting-note { margin: 0 14px; font: 0.8125rem/1.4 var(--sans); color: var(--slate); }
 .mail-main { grid-area: main; min-width: 0; }
 
 .list-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--rule); padding-bottom: 6px; }
