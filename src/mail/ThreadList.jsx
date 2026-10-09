@@ -49,6 +49,33 @@ export default function ThreadList() {
 
   const rows = state.key === key ? state.rows : null;
   const marks = useEcsMarks(rows, (mail.account || '').toLowerCase());
+
+  // Gmail-style selection: a checkbox on each row, one in the header, and
+  // actions for everything ticked.
+  const [sel, setSel] = useState({ key: null, ids: new Set() });
+  const [busyBulk, setBusyBulk] = useState(false);
+  const selected = sel.key === key ? sel.ids : new Set();
+  const toggle = (id) => {
+    const ids = new Set(selected);
+    if (ids.has(id)) ids.delete(id); else ids.add(id);
+    setSel({ key, ids });
+  };
+  const allTicked = !!rows?.length && rows.every((r) => selected.has(r.id));
+  const someTicked = selected.size > 0 && !allTicked;
+  const tickAll = () => setSel({ key, ids: allTicked ? new Set() : new Set(rows.map((r) => r.id)) });
+  const inFolder = (f) => !q && folder === f;
+  const bulk = async (fn, { local } = {}) => {
+    const ids = [...selected];
+    setBusyBulk(true);
+    try {
+      for (let i = 0; i < ids.length; i += 3) await Promise.all(ids.slice(i, i + 3).map(fn)); // a few at a time
+      if (local) setState((s) => ({ ...s, rows: s.rows.map((r) => (selected.has(r.id) ? local(r) : r)) }));
+      else await load(true);
+      setSel({ key, ids: new Set() });
+      mail.refreshCounts();
+    } catch (e) { if (!handle(e)) setState((s) => ({ ...s, error: e.code === 'rate-limit' ? t('rateLimited') : e.message })); }
+    finally { setBusyBulk(false); }
+  };
   const toggleStar = async (row) => {
     setState((s) => ({ ...s, rows: s.rows.map((r) => (r.id === row.id ? { ...r, starred: !r.starred } : r)) }));
     try { await gmail.modifyThread(row.id, row.starred ? [] : ['STARRED'], row.starred ? ['STARRED'] : []); } catch (e) { handle(e); load(true); }
@@ -59,12 +86,34 @@ export default function ThreadList() {
   return (
     <div className="threadlist">
       <div className="list-head">
-        <h1 className="list-title">{title}</h1>
+        <div className="list-head-left">
+          {rows && rows.length > 0 && (
+            <input type="checkbox" className="rowcheck" aria-label={t('selectAll')} checked={allTicked}
+              ref={(el) => { if (el) el.indeterminate = someTicked; }} onChange={tickAll} />
+          )}
+          <h1 className="list-title">{title}</h1>
+        </div>
+        {selected.size > 0 ? (
+          <div className="bulkbar" role="toolbar" aria-label={t('selectedActions')}>
+            <span className="bulkcount">{t('nSelected', { n: selected.size })}</span>
+            {inFolder('trash')
+              ? <button type="button" className="btn" disabled={busyBulk} onClick={() => bulk((id) => gmail.untrashThread(id))}>{t('restore')}</button>
+              : <button type="button" className="btn btn-danger" disabled={busyBulk} onClick={() => bulk((id) => gmail.trashThread(id))}>{t('trash')}</button>}
+            {inFolder('inbox') && <button type="button" className="btn" disabled={busyBulk} onClick={() => bulk((id) => gmail.modifyThread(id, [], ['INBOX']))}>{t('archive')}</button>}
+            {inFolder('spam')
+              ? <button type="button" className="btn" disabled={busyBulk} onClick={() => bulk((id) => gmail.modifyThread(id, ['INBOX'], ['SPAM']))}>{t('notSpam')}</button>
+              : !inFolder('trash') && <button type="button" className="btn" disabled={busyBulk} onClick={() => bulk((id) => gmail.modifyThread(id, ['SPAM'], ['INBOX']))}>{t('reportSpam')}</button>}
+            <button type="button" className="btn" disabled={busyBulk} onClick={() => bulk((id) => gmail.modifyThread(id, [], ['UNREAD']), { local: (r) => ({ ...r, unread: false }) })}>{t('markRead')}</button>
+            <button type="button" className="btn" disabled={busyBulk} onClick={() => bulk((id) => gmail.modifyThread(id, ['UNREAD'], []), { local: (r) => ({ ...r, unread: true }) })}>{t('markUnread')}</button>
+            <button type="button" className="btn btn-quiet" disabled={busyBulk} onClick={() => setSel({ key, ids: new Set() })}>{t('cancel')}</button>
+          </div>
+        ) : (
         <div className="pager">
           <button type="button" className="btn btn-quiet" onClick={() => load(false)}>{t('refresh')}</button>
           <button type="button" className="btn btn-quiet" disabled={pages.length < 2} onClick={() => setPages(pages.slice(0, -1))}>{t('newer')}</button>
           <button type="button" className="btn btn-quiet" disabled={!state.next || state.key !== key} onClick={() => setPages([...pages, state.next])}>{t('older')}</button>
         </div>
+        )}
       </div>
       {state.error && state.key === key && <p className="error" role="alert">{state.error === t('rateLimited') ? state.error : t('errorGeneric', { msg: state.error })}</p>}
       {!rows && !(state.error && state.key === key) && <p className="loading">{t('loading')}</p>}
@@ -72,7 +121,9 @@ export default function ThreadList() {
       {rows && rows.length > 0 && (
         <ul className="msglist">
           {rows.map((r) => (
-            <li key={r.id} className={r.unread ? 'trow trow-unread' : 'trow'}>
+            <li key={r.id} className={`trow${r.unread ? ' trow-unread' : ''}${selected.has(r.id) ? ' trow-selected' : ''}`}>
+              <input type="checkbox" className="rowcheck" checked={selected.has(r.id)} onChange={() => toggle(r.id)}
+                aria-label={t('selectRow', { name: r.subject || t('noSubject') })} />
               <button type="button" className={r.starred ? 'star star-on' : 'star'} aria-pressed={r.starred}
                 aria-label={r.starred ? t('unstar') : t('star')} onClick={() => toggleStar(r)}>★</button>
               <Link to={`/mail/${encodeURIComponent(folder)}/${r.id}${q ? `?q=${encodeURIComponent(q)}` : ''}`} className="trow-link">

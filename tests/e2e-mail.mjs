@@ -395,6 +395,24 @@ await page.getByRole('button', { name: 'Restore' }).click();
 await page.locator('.folder', { hasText: 'Inbox' }).click();
 await page.locator('.trow', { hasText: 'Liste pour samedi' }).waitFor();
 log('delete → trash → restore');
+// Gmail-style checkboxes: tick two rows, delete them together, restore them together
+await page.locator('.trow', { hasText: 'Liste pour samedi' }).locator('.rowcheck').check();
+await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.rowcheck').check();
+await page.getByText('2 selected').waitFor();
+await shot('m13-bulk-select');
+await page.locator('.bulkbar').getByRole('button', { name: 'Delete' }).click();
+await page.locator('.bulkbar').waitFor({ state: 'detached' });
+await must(!(await page.locator('.trow', { hasText: 'Liste pour samedi' }).count()), 'bulk delete removed row 1');
+await must(!(await page.locator('.trow', { hasText: 'Ordinary note' }).count()), 'bulk delete removed row 2');
+await page.locator('.folder', { hasText: 'Trash' }).click();
+await page.locator('.trow', { hasText: 'Ordinary note' }).waitFor();
+await page.getByRole('checkbox', { name: 'Select all' }).check();
+await page.locator('.bulkbar').getByRole('button', { name: 'Restore' }).click();
+await page.locator('.bulkbar').waitFor({ state: 'detached' });
+await page.locator('.folder', { hasText: 'Inbox' }).click();
+await page.locator('.trow', { hasText: 'Liste pour samedi' }).waitFor();
+await page.locator('.trow', { hasText: 'Ordinary note' }).waitFor();
+log('checkboxes: select several, delete together, select all in Trash, restore together');
 
 // ---- Alice withdraws
 await connectAs('alice@example.com');

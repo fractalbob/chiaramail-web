@@ -443,3 +443,11 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .before { margin: 4px 0 14px; padding: 12px 14px; border-radius: var(--radius-s); background: var(--sky); font-size: 0.9375rem; }
 .before-title { margin: 0 0 6px; font: 600 0.9375rem/1.3 var(--sans); }
 .before ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+
+/* Gmail-style selection */
+.list-head-left { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.rowcheck { width: 18px; height: 18px; margin: 0 4px 0 10px; accent-color: var(--ink); cursor: pointer; flex: none; }
+.list-head .rowcheck { margin-right: 10px; }
+.trow-selected { background: color-mix(in srgb, var(--lumen) 22%, var(--paper)); }
+.bulkbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bulkcount { color: var(--slate); font-size: 0.9375rem; margin-right: 4px; }

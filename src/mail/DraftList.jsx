@@ -39,6 +39,19 @@ export default function DraftList() {
   }, [fetchPage, handle, key]);
 
   const rows = state.key === key ? state.rows : null;
+  const [sel, setSel] = useState({ key: null, ids: new Set() });
+  const selected = sel.key === key ? sel.ids : new Set();
+  const toggle = (id) => { const ids = new Set(selected); if (ids.has(id)) ids.delete(id); else ids.add(id); setSel({ key, ids }); };
+  const allTicked = !!rows?.length && rows.every((r) => selected.has(r.id));
+  const removeSelected = async () => {
+    const ids = [...selected];
+    setState((s) => ({ ...s, rows: s.rows.filter((r) => !selected.has(r.id)) }));
+    setSel({ key, ids: new Set() });
+    try {
+      for (let i = 0; i < ids.length; i += 3) await Promise.all(ids.slice(i, i + 3).map((id) => gmail.deleteDraft(id)));
+      refreshCounts();
+    } catch (e) { if (!handle(e)) setState((s) => ({ ...s, error: e.message })); }
+  };
   const remove = async (id) => {
     setState((s) => ({ ...s, rows: s.rows.filter((r) => r.id !== id) }));
     try { await gmail.deleteDraft(id); refreshCounts(); } catch (e) { if (!handle(e)) setState((s) => ({ ...s, error: e.message })); }
@@ -47,11 +60,26 @@ export default function DraftList() {
   return (
     <div className="threadlist">
       <div className="list-head">
-        <h1 className="list-title">{t('folder_drafts')}</h1>
+        <div className="list-head-left">
+          {rows && rows.length > 0 && (
+            <input type="checkbox" className="rowcheck" aria-label={t('selectAll')} checked={allTicked}
+              ref={(el) => { if (el) el.indeterminate = selected.size > 0 && !allTicked; }}
+              onChange={() => setSel({ key, ids: allTicked ? new Set() : new Set(rows.map((r) => r.id)) })} />
+          )}
+          <h1 className="list-title">{t('folder_drafts')}</h1>
+        </div>
+        {selected.size > 0 ? (
+          <div className="bulkbar" role="toolbar" aria-label={t('selectedActions')}>
+            <span className="bulkcount">{t('nSelected', { n: selected.size })}</span>
+            <button type="button" className="btn btn-danger" onClick={removeSelected}>{t('deleteSelected')}</button>
+            <button type="button" className="btn btn-quiet" onClick={() => setSel({ key, ids: new Set() })}>{t('cancel')}</button>
+          </div>
+        ) : (
         <div className="pager">
           <button type="button" className="btn btn-quiet" disabled={pages.length < 2} onClick={() => setPages(pages.slice(0, -1))}>{t('newer')}</button>
           <button type="button" className="btn btn-quiet" disabled={!state.next || state.key !== key} onClick={() => setPages([...pages, state.next])}>{t('older')}</button>
         </div>
+        )}
       </div>
       {state.error && <p className="error" role="alert">{t('errorGeneric', { msg: state.error })}</p>}
       {!rows && !state.error && <p className="loading">{t('loading')}</p>}
@@ -59,7 +87,9 @@ export default function DraftList() {
       {rows && rows.length > 0 && (
         <ul className="msglist">
           {rows.map((r) => (
-            <li key={r.id} className="trow">
+            <li key={r.id} className={selected.has(r.id) ? 'trow trow-selected' : 'trow'}>
+              <input type="checkbox" className="rowcheck" checked={selected.has(r.id)} onChange={() => toggle(r.id)}
+                aria-label={t('selectRow', { name: r.subject || t('noSubject') })} />
               <Link to={`/compose?draft=${r.id}`} className="trow-link trow-draft">
                 <span className="row-people"><span className="draft-tag">{t('draft')}</span> {r.to || t('noRecipients')}</span>
                 <span className="row-subject">
