@@ -38,7 +38,7 @@ function Attachments({ message }) {
 }
 
 function DraftCard({ m }) {
-  const { t, formatDate } = useI18n();
+  const { t, formatMail } = useI18n();
   const nav = useNavigate();
   const { handle, refreshCounts } = useMail();
   const [gone, setGone] = useState(false);
@@ -51,7 +51,7 @@ function DraftCard({ m }) {
   if (gone) return null;
   return (
     <li className="mcard mcard-draft">
-      <p className="mdraft-head"><span className="draft-tag">{t('draft')}</span> <span className="mdate">{formatDate(m.date)}</span></p>
+      <p className="mdraft-head"><span className="draft-tag">{t('draft')}</span> <span className="mdate">{formatMail(m.date)}</span></p>
       <p className="msnip">{m.text ? m.text.slice(0, 200) : m.snippet}</p>
       <div className="actions">
         <button type="button" className="btn btn-primary" onClick={open}>{t('continueEditing')}</button>
@@ -62,7 +62,7 @@ function DraftCard({ m }) {
 }
 
 function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
-  const { t, formatDate } = useI18n();
+  const { t, formatMail } = useI18n();
   const [live, setLive] = useState(null); // { isSender, allowForward, withdrawn } for ECS messages
   const forwardBlocked = !!(m.pointer && live && !live.isSender && (live.withdrawn || !live.allowForward));
   const people = (list) => list.map((a) => (a.email.toLowerCase() === me ? t('me') : displayName(a))).join(', ');
@@ -76,7 +76,7 @@ function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
         <button type="button" className="mcard-toggle" onClick={onToggle} aria-expanded="false">
           <span className="mfrom">{fromEmail === me ? t('me') : fromName}</span>
           <span className="msnip">{m.pointer ? t('liveCollapsed') : m.snippet}</span>
-          <span className="mdate">{formatDate(m.date)}</span>
+          <span className="mdate">{formatMail(m.date)}</span>
         </button>
       </li>
     );
@@ -86,7 +86,7 @@ function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
       <header className="mhead">
         <button type="button" className="mcard-toggle mcard-toggle-open" onClick={onToggle} aria-expanded="true" disabled={isLast}>
           <span className="mfrom">{fromName} <span className="maddr">&lt;{m.from?.email}&gt;</span></span>
-          <span className="mdate">{formatDate(m.date)}</span>
+          <span className="mdate">{formatMail(m.date)}</span>
         </button>
         <p className="mto">
           {t('to')}: {people(m.to) || '—'}

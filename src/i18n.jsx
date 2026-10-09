@@ -468,6 +468,25 @@ export function I18nProvider({ children }) {
       if (d.getFullYear() === now.getFullYear()) return new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short' }).format(d);
       return new Intl.DateTimeFormat(loc, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
     },
+    // Like Gmail's message header: today "14:32 (12 minutes ago)"; this year
+    // "Wed 7 Oct, 10:15" (+ "(2 days ago)" within a week); older "7 Oct 2025, 10:15".
+    formatMail: (d) => {
+      if (!d) return '';
+      const loc = lang === 'fr' ? 'fr-FR' : 'en-GB';
+      const now = new Date();
+      const time = new Intl.DateTimeFormat(loc, { hour: '2-digit', minute: '2-digit' }).format(d);
+      const mins = Math.max(0, Math.round((now - d) / 60000));
+      const rtf = new Intl.RelativeTimeFormat(loc, { numeric: 'always' });
+      const ago = mins < 60 ? rtf.format(-mins, 'minute')
+        : mins < 24 * 60 ? rtf.format(-Math.floor(mins / 60), 'hour')
+        : mins < 7 * 24 * 60 ? rtf.format(-Math.floor(mins / (24 * 60)), 'day') : '';
+      if (d.toDateString() === now.toDateString()) return `${time} (${ago})`;
+      if (d.getFullYear() === now.getFullYear()) {
+        const day = new Intl.DateTimeFormat(loc, { weekday: 'short', day: 'numeric', month: 'short' }).format(d);
+        return `${day}, ${time}${ago ? ` (${ago})` : ''}`;
+      }
+      return `${new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short', year: 'numeric' }).format(d)}, ${time}`;
+    },
     formatDate: (d) => (d ? new Intl.DateTimeFormat(lang === 'fr' ? 'fr-FR' : 'en-GB', {
       day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
     }).format(d) : ''),
