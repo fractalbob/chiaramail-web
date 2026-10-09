@@ -77,8 +77,12 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
   waits, and you get a plain-language message if Gmail is still busy.
 - **English and French.** There's a light and a dark theme, and the layout
   works on phones.
-- **Tab icon.** The full-colour ChiaraMail logo centred on a white envelope
-  (`public/favicon.ico`, `favicon-32.png`, `apple-touch-icon.png`).
+- **Installable app.** `public/manifest.webmanifest` lets Chrome offer
+  **Install ChiaraMail**, which opens it in its own window on a computer and
+  full-screen on a phone. The installed app uses the plain logo on white
+  (`icon-192.png`, `icon-512.png`, `icon-maskable-512.png`,
+  `apple-touch-icon.png`). The browser tab uses the logo on a white envelope
+  (`favicon.ico`, `favicon-32.png`).
 
 ### What is kept in the browser only
 
@@ -93,6 +97,13 @@ The app keeps a few things in your browser and nowhere else:
 | Language | `chiaramail.lang` |
 | The address you last connected with, to pre-select it at sign-in | `chiaramail.lastAccount` |
 | Google's hour-long Gmail permission (this tab only, sessionStorage) | `chiaramail.gmailToken` |
+
+## Installing it on a phone or computer
+
+- **Computer (Chrome):** click the install icon at the right of the address
+  bar, or **⋮ → Cast, save and share → Install ChiaraMail**.
+- **Android (Chrome):** **⋮ → Add to Home screen → Install**.
+- **iPhone (Safari):** **Share → Add to Home Screen**.
 
 ## Try it with no setup
 
