@@ -22,10 +22,20 @@ function SearchBox() {
   );
 }
 
+function ImagesSetting() {
+  const { t } = useI18n();
+  const on = useAlwaysImages();
+  return (
+    <label className="setting" title={on ? t('alwaysImagesNote') : undefined}>
+      <input type="checkbox" checked={on} onChange={(e) => setAlwaysImages(e.target.checked)} />
+      <span>{t('alwaysShowImages')}</span>
+    </label>
+  );
+}
+
 function Sidebar({ onNavigate }) {
   const { t } = useI18n();
   const mail = useMail();
-  const alwaysImages = useAlwaysImages();
   const count = { inbox: mail.unread.inbox, spam: mail.unread.spam, drafts: mail.unread.drafts };
   return (
     <nav className="sidebar" aria-label={t('folders')}>
@@ -54,12 +64,6 @@ function Sidebar({ onNavigate }) {
           </ul>
         </>
       )}
-      <h2 className="sidebar-title">{t('settings')}</h2>
-      <label className="setting">
-        <input type="checkbox" checked={alwaysImages} onChange={(e) => setAlwaysImages(e.target.checked)} />
-        <span>{t('alwaysShowImages')}</span>
-      </label>
-      {alwaysImages && <p className="setting-note">{t('alwaysImagesNote')}</p>}
     </nav>
   );
 }
@@ -73,7 +77,10 @@ export default function MailLayout() {
     <div className={open ? 'mail mail-menu-open' : 'mail'}>
       <div className="mail-bar">
         <button type="button" className="btn btn-quiet menu-btn" aria-expanded={open} onClick={() => setOpen(!open)}>{t('menu')}</button>
-        <SearchBox key={loc.search} />
+        <div className="search-col">
+          <SearchBox key={loc.search} />
+          <ImagesSetting />
+        </div>
         <span className="who" title={mail.account}>{mail.account}</span>
         <button type="button" className="btn btn-quiet" onClick={mail.disconnect}>{t('signOut')}</button>
       </div>
