@@ -77,7 +77,7 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
   waits, and you get a plain-language message if Gmail is still busy.
 - **English and French.** There's a light and a dark theme, and the layout
   works on phones.
-- **Tab icon.** The full-colour ChiaraMail logo across a white envelope
+- **Tab icon.** The full-colour ChiaraMail logo centred on a white envelope
   (`public/favicon.ico`, `favicon-32.png`, `apple-touch-icon.png`).
 
 ### What is kept in the browser only
