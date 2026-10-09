@@ -155,8 +155,42 @@ export async function getAttachment(messageId, attachmentId) {
   return (await call(`/messages/${messageId}/attachments/${attachmentId}`)).data;
 }
 export const modifyThread = (id, add = [], remove = []) => call(`/threads/${id}/modify`, { method: 'POST', body: { addLabelIds: add, removeLabelIds: remove } });
-export const trashThread = (id) => call(`/threads/${id}/trash`, { method: 'POST' });
-export const untrashThread = (id) => call(`/threads/${id}/untrash`, { method: 'POST' });
+// Trashing makes Gmail drop the INBOX label, and untrash does not give it back,
+// so remember which threads were in the Inbox when they were deleted.
+const WAS_INBOX = 'chiaramail.trashedFromInbox';
+const readWasInbox = () => { try { return JSON.parse(localStorage.getItem(WAS_INBOX)) || {}; } catch { return {}; } };
+const writeWasInbox = (m) => { try { localStorage.setItem(WAS_INBOX, JSON.stringify(m)); } catch { /* ignore */ } };
+const labelsOf = (th) => (th?.messages || []).flatMap((m) => m.labelIds || []);
+
+export async function trashThread(id) {
+  let wasInbox = null;
+  try { wasInbox = labelsOf(await call(`/threads/${id}`, { query: { format: 'minimal' } })).includes('INBOX'); } catch { /* best effort */ }
+  const r = await call(`/threads/${id}/trash`, { method: 'POST' });
+  if (wasInbox !== null) { const m = readWasInbox(); m[id] = wasInbox; writeWasInbox(m); }
+  return r;
+}
+
+/**
+ * Restore from Trash to where it was. If we deleted it, we know whether it was
+ * in the Inbox. If it was deleted elsewhere, put it in the Inbox unless it is
+ * plainly mail you only sent: anything received, or sent to yourself (Gmail
+ * gives those an inbox category), goes back to the Inbox.
+ */
+export async function untrashThread(id) {
+  const th = await call(`/threads/${id}/untrash`, { method: 'POST' });
+  const m = readWasInbox();
+  let toInbox = m[id];
+  if (toInbox === undefined) {
+    const msgs = th?.messages || [];
+    toInbox = !msgs.length || msgs.some((x) => {
+      const l = x.labelIds || [];
+      return (!l.includes('SENT') && !l.includes('DRAFT')) || l.some((k) => k.startsWith('CATEGORY_'));
+    });
+  }
+  if (toInbox) await modifyThread(id, ['INBOX'], []);
+  delete m[id]; writeWasInbox(m);
+  return th;
+}
 
 // ---- drafts -------------------------------------------------------------------
 const b64url = (raw) => btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');

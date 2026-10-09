@@ -413,6 +413,40 @@ await page.locator('.folder', { hasText: 'Inbox' }).click();
 await page.locator('.trow', { hasText: 'Liste pour samedi' }).waitFor();
 await page.locator('.trow', { hasText: 'Ordinary note' }).waitFor();
 log('checkboxes: select several, delete together, select all in Trash, restore together');
+// A note to yourself is ONE message marked Sent and Inbox — Restore must bring it back to the Inbox
+await page.getByRole('link', { name: 'Compose' }).click();
+await page.getByLabel('To', { exact: true }).fill('bob@example.com');
+await page.getByLabel('Subject', { exact: true }).fill('Note to self');
+await page.getByLabel('Message', { exact: true }).fill('Remember the milk.');
+await send();
+await page.locator('.folder', { hasText: 'Inbox' }).click();
+await page.locator('.trow', { hasText: 'Note to self' }).locator('.rowcheck').check();
+await page.locator('.bulkbar').getByRole('button', { name: 'Delete' }).click();
+await page.locator('.bulkbar').waitFor({ state: 'detached' });
+await page.locator('.folder', { hasText: 'Trash' }).click();
+await page.locator('.trow', { hasText: 'Note to self' }).locator('.rowcheck').check();
+await page.locator('.bulkbar').getByRole('button', { name: 'Restore' }).click();
+await page.locator('.bulkbar').waitFor({ state: 'detached' });
+await page.locator('.folder', { hasText: 'Inbox' }).click();
+await page.locator('.trow', { hasText: 'Note to self' }).waitFor();
+// …while mail you only sent goes back to Sent, not the Inbox
+await page.locator('.folder', { hasText: 'Sent' }).click();
+const sentRow = page.locator('.trow').filter({ hasNotText: 'Note to self' }).first();
+await sentRow.waitFor();
+const sentSubj = (await sentRow.locator('.subj').innerText()).trim();
+await sentRow.locator('.rowcheck').check();
+await page.locator('.bulkbar').getByRole('button', { name: 'Delete' }).click();
+await page.locator('.bulkbar').waitFor({ state: 'detached' });
+await page.locator('.folder', { hasText: 'Trash' }).click();
+await page.locator('.trow', { hasText: sentSubj }).locator('.rowcheck').check();
+await page.locator('.bulkbar').getByRole('button', { name: 'Restore' }).click();
+await page.locator('.bulkbar').waitFor({ state: 'detached' });
+await page.locator('.folder', { hasText: 'Sent' }).click();
+await page.locator('.trow', { hasText: sentSubj }).waitFor();
+await page.locator('.folder', { hasText: 'Inbox' }).click();
+await page.locator('.trow').first().waitFor();
+await must(!(await page.locator('.trow', { hasText: sentSubj }).count()), 'sent-only mail not pushed into the Inbox');
+log('restore: note to self returns to Inbox; sent-only mail returns to Sent only');
 
 // ---- Alice withdraws
 await connectAs('alice@example.com');

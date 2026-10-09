@@ -176,8 +176,30 @@ function modify(id, add, remove) {
   save(s);
 }
 export async function modifyThread(id, add = [], remove = []) { await later(); modify(id, add, remove); }
-export async function trashThread(id) { await later(); modify(id, ['TRASH'], ['INBOX']); }
-export async function untrashThread(id) { await later(); modify(id, ['INBOX'], ['TRASH']); }
+// Like real Gmail: trash drops INBOX and untrash only removes TRASH; putting it
+// back in the Inbox is the app's job (same rule as api.js).
+const WAS_INBOX = 'chiaramail.trashedFromInbox';
+const readWasInbox = () => { try { return JSON.parse(localStorage.getItem(WAS_INBOX)) || {}; } catch { return {}; } };
+const writeWasInbox = (m) => { try { localStorage.setItem(WAS_INBOX, JSON.stringify(m)); } catch { /* ignore */ } };
+export async function trashThread(id) {
+  await later();
+  const was = (threadJson(mine(load()), id)?.messages || []).some((m) => m.labelIds.includes('INBOX'));
+  modify(id, ['TRASH'], ['INBOX']);
+  const m = readWasInbox(); m[id] = was; writeWasInbox(m);
+}
+export async function untrashThread(id) {
+  await later();
+  modify(id, [], ['TRASH']);
+  const th = threadJson(mine(load()), id);
+  const m = readWasInbox();
+  let toInbox = m[id];
+  if (toInbox === undefined) {
+    toInbox = (th?.messages || []).some((x) => (!x.labelIds.includes('SENT') && !x.labelIds.includes('DRAFT')) || x.labelIds.some((k) => k.startsWith('CATEGORY_')));
+  }
+  if (toInbox) modify(id, ['INBOX'], []);
+  delete m[id]; writeWasInbox(m);
+  return th;
+}
 
 // ---- drafts ------------------------------------------------------------------------
 async function messageFromRaw(s, b, raw, labels, threadId) {
@@ -299,7 +321,11 @@ export async function sendRaw(raw, threadId) {
 
   const sent = deliver(sender, ['SENT'], true, threadId || null);
   const rcpts = [...(p.to || []), ...(p.cc || []), ...(p.bcc || [])].map((a) => a.address.toLowerCase());
-  [...new Set(rcpts)].forEach((addr) => deliver(box(s, addr), ['INBOX', 'UNREAD'], false, addr === me ? sent.threadId : null));
+  [...new Set(rcpts)].forEach((addr) => {
+    // Like real Gmail, mail to yourself is ONE message marked both Sent and Inbox.
+    if (addr === me && sender === box(s, me)) { sent.labelIds = [...new Set([...sent.labelIds, 'INBOX', 'UNREAD', 'CATEGORY_PERSONAL'])]; return; }
+    deliver(box(s, addr), ['INBOX', 'UNREAD'], false, addr === me ? sent.threadId : null);
+  });
   save(s);
   return { id: sent.id, threadId: sent.threadId, labelIds: sent.labelIds };
 }
