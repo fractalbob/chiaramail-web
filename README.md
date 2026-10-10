@@ -102,7 +102,9 @@ The app keeps a few things in your browser and nowhere else:
 
 - **Computer (Chrome):** click the install icon at the right of the address
   bar, or **⋮ → Cast, save and share → Install ChiaraMail**.
-- **Android (Chrome):** **⋮ → Add to Home screen → Install**.
+- **Android (Chrome):** **⋮** (at the bottom on some phones) → **Install and
+  create shortcut** → choose **Install**. The other choice, "Create shortcut",
+  only adds a link to the page.
 - **iPhone (Safari):** **Share → Add to Home Screen**.
 
 ## Try it with no setup
