@@ -21,6 +21,7 @@ export const isEmail = (s) => EMAIL.test(s.trim());
 // when the app is opened on its .web.app address. Falls back to the current site.
 const PUBLIC_ORIGIN = import.meta.env.VITE_PUBLIC_ORIGIN || window.location.origin;
 export const messageUrl = (id) => new URL(`/m/${id}`, PUBLIC_ORIGIN).toString();
+export const homeUrl = () => new URL('/', PUBLIC_ORIGIN).toString();
 
 // The note the sender emails to recipients, containing the link.
 export function invitation(t, { id, updated }) {

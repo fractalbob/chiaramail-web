@@ -35,6 +35,8 @@ Tick **ECS message** when writing.
   is too big, ChiaraMail suggests sending it as an ECS message.
 - **Recipients without ChiaraMail** get a short email with a link to the
   current version. They sign in with the address it was sent to.
+  The email and that page both invite them to get ChiaraMail themselves, so
+  every ECS message introduces the app to its readers.
 - **Forwarding** is off unless the sender ticks "Let recipients forward it".
   It can be switched at any time from the message. When it's off, recipients
   can't forward it from ChiaraMail, and anyone they forward the email to can't

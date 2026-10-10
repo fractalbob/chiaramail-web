@@ -6,7 +6,7 @@ import {
   buildRaw, parseMessage, parseAddressList, isEmail, replySubject, forwardSubject,
   htmlToText, quote, bytesToB64, b64ToBytes, b64urlToB64, escapeHtml, CONTENT_POINTER, CONTENT_KEY, displayName,
 } from '../gmail/mime.js';
-import { messageUrl } from '../lib.js';
+import { messageUrl, homeUrl } from '../lib.js';
 import { createEcs, openEcs, getEcsAttachment } from '../ecs.js';
 import { useAuth } from '../auth.jsx';
 import { useMail } from './context.jsx';
@@ -271,11 +271,11 @@ export default function Composer() {
         headers[CONTENT_POINTER] = pointer;
         headers[CONTENT_KEY] = made.key;
         const link = `${messageUrl(pointer)}#k=${made.key}`;
-        text = `${t('liveFallback')}\n\n${link}\n\n${t('liveFallbackHint')}`;
+        text = `${t('liveFallback')}\n\n${link}\n\n${t('liveFallbackHint')}\n${t('mailInvite')} ${homeUrl()}`;
         html = `<div style="font-family:Georgia,serif;font-size:16px;line-height:1.5;color:#14313b">
 <p>${escapeHtml(t('liveFallback'))}</p>
 <p><a href="${link}" style="display:inline-block;padding:10px 18px;background:#14313b;color:#fbfdfe;border-radius:6px;text-decoration:none">${escapeHtml(t('liveFallbackButton'))}</a></p>
-<p style="color:#587079;font-size:14px">${escapeHtml(t('liveFallbackHint'))}</p></div>`;
+<p style="color:#587079;font-size:14px">${escapeHtml(t('liveFallbackHint'))}<br>${escapeHtml(t('mailInvite'))} <a href="${homeUrl()}" style="color:#1d58b5">${escapeHtml(t('mailInviteLink'))}</a></p></div>`;
       }
       const raw = buildRaw({
         to: toL, cc: ccL, bcc: bccL, subject: subject.trim(), text, html, attachments, headers,

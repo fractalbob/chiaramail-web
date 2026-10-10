@@ -186,6 +186,9 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .updated-banner mark { background: none; color: var(--ink); font-weight: 600; }
 .updated-banner span { color: var(--slate); font-size: 0.9375rem; }
 .fineprint { color: var(--slate); font-size: 0.8125rem; margin: 12px 4px; }
+.invite { max-width: 680px; box-sizing: border-box; margin-top: 28px; padding: 20px 22px; border: 1px solid var(--rule); border-radius: 12px; background: var(--paper); }
+.invite-title { margin: 0 0 6px; font: 600 1.125rem/1.35 var(--serif); }
+.invite p { margin: 0 0 14px; color: var(--slate); }
 
 .notice {
   background: var(--paper); border: 1px solid var(--rule); border-left: 4px solid var(--slate);

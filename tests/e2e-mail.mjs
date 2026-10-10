@@ -357,6 +357,22 @@ const [webDl] = await Promise.all([page.waitForEvent('download'), page.getByRole
 await must(webDl.suggestedFilename() === 'agenda.txt', 'attachment on the web page');
 await shot('m09-web-page');
 log('link fallback page works for a recipient, with the attachment');
+// …and invites the reader to get ChiaraMail; so does the email itself
+const mailText = await page.evaluate((p) => {
+  const s = JSON.parse(localStorage.getItem('chiaramail.mock.gmail'));
+  const dec = (d) => decodeURIComponent(escape(atob(d.replace(/-/g, '+').replace(/_/g, '/'))));
+  const out = [];
+  const walk = (part) => { if (part.body?.data) out.push(dec(part.body.data)); (part.parts || []).forEach(walk); };
+  for (const box of Object.values(s.boxes)) for (const m of Object.values(box.messages)) {
+    if (m.payload.headers.some((h) => h.name.toLowerCase() === 'x-chiaramail-content-pointer' && h.value === p)) walk(m.payload);
+  }
+  return out.join('\n');
+}, pointer);
+await must(mailText.includes('Send your own ECS messages from your Gmail:') && mailText.includes(`${BASE}/`), 'the email invites the reader to ChiaraMail');
+await page.getByRole('heading', { name: 'Send your own ECS messages' }).waitFor();
+await page.getByRole('link', { name: 'Get ChiaraMail' }).click();
+await page.waitForURL(`${BASE}/`);
+log('readers are invited to get ChiaraMail, on the page and in the email');
 
 // ---- Eve forges an ECS message "from Alice" using content she stored herself
 await connectAs('eve@example.com');

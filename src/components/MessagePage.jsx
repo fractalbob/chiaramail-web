@@ -116,6 +116,13 @@ export default function MessagePage() {
           <Letter message={m} myEmail={user.email} banner={updatedBanner} ecsKey={key} />
           {withdrawnNote}
           {!isSender && !m.withdrawn && <p className="fineprint">{t('readNotice')}</p>}
+          {!isSender && (
+            <aside className="invite" aria-labelledby="invite-title">
+              <h2 id="invite-title" className="invite-title">{t('inviteTitle')}</h2>
+              <p>{t('inviteBody')}</p>
+              <Link to="/" className="btn btn-primary">{t('inviteButton')}</Link>
+            </aside>
+          )}
         </div>
         {isSender && <SenderTools message={m} ecsKey={key} onSendLink={() => { setParams({ send: 'new' }); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
       </div>
