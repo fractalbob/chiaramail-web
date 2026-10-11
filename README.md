@@ -96,10 +96,12 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
   - The list updates as soon as you click; "Working…" shows while Gmail
     catches up, and if Gmail refuses, an error appears and the list reloads.
   - In an opened conversation: Back, Archive or Move to inbox, Report spam,
-    Delete or Restore, Mark unread, Star, Label as, and on the right
-    **Reply**, **Reply all** (when there are several recipients) and
-    **Forward** for the latest message. Each message also keeps its own
-    Reply / Forward buttons underneath it.
+    Delete or Restore, Mark unread, Star and Label as.
+  - As in Gmail, each message has a **reply arrow** and a **⋮ menu** (Reply,
+    Reply all, Forward, Forward as attachment) beside its date, so any earlier
+    message can be answered or forwarded. One row of big **Reply / Reply all /
+    Forward** buttons sits under the last message. Forwarding is greyed out on
+    ECS messages whose sender doesn't allow it.
   - **Right-click a conversation** in the list for Gmail's menu: Reply,
     Reply all, Forward, **Forward as attachment** (each message as an .eml
     file), Archive, Delete (Restore in Trash), Mark read/unread, Add/Remove

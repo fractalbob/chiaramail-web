@@ -65,6 +65,7 @@ function DraftCard({ m }) {
 
 function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
   const { t, formatMail } = useI18n();
+  const nav = useNavigate();
   const [live, setLive] = useState(null); // { isSender, allowForward, withdrawn } for ECS messages
   const forwardBlocked = !!(m.pointer && live && !live.isSender && (live.withdrawn || !live.allowForward));
   const people = (list) => list.map((a) => (a.email.toLowerCase() === me ? t('me') : displayName(a))).join(', ');
@@ -86,10 +87,22 @@ function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
   return (
     <li className="mcard">
       <header className="mhead">
-        <button type="button" className="mcard-toggle mcard-toggle-open" onClick={onToggle} aria-expanded="true" disabled={isLast}>
-          <span className="mfrom">{fromName} <span className="maddr">&lt;{m.from?.email}&gt;</span></span>
-          <span className="mdate">{formatMail(m.date)}</span>
-        </button>
+        <div className="mhead-row">
+          <button type="button" className="mcard-toggle mcard-toggle-open" onClick={onToggle} aria-expanded="true" disabled={isLast}>
+            <span className="mfrom">{fromName} <span className="maddr">&lt;{m.from?.email}&gt;</span></span>
+            <span className="mdate">{formatMail(m.date)}</span>
+          </button>
+          {/* Gmail: a reply arrow and a ⋮ menu for this message, beside its date */}
+          <span className="mhead-actions">
+            <Link className="ibtn" to={`${replyBase}&mode=reply`} aria-label={t('reply')} title={t('reply')}><Icon name="reply" /></Link>
+            <Menu align="right" label={t('moreActions')} button={<Icon name="more" />}>
+              <MenuItem icon={<Icon name="reply" size={18} />} onClick={() => nav(`${replyBase}&mode=reply`)}>{t('reply')}</MenuItem>
+              {(m.to.length + m.cc.length > 1) && <MenuItem icon={<Icon name="replyAll" size={18} />} onClick={() => nav(`${replyBase}&mode=replyAll`)}>{t('replyAll')}</MenuItem>}
+              <MenuItem icon={<Icon name="forward" size={18} />} disabled={forwardBlocked} onClick={() => nav(`${replyBase}&mode=forward`)}>{t('forward')}</MenuItem>
+              <MenuItem icon={<Icon name="attach" size={18} />} disabled={forwardBlocked} onClick={() => nav(`${replyBase}&mode=forwardAttach&one=1`)}>{t('forwardAttach')}</MenuItem>
+            </Menu>
+          </span>
+        </div>
         <p className="mto">
           {t('to')}: {people(m.to) || '—'}
           {m.cc.length > 0 && <> · {t('cc')}: {people(m.cc)}</>}
@@ -102,13 +115,16 @@ function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
           : m.html ? <HtmlBody message={m} /> : <PlainBody text={m.text} />}
       </div>
       <Attachments message={m} />
-      <div className="actions mactions">
-        <Link className="btn" to={`${replyBase}&mode=reply`}>{t('reply')}</Link>
-        {(m.to.length + m.cc.length > 1) && <Link className="btn" to={`${replyBase}&mode=replyAll`}>{t('replyAll')}</Link>}
-        {forwardBlocked
-          ? <button type="button" className="btn" disabled aria-describedby={`nofwd-${m.id}`}>{t('forward')}</button>
-          : <Link className="btn" to={`${replyBase}&mode=forward`}>{t('forward')}</Link>}
-      </div>
+      {isLast && (
+        // Gmail: one row of big buttons, under the last message only.
+        <div className="actions mactions">
+          <Link className="btn btn-icon" to={`${replyBase}&mode=reply`}><Icon name="reply" size={18} />{t('reply')}</Link>
+          {(m.to.length + m.cc.length > 1) && <Link className="btn btn-icon" to={`${replyBase}&mode=replyAll`}><Icon name="replyAll" size={18} />{t('replyAll')}</Link>}
+          {forwardBlocked
+            ? <button type="button" className="btn btn-icon" disabled aria-describedby={`nofwd-${m.id}`}><Icon name="forward" size={18} />{t('forward')}</button>
+            : <Link className="btn btn-icon" to={`${replyBase}&mode=forward`}><Icon name="forward" size={18} />{t('forward')}</Link>}
+        </div>
+      )}
       {forwardBlocked && <p id={`nofwd-${m.id}`} className="help">{t('forwardBlocked')}</p>}
     </li>
   );
@@ -155,7 +171,6 @@ export default function ThreadView() {
   };
   const subject = msgs[0]?.subject || t('noSubject');
   const lastReal = msgs.map((m) => m.labelIds.includes('DRAFT')).lastIndexOf(false);
-  const lastMsg = lastReal >= 0 ? msgs[lastReal] : null; // Reply / Forward in the toolbar act on the latest message
   const isOpen = (m, i) => open[m.id] ?? (i === lastReal || m.labelIds.includes('UNREAD') || !!m.pointer);
 
   return (
@@ -183,13 +198,6 @@ export default function ThreadView() {
                 onClick={() => act(() => gmail.modifyThread(threadId, labels.has(l.id) ? [] : [l.id], labels.has(l.id) ? [l.id] : []), false)}>{l.name}</MenuItem>
             ))}
           </Menu>
-        )}
-        {lastMsg && (
-          <span className="toolbar-reply">
-            <Link className="ibtn" to={`/compose?thread=${threadId}&msg=${lastMsg.id}&mode=reply`} aria-label={t('reply')} title={t('reply')}><Icon name="reply" /></Link>
-            {(lastMsg.to.length + lastMsg.cc.length > 1) && <Link className="ibtn" to={`/compose?thread=${threadId}&msg=${lastMsg.id}&mode=replyAll`} aria-label={t('replyAll')} title={t('replyAll')}><Icon name="replyAll" /></Link>}
-            <Link className="ibtn" to={`/compose?thread=${threadId}&msg=${lastMsg.id}&mode=forward`} aria-label={t('forward')} title={t('forward')}><Icon name="forward" /></Link>
-          </span>
         )}
       </div>
       <h1 className="thread-subject">{subject}</h1>

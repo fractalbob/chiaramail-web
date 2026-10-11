@@ -89,7 +89,8 @@ export default function Composer() {
     gmail.getThread(threadParam).then(async (th) => {
       if (mode === 'forwardAttach') {
         // Gmail's "Forward as attachment": each message of the conversation as an .eml file.
-        const real = th.messages.filter((x) => !(x.labelIds || []).includes('DRAFT'));
+        // From a message's own menu (one=1): just that message.
+        const real = th.messages.filter((x) => !(x.labelIds || []).includes('DRAFT') && (params.get('one') !== '1' || x.id === msgParam));
         const parsed = real.map(parseMessage);
         // An ECS message travels with its key, so the sender's "don't forward" applies here too.
         for (const pm of parsed.filter((x) => x.pointer)) {

@@ -342,6 +342,11 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .mto { color: var(--slate); font-size: 0.875rem; margin: 4px 0 0; overflow-wrap: anywhere; }
 .mbody { margin-top: 16px; }
 .mactions { margin-top: 18px; }
+.mhead-row { display: flex; align-items: flex-start; gap: 4px; }
+.mhead-row .mcard-toggle { flex: 1; min-width: 0; }
+.mhead-actions { display: inline-flex; flex: none; margin: -8px -10px 0 0; }
+.btn-icon { display: inline-flex; align-items: center; gap: 8px; }
+.btn-icon .icon { color: var(--slate); }
 .htmlbody iframe { width: 100%; border: 0; display: block; min-height: 60px; border-radius: var(--radius-s); background: #fff; }
 .imgbar { background: var(--sky); padding: 8px 12px; border-radius: var(--radius-s); font-size: 0.875rem; margin: 0 0 8px; }
 .imgbar .linklike { padding: 0; }
@@ -428,6 +433,8 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
   .mcard { padding: 14px 14px; }
   .mcard-toggle { padding: 12px 14px; }
   .mcard-toggle-open { padding: 0; }
+  .mhead .maddr { display: none; }
+  .mhead-actions { margin-right: -12px; }
 }
 
 @media (max-width: 860px) {

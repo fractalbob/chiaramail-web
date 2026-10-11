@@ -274,7 +274,10 @@ await page.getByRole('link', { name: 'Back' }).click();
 await page.locator('.folder', { hasText: 'Inbox' }).click();
 await openRow('Committee meeting');
 await page.getByText('The sender doesn’t allow this message to be forwarded.').waitFor();
-await must(page.locator('.mcard').first().getByRole('button', { name: 'Forward' }).isDisabled(), 'forward disabled');
+await page.locator('.mcard').first().getByRole('button', { name: 'More' }).click();
+await must(page.getByRole('menuitem', { name: 'Forward', exact: true }).isDisabled(), 'forward disabled');
+await must(page.getByRole('menuitem', { name: 'Forward as attachment' }).isDisabled(), 'forward as attachment disabled');
+await page.keyboard.press('Escape');
 await page.getByRole('link', { name: 'Back' }).click();
 await page.locator('.trow', { hasText: 'Committee meeting' }).click({ button: 'right' });
 await page.getByRole('menu', { name: 'Conversation menu' }).getByRole('menuitem', { name: 'Forward as attachment' }).click();
@@ -295,16 +298,19 @@ log('sender switches forwarding on');
 await connectAs('bob@example.com');
 await openRow('Committee meeting');
 await must(!(await page.getByText('The sender doesn’t allow this message to be forwarded.').count()), 'forward now allowed');
-await page.locator('.mcard').first().getByRole('link', { name: 'Forward' }).click(); // Alice's ECS message, not the latest reply
+await page.locator('.mcard').first().getByRole('button', { name: 'More' }).click(); // Alice's ECS message, not the latest reply
+await page.getByRole('menuitem', { name: 'Forward', exact: true }).click();
 await waitValue(page.getByLabel('Subject', { exact: true }), (v) => v.startsWith('Fwd:'), 'forward prefilled');
 await page.locator('.compose .chip', { hasText: 'agenda.txt' }).waitFor();
 await page.getByLabel('To', { exact: true }).fill('dave@example.com');
 await send();
 await page.locator('.mcard').first().waitFor();
 log('forwarded to an outsider');
-// Reply and Forward also sit in the top toolbar, acting on the latest message
-await must(await page.locator('.toolbar').getByRole('link', { name: 'Forward' }).count() === 1, 'Forward in the toolbar');
-await must(await page.locator('.toolbar').getByRole('link', { name: 'Reply', exact: true }).count() === 1, 'Reply in the toolbar');
+// Gmail layout: a reply arrow in every message's header, one row of big buttons under the last message
+await must(await page.locator('.mcard:not(.mcard-collapsed)').count() === await page.locator('.mhead-actions').getByRole('link', { name: 'Reply', exact: true }).count(), 'reply arrow in each open message');
+await must(await page.locator('.mactions').count() === 1, 'one row of Reply / Forward buttons, under the last message');
+await must(!(await page.locator('.toolbar').getByRole('link', { name: 'Reply', exact: true }).count()), 'no Reply in the top toolbar');
+log('Gmail layout: reply arrow and ⋮ per message, big buttons only at the bottom');
 
 // ---- Alice edits
 await connectAs('alice@example.com');
