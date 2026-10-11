@@ -36,6 +36,48 @@ service cloud.firestore {
       return getAfter(/databases/$(database)/documents/messages/$(id)).data;
     }
 
+    // ---- Attachment allowance -------------------------------------------------
+    // Each sender may keep up to 1 GB of ECS attachments stored at once.
+    // usage/{uid}.bytes is their running total: a new ECS message with files
+    // must raise it by exactly the files' declared sizes (storage.rules makes
+    // sure the uploads aren't bigger), and withdrawing or deleting one lowers it.
+    function quotaBytes() {
+      return 1073741824;
+    }
+    function att(a, i) {
+      return a.size() > i ? a[i]['size'] : 0;
+    }
+    // Sum of the declared sizes (at most 20 files; rules have no loops).
+    function attTotal(a) {
+      return att(a, 0) + att(a, 1) + att(a, 2) + att(a, 3) + att(a, 4)
+        + att(a, 5) + att(a, 6) + att(a, 7) + att(a, 8) + att(a, 9)
+        + att(a, 10) + att(a, 11) + att(a, 12) + att(a, 13) + att(a, 14)
+        + att(a, 15) + att(a, 16) + att(a, 17) + att(a, 18) + att(a, 19);
+    }
+    function sizesOk(a) {
+      return a.size() <= 20 && attTotal(a) is int && attTotal(a) >= 0;
+    }
+    function usagePath(uid) {
+      return /databases/$(database)/documents/usage/$(uid);
+    }
+    function usedBefore(uid) {
+      return exists(usagePath(uid)) ? get(usagePath(uid)).data.bytes : 0;
+    }
+
+    // Lowering a sender's total: only together with withdrawing or deleting
+    // one of their counted messages (named in `freed`), by exactly its files.
+    function freedOk(uid) {
+      let m = request.resource.data.get('freed', '');
+      let path = /databases/$(database)/documents/messages/$(m);
+      return m is string && m != ''
+        && exists(path)
+        && get(path).data.senderUid == uid
+        && get(path).data.withdrawn == false
+        && get(path).data.get('counted', false) == true
+        && (!existsAfter(path) || getAfter(path).data.withdrawn == true)
+        && request.resource.data.bytes == usedBefore(uid) - attTotal(get(path).data.attachments);
+    }
+
     // ---- Old ChiaraMail (Android app, 2020): device registrations. ----------
     // Kept exactly as it was in project chiaramail-15119 so the old app keeps
     // working. NOTE: this lets anyone read or write users/ — see README.
@@ -60,6 +102,18 @@ service cloud.firestore {
       allow delete: if verified() && email == myEmail();
     }
 
+    // A sender's attachment total. They can read it; raising it is always
+    // allowed (it only limits them), lowering it only together with withdrawing
+    // or deleting one of their counted messages, by exactly its files' sizes.
+    match /usage/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['bytes', 'freed'])
+        && request.resource.data.bytes is int
+        && request.resource.data.bytes >= 0
+        && (request.resource.data.bytes >= usedBefore(uid) || freedOk(uid));
+    }
+
     match /messages/{id} {
       allow read: if isSender(resource.data) || isRecipient(resource.data);
 
@@ -67,7 +121,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(
              ['senderUid', 'senderEmail', 'senderName', 'recipients', 'subject',
               'body', 'createdAt', 'updatedAt', 'edition', 'withdrawn', 'allowForward',
-              'attachments', 'enc'])
+              'attachments', 'enc', 'counted'])
         && request.resource.data.keys().hasAll(
              ['senderUid', 'senderEmail', 'recipients', 'subject', 'body',
               'createdAt', 'updatedAt', 'edition', 'withdrawn'])
@@ -83,7 +137,14 @@ service cloud.firestore {
         && (!('attachments' in request.resource.data)
             || (request.resource.data.attachments is list
                 && request.resource.data.attachments.size() >= 1
-                && request.resource.data.attachments.size() <= 20))
+                && request.resource.data.attachments.size() <= 20
+                && sizesOk(request.resource.data.attachments)
+                // counted against the sender's allowance, in the same batch
+                && request.resource.data.get('counted', false) == true
+                && getAfter(usagePath(request.auth.uid)).data.bytes
+                     == usedBefore(request.auth.uid) + attTotal(request.resource.data.attachments)
+                && getAfter(usagePath(request.auth.uid)).data.bytes <= quotaBytes()))
+        && (!('counted' in request.resource.data) || 'attachments' in request.resource.data)
         && (!('senderName' in request.resource.data)
             || (request.resource.data.senderName is string
                 && request.resource.data.senderName.size() <= 120))

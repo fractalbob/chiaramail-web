@@ -9,7 +9,7 @@ import {
 import {
   getFirestore, connectFirestoreEmulator, collection, doc, query, where,
   orderBy, onSnapshot, writeBatch, serverTimestamp, increment, getDoc,
-  getDocs, setDoc, updateDoc, deleteDoc,
+  getDocs, setDoc, updateDoc, deleteDoc, runTransaction,
 } from 'firebase/firestore';
 import {
   getStorage, connectStorageEmulator, ref as sref, uploadBytesResumable, getBlob, deleteObject,
@@ -126,9 +126,24 @@ export function watchMessage(id, cb, onErr) {
 const fileRef = (id, i) => sref(storage, `ecs/${id}/${i}`);
 const fileMeta = (files) => files.map((f) => ({ name: f.name, type: f.type || 'application/octet-stream', size: f.size }));
 
+// ---- attachment allowance ----------------------------------------------------
+// Each sender may keep up to QUOTA bytes of ECS attachments stored at once;
+// usage/{uid}.bytes is their running total (enforced in firestore.rules).
+export const QUOTA = 1024 * 1024 * 1024;
+export const MAX_FILE = 25 * 1024 * 1024;
+const usageRef = (uid) => doc(db, 'usage', uid);
+const filesTotal = (atts) => (atts || []).reduce((n, a) => n + (a.size || 0), 0);
+export async function getUsage(uid) {
+  const s = await getDoc(usageRef(uid)).catch(() => null);
+  return { used: s?.exists() ? s.data().bytes || 0 : 0, quota: QUOTA };
+}
+// Thrown when a message's files would go over the allowance.
+export class QuotaError extends Error {
+  constructor(used, need) { super('quota'); this.code = 'quota'; this.used = used; this.need = need; this.quota = QUOTA; }
+}
+
 async function createMessage_(user, { recipients, subject, body, allowForward = false, attachments = [], enc = 0 }) {
   const ref = doc(messages);
-  const batch = writeBatch(db);
   const data = {
     senderUid: user.uid,
     senderEmail: user.email,
@@ -142,12 +157,53 @@ async function createMessage_(user, { recipients, subject, body, allowForward = 
     allowForward: !!allowForward,
   };
   if (user.name) data.senderName = user.name.slice(0, 120);
-  if (attachments.length) data.attachments = fileMeta(attachments);
   if (enc) data.enc = 1; // end-to-end encrypted: subject, body and attachment names are ciphertext
-  batch.set(ref, data);
-  batch.set(doc(ref, 'editions', '1'), { edition: 1, subject, body, savedAt: serverTimestamp() });
-  await batch.commit();
+  const edition = { edition: 1, subject, body, savedAt: serverTimestamp() };
+  if (!attachments.length) {
+    const batch = writeBatch(db);
+    batch.set(ref, data);
+    batch.set(doc(ref, 'editions', '1'), edition);
+    await batch.commit();
+    return ref.id;
+  }
+  // With files: count them against the sender's allowance in the same write.
+  data.attachments = fileMeta(attachments);
+  data.counted = true;
+  const need = filesTotal(data.attachments);
+  await runTransaction(db, async (tx) => {
+    const u = await tx.get(usageRef(user.uid));
+    const used = u.exists() ? u.data().bytes || 0 : 0;
+    if (used + need > QUOTA) throw new QuotaError(used, need);
+    tx.set(usageRef(user.uid), { bytes: used + need });
+    tx.set(ref, data);
+    tx.set(doc(ref, 'editions', '1'), edition);
+  });
   return ref.id;
+}
+
+// Gives a counted message's files back to the sender's allowance, in the same
+// write that withdraws or deletes it. `change(tx, ref)` does that write.
+async function freeing(id, change) {
+  const ref = doc(messages, id);
+  try {
+    await runTransaction(db, async (tx) => {
+      const m = await tx.get(ref);
+      const d = m.data();
+      if (d && d.counted && !d.withdrawn && d.senderUid) {
+        const u = await tx.get(usageRef(d.senderUid));
+        const used = u.exists() ? u.data().bytes || 0 : 0;
+        tx.set(usageRef(d.senderUid), { bytes: Math.max(0, used - filesTotal(d.attachments)), freed: id });
+      }
+      change(tx, ref);
+    });
+  } catch (e) {
+    // Never let the allowance stand in the way of withdrawing or deleting.
+    if (e?.code === 'permission-denied') {
+      const batch = writeBatch(db);
+      change(batch, ref);
+      await batch.commit();
+    } else throw e;
+  }
 }
 
 // files: [{ name, type, bytes: Blob | Uint8Array }] in the same order as
@@ -188,7 +244,7 @@ function setAllowForward_(id, allow) {
 
 async function withdraw_(id) {
   const snap = await getDoc(doc(messages, id));
-  await updateDoc(doc(messages, id), { withdrawn: true, body: '', updatedAt: serverTimestamp() });
+  await freeing(id, (w, ref) => w.update(ref, { withdrawn: true, body: '', updatedAt: serverTimestamp() }));
   await removeFiles(id, snap.data()?.attachments?.length || 0);
 }
 
@@ -201,7 +257,7 @@ async function deleteMessage_(id, fileCount) {
     getDocs(collection(ref, 'reads')),
   ]);
   await Promise.all([...eds.docs, ...reads.docs].map((d) => deleteDoc(d.ref)));
-  await deleteDoc(ref);
+  await freeing(id, (w, r) => w.delete(r));
 }
 
 async function listEditions_(id) {

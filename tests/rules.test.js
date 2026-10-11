@@ -185,23 +185,32 @@ const FILES = [{ name: 'agenda.txt', type: 'text/plain', size: 5 }];
 const bytes = new Uint8Array([104, 101, 108, 108, 111]);
 const store = (u, verified = true) =>
   env.authenticatedContext(u.uid, { email: u.email, email_verified: verified }).storage();
+const sum = (fs) => fs.reduce((n, f) => n + f.size, 0);
+// A message with files is written together with the sender's raised total.
+function sendWithFiles(db, id, files = FILES, before = 0, uid = 'alice', over = {}) {
+  const b = writeBatch(db);
+  b.set(doc(db, `messages/${id}`), newMessage({ attachments: files, counted: true, ...over }));
+  b.set(doc(db, `usage/${uid}`), { bytes: before + sum(files) });
+  return b.commit();
+}
 
 test('a message may list its attachments, within limits, and never change them', async () => {
   const db = ctx(ALICE);
-  await assertSucceeds(setDoc(doc(db, 'messages/m1'), newMessage({ attachments: FILES })));
+  await assertSucceeds(sendWithFiles(db, 'm1'));
   await assertFails(setDoc(doc(db, 'messages/m2'), newMessage({ attachments: 'x' })));
   await assertFails(setDoc(doc(db, 'messages/m3'), newMessage({ attachments: [] })));
-  await assertFails(setDoc(doc(db, 'messages/m4'), newMessage({ attachments: Array(21).fill(FILES[0]) })));
+  await assertFails(sendWithFiles(db, 'm4', Array(21).fill(FILES[0]), 5));
   await assertFails(updateDoc(doc(db, 'messages/m1'), { attachments: [...FILES, ...FILES] }));
 });
 
 async function seedWithFile() {
-  await assertSucceeds(setDoc(doc(ctx(ALICE), 'messages/m1'), newMessage({ attachments: FILES })));
+  await assertSucceeds(sendWithFiles(ctx(ALICE), 'm1'));
   await assertSucceeds(store(ALICE).ref('ecs/m1/0').put(bytes, { contentType: 'text/plain' }));
 }
 
 test('only the sender uploads, and only the files the message lists', async () => {
-  await assertSucceeds(setDoc(doc(ctx(ALICE), 'messages/m1'), newMessage({ attachments: FILES })));
+  await assertSucceeds(sendWithFiles(ctx(ALICE), 'm1'));
+  await assertFails(store(ALICE).ref('ecs/m1/0').put(new Uint8Array(2048))); // bigger than declared
   await assertFails(store(BOB).ref('ecs/m1/0').put(bytes));
   await assertFails(store(ALICE).ref('ecs/m1/1').put(bytes));
   await assertFails(store(ALICE).ref('ecs/m1/x').put(bytes));
@@ -226,6 +235,55 @@ test('withdrawn: nobody can fetch attachments; only the sender deletes them', as
   await assertFails(store(BOB).ref('ecs/m1/0').getMetadata());
   await assertFails(store(ALICE).ref('ecs/m1/0').getMetadata());
   await assertSucceeds(store(ALICE).ref('ecs/m1/0').delete());
+});
+
+// ---- Attachment allowance (1 GB per sender) -----------------------------------
+test('files count against the sender’s allowance, in the same write', async () => {
+  const db = ctx(ALICE);
+  // not counted, or counted wrongly: refused
+  await assertFails(setDoc(doc(db, 'messages/a'), newMessage({ attachments: FILES })));
+  await assertFails(setDoc(doc(db, 'messages/b'), newMessage({ attachments: FILES, counted: true })));
+  const wrong = writeBatch(db);
+  wrong.set(doc(db, 'messages/c'), newMessage({ attachments: FILES, counted: true }));
+  wrong.set(doc(db, 'usage/alice'), { bytes: 1 });
+  await assertFails(wrong.commit());
+  // counted right: accepted, and the total adds up
+  await assertSucceeds(sendWithFiles(db, 'm1'));
+  await assertSucceeds(sendWithFiles(db, 'm2', FILES, 5));
+  // over 1 GB: refused
+  const big = [{ name: 'x', type: 'x', size: 1024 * 1024 * 1024 }];
+  await assertFails(sendWithFiles(db, 'm3', big, 10));
+  // nobody else can touch or read Alice's total
+  await assertFails(getDoc(doc(ctx(BOB), 'usage/alice')));
+  await assertFails(setDoc(doc(ctx(BOB), 'usage/alice'), { bytes: 0 }));
+  // she can't simply lower it…
+  await assertFails(setDoc(doc(db, 'usage/alice'), { bytes: 0 }));
+  await assertFails(setDoc(doc(db, 'usage/alice'), { bytes: 5, freed: 'm1' })); // m1 not withdrawn
+});
+
+test('withdrawing or deleting a counted message gives its space back, once', async () => {
+  const db = ctx(ALICE);
+  await assertSucceeds(sendWithFiles(db, 'm1'));
+  await assertSucceeds(sendWithFiles(db, 'm2', FILES, 5));
+  const w = writeBatch(db);
+  w.update(doc(db, 'messages/m1'), { withdrawn: true, body: '', updatedAt: serverTimestamp() });
+  w.set(doc(db, 'usage/alice'), { bytes: 5, freed: 'm1' });
+  await assertSucceeds(w.commit());
+  // not again for the same message
+  await assertFails(setDoc(doc(db, 'usage/alice'), { bytes: 0, freed: 'm1' }));
+  const d = writeBatch(db);
+  d.delete(doc(db, 'messages/m2'));
+  d.set(doc(db, 'usage/alice'), { bytes: 0, freed: 'm2' });
+  await assertSucceeds(d.commit());
+  // and withdrawing never depends on the total
+  await assertSucceeds(sendWithFiles(db, 'm3'));
+  await assertSucceeds(updateDoc(doc(db, 'messages/m3'), { withdrawn: true, body: '', updatedAt: serverTimestamp() }));
+});
+
+test('uploads: at most 25 MB per file', async () => {
+  const big = [{ name: 'v', type: 'video/mp4', size: 30 * 1024 * 1024 }];
+  await assertSucceeds(sendWithFiles(ctx(ALICE), 'm1', big));
+  await assertFails(store(ALICE).ref('ecs/m1/0').put(new Uint8Array(26 * 1024 * 1024)));
 });
 
 // ---- ECS directory -----------------------------------------------------------

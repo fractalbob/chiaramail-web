@@ -31,7 +31,17 @@ Tick **ECS message** when writing.
 - **Edit and Withdraw.** The sender can edit or withdraw the message from
   inside it, and can see who has read which edition and every earlier edition.
 - **Attachments are stored with the content, not the email.** Up to 20 files,
-  100 MB each. Ordinary emails and drafts keep Gmail's 24 MB limit; if a draft
+  25 MB each, and **1 GB in total per sender** for all their ECS messages still
+  stored. The composer shows how much is in use; withdrawing (or deleting) an
+  ECS message gives its space back. The total is kept in `usage/{uid}` and
+  enforced by the security rules: a message with files must raise it by
+  exactly their declared sizes in the same write, uploads can't be bigger
+  than declared, and it can only go down together with withdrawing or
+  deleting a counted message. Messages sent before this (11 October 2026)
+  aren't counted. (Rules can't see whether a withdrawn message's files were
+  really deleted — the app always deletes them; only a hand-made client could
+  leave them behind, and they'd be unreadable.) Change the limits in `firestore.rules` (`quotaBytes`),
+  `storage.rules` and `QUOTA` / `MAX_FILE` in `src/backend/firebase.js`. Ordinary emails and drafts keep Gmail's 24 MB limit; if a draft
   is too big, ChiaraMail suggests sending it as an ECS message.
 - **Recipients without ChiaraMail** get a short email with a link to the
   current version. They sign in with the address it was sent to.

@@ -6,7 +6,7 @@ import {
   buildRaw, parseMessage, parseAddressList, isEmail, replySubject, forwardSubject,
   htmlToText, quote, bytesToB64, b64ToBytes, b64urlToB64, escapeHtml, CONTENT_POINTER, CONTENT_KEY, displayName,
 } from '../gmail/mime.js';
-import { messageUrl } from '../lib.js';
+import { messageUrl, fmtSize } from '../lib.js';
 import { createEcs, openEcs, getEcsAttachment } from '../ecs.js';
 import { useAuth } from '../auth.jsx';
 import { useMail } from './context.jsx';
@@ -15,7 +15,7 @@ import RecipientField from './RecipientField.jsx';
 import { cachedContacts, refreshContacts, rememberRecipients } from './contacts.js';
 
 const MAX_TOTAL = 24 * 1024 * 1024; // what Gmail lets an ordinary email (or a draft) carry
-const MAX_ECS_FILE = 100 * 1024 * 1024; // ECS attachments skip the email: per-file limit (see storage.rules)
+const MAX_ECS_FILE = backend.MAX_FILE; // ECS attachments skip the email: per-file limit (see storage.rules)
 const MAX_ECS_FILES = 20;
 // An ECS message's content as this reader may see it (null if they can't).
 const liveInfo = (pointer) => new Promise((resolve) => {
@@ -253,6 +253,16 @@ export default function Composer() {
     setFiles((f) => [...f, ...added]);
   };
 
+  // ECS attachments count against the sender's allowance (see firestore.rules).
+  const [usage, setUsage] = useState(null);
+  useEffect(() => {
+    if (!changeable || !user?.uid) return;
+    let live = true;
+    backend.getUsage(user.uid).then((u) => { if (live) setUsage(u); }).catch(() => {});
+    return () => { live = false; };
+  }, [changeable, user?.uid]);
+  const quotaMsg = (used, need, quota) => t('ecsQuota', { quota: fmtSize(quota), need: fmtSize(need), left: fmtSize(Math.max(0, quota - used)) });
+
   const send = async (ev) => {
     ev.preventDefault();
     setError('');
@@ -265,6 +275,10 @@ export default function Composer() {
     if (changeable) {
       if (files.length > MAX_ECS_FILES) return setError(t('tooManyFiles', { n: MAX_ECS_FILES }));
       if (files.some((f) => f.size > MAX_ECS_FILE)) return setError(t('tooBigEcs'));
+      if (files.length) {
+        const u = await backend.getUsage(user.uid).catch(() => null);
+        if (u && u.used + total > u.quota) return setError(quotaMsg(u.used, total, u.quota));
+      }
     } else if (total > MAX_TOTAL) return setError(t('tooBig'));
     setBusy(true);
     doneRef.current = true;
@@ -312,7 +326,8 @@ export default function Composer() {
       nav(`/mail/sent/${res.threadId}`, { replace: true });
     } catch (e) {
       if (pointer) backend.deleteMessage(pointer, files.length).catch(() => {});
-      if (!mail.handle(e)) setError(t('errorGeneric', { msg: e.message }));
+      if (e?.code === 'quota') setError(quotaMsg(e.used, e.need, e.quota));
+      else if (!mail.handle(e)) setError(t('errorGeneric', { msg: e.message }));
       doneRef.current = false;
       setBusy(false);
       setProgress(null);
@@ -379,6 +394,9 @@ export default function Composer() {
               </li>
             ))}
           </ul>
+        )}
+        {changeable && usage && (files.length > 0 || usage.used > 0) && (
+          <p className="help ecs-usage">{t('ecsUsage', { used: fmtSize(usage.used), quota: fmtSize(usage.quota), max: fmtSize(MAX_ECS_FILE) })}</p>
         )}
         <label className="btn filebtn">
           {t('attachFiles')}

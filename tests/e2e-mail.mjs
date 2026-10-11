@@ -184,8 +184,17 @@ await page.getByLabel('Message', { exact: true }).fill('Hi both,\n\nThe committe
 await must(page.getByLabel(/^ECS message/).isChecked(), 'ECS on by default for new mail');
 await must(!(await page.getByLabel(/Let recipients forward it/).isChecked()), 'forwarding off by default');
 await page.locator('input[type=file]').setInputFiles(`${SHOTS}/agenda.txt`);
+await page.getByText(/ECS attachments you have stored: .* of your 1 GB\. Up to 25 MB per file/).waitFor();
+// over the sender's allowance: refused, with an explanation
+await page.evaluate(() => localStorage.setItem('chiaramail.mock.quota', '10'));
+await page.getByRole('button', { name: 'Send' }).click();
+await page.getByRole('alert').filter({ hasText: /would go over your 1 KB for ECS attachments/ }).waitFor();
+await page.evaluate(() => localStorage.removeItem('chiaramail.mock.quota'));
+log('ECS attachment allowance: usage shown, sending over it refused');
 await shot('m04-compose');
 await send();
+const usedAfter = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('chiaramail.mock.db')).usage || {})[0]);
+await must(usedAfter > 0, 'files counted against the allowance');
 await page.locator('.live-block').waitFor();
 await page.getByText('First edition').waitFor();
 await page.getByRole('button', { name: 'Edit' }).waitFor();
@@ -667,6 +676,7 @@ await page.getByText(/withdrew this message on/).waitFor();
 await must(!(await page.getByText('Change of plan').count()), 'withdrawn text gone');
 await must(!(await page.getByRole('button', { name: /agenda\.txt/ }).count()), 'withdrawn attachment gone');
 await must(!(await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('chiaramail.mock.files') || '{}')).length)), 'stored files erased on withdraw');
+await must(!(await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('chiaramail.mock.db')).usage || {}).reduce((a, b) => a + b, 0))), 'withdrawing gives the space back');
 log('withdraw erases the live text for readers');
 
 // French + mobile dark

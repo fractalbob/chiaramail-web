@@ -42,7 +42,11 @@ service firebase.storage {
         && msg().withdrawn == false
         && file.matches('[0-9]{1,2}')
         && int(file) < msg().get('attachments', []).size()
-        && request.resource.size <= 100 * 1024 * 1024;
+        // At most 25 MB per file, and no bigger than the size declared in the
+        // message (which counts against the sender's 1 GB, see firestore.rules).
+        // Encryption adds 28 bytes; 1 KB of slack covers it.
+        && request.resource.size <= 25 * 1024 * 1024 + 1024
+        && request.resource.size <= msg().attachments[int(file)]['size'] + 1024;
 
       allow delete: if isSender();
     }

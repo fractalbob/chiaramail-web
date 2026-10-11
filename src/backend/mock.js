@@ -90,6 +90,15 @@ export function watchMessage(id, cb, onErr) {
     cb(out(id, m));
   });
 }
+// Attachment allowance, as in firestore.rules (tests may lower it).
+export const QUOTA = 1024 * 1024 * 1024;
+export const MAX_FILE = 25 * 1024 * 1024;
+const quota = () => Number(localStorage.getItem('chiaramail.mock.quota')) || QUOTA;
+const filesTotal = (atts) => (atts || []).reduce((n, a) => n + (a.size || 0), 0);
+export class QuotaError extends Error {
+  constructor(used, need) { super('quota'); this.code = 'quota'; this.used = used; this.need = need; this.quota = quota(); }
+}
+export async function getUsage(uid) { return { used: (load().usage || {})[uid] || 0, quota: quota() }; }
 export async function createMessage(user, { recipients, subject, body, allowForward = false, attachments = [], enc = 0 }) {
   await later();
   if (!me() || !me().verified || me().uid !== user.uid) throw denied();
@@ -102,7 +111,15 @@ export async function createMessage(user, { recipients, subject, body, allowForw
     editions: { 1: { edition: 1, subject, body, savedAt: now } }, reads: {},
   };
   if (enc) db.messages[id].enc = 1;
-  if (attachments.length) db.messages[id].attachments = attachments.map((f) => ({ name: f.name, type: f.type || 'application/octet-stream', size: f.size }));
+  if (attachments.length) {
+    db.messages[id].attachments = attachments.map((f) => ({ name: f.name, type: f.type || 'application/octet-stream', size: f.size }));
+    db.usage ||= {};
+    const used = db.usage[user.uid] || 0;
+    const need = filesTotal(db.messages[id].attachments);
+    if (used + need > quota()) throw new QuotaError(used, need);
+    db.usage[user.uid] = used + need;
+    db.messages[id].counted = true;
+  }
   save(db);
   return id;
 }
@@ -118,7 +135,7 @@ export async function uploadAttachments(id, files, onProgress) {
   const all = loadFiles();
   for (const [i, f] of files.entries()) {
     const bytes = f.bytes instanceof Uint8Array ? f.bytes : new Uint8Array(await f.bytes.arrayBuffer());
-    if (bytes.length > 100 * 1024 * 1024) throw denied();
+    if (bytes.length > MAX_FILE + 1024 || bytes.length > (m.attachments?.[i]?.size ?? 0) + 1024) throw denied();
     all[`${id}/${i}`] = { type: f.type, data: toB64(bytes) };
   }
   saveFiles(all);
@@ -155,10 +172,16 @@ export async function setAllowForward(id, allow) {
   m.allowForward = !!allow;
   save(db);
 }
+const free = (db, m) => {
+  if (!m.counted || m.withdrawn) return;
+  db.usage ||= {};
+  db.usage[m.senderUid] = Math.max(0, (db.usage[m.senderUid] || 0) - filesTotal(m.attachments));
+};
 export async function withdraw(id) {
   await later();
   const db = load(); const m = db.messages[id];
   if (!m || !isSender(m) || m.withdrawn) throw denied();
+  free(db, m);
   Object.assign(m, { withdrawn: true, body: '', updatedAt: Date.now() });
   save(db);
   removeFiles(id);
@@ -167,6 +190,7 @@ export async function deleteMessage(id) {
   await later();
   const db = load(); const m = db.messages[id];
   if (!m || !isSender(m)) throw denied();
+  free(db, m);
   delete db.messages[id];
   save(db);
   removeFiles(id);
