@@ -64,17 +64,23 @@ export default function ThreadList() {
   const someTicked = selected.size > 0 && !allTicked;
   const tickAll = () => setSel({ key, ids: allTicked ? new Set() : new Set(rows.map((r) => r.id)) });
   const inFolder = (f) => !q && folder === f;
+  // Act on every ticked conversation. The list updates at once (rows that
+  // leave this folder disappear, read/unread flips) and Gmail catches up in the
+  // background; if Gmail refuses, the error shows and the list is reloaded.
   const bulk = async (fn, { local } = {}) => {
     const ids = [...selected];
+    const picked = new Set(ids);
+    setSel({ key, ids: new Set() });
+    setState((s) => ({ ...s, error: '', rows: local ? s.rows.map((r) => (picked.has(r.id) ? local(r) : r)) : s.rows.filter((r) => !picked.has(r.id)) }));
     setBusyBulk(true);
     try {
       for (let i = 0; i < ids.length; i += 3) await Promise.all(ids.slice(i, i + 3).map(fn)); // a few at a time
-      if (local) setState((s) => ({ ...s, rows: s.rows.map((r) => (selected.has(r.id) ? local(r) : r)) }));
-      else await load(true);
-      setSel({ key, ids: new Set() });
       mail.refreshCounts();
-    } catch (e) { if (!handle(e)) setState((s) => ({ ...s, error: e.code === 'rate-limit' ? t('rateLimited') : e.message })); }
-    finally { setBusyBulk(false); }
+      if (!local) load(true); // fill the page back up from Gmail
+    } catch (e) {
+      if (!handle(e)) setState((s) => ({ ...s, error: e.code === 'rate-limit' ? t('rateLimited') : e.message }));
+      load(true);
+    } finally { setBusyBulk(false); }
   };
   const toggleStar = async (row) => {
     setState((s) => ({ ...s, rows: s.rows.map((r) => (r.id === row.id ? { ...r, starred: !r.starred } : r)) }));
@@ -107,6 +113,8 @@ export default function ThreadList() {
             <button type="button" className="btn" disabled={busyBulk} onClick={() => bulk((id) => gmail.modifyThread(id, ['UNREAD'], []), { local: (r) => ({ ...r, unread: true }) })}>{t('markUnread')}</button>
             <button type="button" className="btn btn-quiet" disabled={busyBulk} onClick={() => setSel({ key, ids: new Set() })}>{t('cancel')}</button>
           </div>
+        ) : busyBulk ? (
+          <span className="bulkcount working" role="status">{t('working')}</span>
         ) : (
         <div className="pager">
           <button type="button" className="btn btn-quiet" onClick={() => load(false)}>{t('refresh')}</button>

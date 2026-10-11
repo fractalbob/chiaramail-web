@@ -77,9 +77,14 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
   refreshed daily and kept in your browser only.
 - **Gmail rate limits.** Requests are retried automatically with increasing
   waits, and you get a plain-language message if Gmail is still busy.
-- **Busy cursor.** While something you started is still working (opening,
-  deleting, sending, switching folders), the pointer shows the busy cursor.
-  Background refreshes don't (`src/busy.js`).
+- **Busy cursor and bar.** While something you started is still working
+  (opening, deleting, sending, switching folders), the pointer shows the busy
+  cursor and a thin bar moves along the top of the screen, which is the sign
+  that shows on phones. Background refreshes don't trigger either
+  (`src/busy.js`).
+- **Instant bulk actions.** Ticked messages leave the list as soon as you tap
+  Delete, Archive, Report spam, Not spam or Restore. "Working…" shows while
+  Gmail catches up; if Gmail refuses, an error appears and the list reloads.
 - **Your address and account name** show in bold under the search bar, above
   **Always show images**, e.g. "ruomini@gmail.com (Robert Uomini)".
 - **English and French.** There's a light and a dark theme, and the layout

@@ -371,7 +371,7 @@ const mailText = await page.evaluate((p) => {
 await must(mailText.includes('Send your own ECS messages from your Gmail:') && mailText.includes(`${BASE}/`), 'the email invites the reader to ChiaraMail');
 await page.getByRole('heading', { name: 'Send your own ECS messages' }).waitFor();
 await page.getByRole('link', { name: 'Get ChiaraMail' }).click();
-await page.waitForURL(`${BASE}/`);
+await page.waitForURL((u) => u.pathname === '/' || u.pathname.startsWith('/mail')); // the app's home (signed-in readers go on to their mail)
 log('readers are invited to get ChiaraMail, on the page and in the email');
 
 // ---- Eve forges an ECS message "from Alice" using content she stored herself
@@ -433,6 +433,7 @@ await page.getByText('2 selected').waitFor();
 await shot('m13-bulk-select');
 await page.locator('.bulkbar').getByRole('button', { name: 'Delete' }).click();
 await page.locator('.bulkbar').waitFor({ state: 'detached' });
+await page.locator('.working').waitFor({ state: 'detached' });
 await must(!(await page.locator('.trow', { hasText: 'Liste pour samedi' }).count()), 'bulk delete removed row 1');
 await must(!(await page.locator('.trow', { hasText: 'Ordinary note' }).count()), 'bulk delete removed row 2');
 await page.locator('.folder', { hasText: 'Trash' }).click();
@@ -440,6 +441,7 @@ await page.locator('.trow', { hasText: 'Ordinary note' }).waitFor();
 await page.getByRole('checkbox', { name: 'Select all' }).check();
 await page.locator('.bulkbar').getByRole('button', { name: 'Restore' }).click();
 await page.locator('.bulkbar').waitFor({ state: 'detached' });
+await page.locator('.working').waitFor({ state: 'detached' });
 await page.locator('.folder', { hasText: 'Inbox' }).click();
 await page.locator('.trow', { hasText: 'Liste pour samedi' }).waitFor();
 await page.locator('.trow', { hasText: 'Ordinary note' }).waitFor();
@@ -454,10 +456,12 @@ await page.locator('.folder', { hasText: 'Inbox' }).click();
 await page.locator('.trow', { hasText: 'Note to self' }).locator('.rowcheck').check();
 await page.locator('.bulkbar').getByRole('button', { name: 'Delete' }).click();
 await page.locator('.bulkbar').waitFor({ state: 'detached' });
+await page.locator('.working').waitFor({ state: 'detached' });
 await page.locator('.folder', { hasText: 'Trash' }).click();
 await page.locator('.trow', { hasText: 'Note to self' }).locator('.rowcheck').check();
 await page.locator('.bulkbar').getByRole('button', { name: 'Restore' }).click();
 await page.locator('.bulkbar').waitFor({ state: 'detached' });
+await page.locator('.working').waitFor({ state: 'detached' });
 await page.locator('.folder', { hasText: 'Inbox' }).click();
 await page.locator('.trow', { hasText: 'Note to self' }).waitFor();
 // …while mail you only sent goes back to Sent, not the Inbox
@@ -471,10 +475,12 @@ await page.locator('.folder', { hasText: 'Sent' }).click();
 await page.locator('.trow', { hasText: sentSubj }).locator('.rowcheck').check();
 await page.locator('.bulkbar').getByRole('button', { name: 'Delete' }).click();
 await page.locator('.bulkbar').waitFor({ state: 'detached' });
+await page.locator('.working').waitFor({ state: 'detached' });
 await page.locator('.folder', { hasText: 'Trash' }).click();
 await page.locator('.trow', { hasText: sentSubj }).locator('.rowcheck').check();
 await page.locator('.bulkbar').getByRole('button', { name: 'Restore' }).click();
 await page.locator('.bulkbar').waitFor({ state: 'detached' });
+await page.locator('.working').waitFor({ state: 'detached' });
 await page.locator('.folder', { hasText: 'Sent' }).click();
 await page.locator('.trow', { hasText: sentSubj }).waitFor();
 await page.locator('.folder', { hasText: 'Inbox' }).click();
