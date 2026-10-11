@@ -288,13 +288,16 @@ log('sender switches forwarding on');
 await connectAs('bob@example.com');
 await openRow('Committee meeting');
 await must(!(await page.getByText('The sender doesn’t allow this message to be forwarded.').count()), 'forward now allowed');
-await page.getByRole('link', { name: 'Forward' }).first().click();
+await page.locator('.mcard').first().getByRole('link', { name: 'Forward' }).click(); // Alice's ECS message, not the latest reply
 await waitValue(page.getByLabel('Subject', { exact: true }), (v) => v.startsWith('Fwd:'), 'forward prefilled');
 await page.locator('.compose .chip', { hasText: 'agenda.txt' }).waitFor();
 await page.getByLabel('To', { exact: true }).fill('dave@example.com');
 await send();
 await page.locator('.mcard').first().waitFor();
 log('forwarded to an outsider');
+// Reply and Forward also sit in the top toolbar, acting on the latest message
+await must(await page.locator('.toolbar').getByRole('link', { name: 'Forward' }).count() === 1, 'Forward in the toolbar');
+await must(await page.locator('.toolbar').getByRole('link', { name: 'Reply', exact: true }).count() === 1, 'Reply in the toolbar');
 
 // ---- Alice edits
 await connectAs('alice@example.com');

@@ -82,6 +82,11 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
   cursor and a thin bar moves along the top of the screen, which is the sign
   that shows on phones. Background refreshes don't trigger either
   (`src/busy.js`).
+- **Reply and Forward at the top.** The toolbar above an opened conversation
+  has **Reply**, **Reply all** (when there are several recipients) and
+  **Forward** for the latest message, next to Archive and Delete. They wrap
+  onto the next line when there's no room. Each message also keeps its own
+  row of these buttons underneath it.
 - **Instant bulk actions.** Ticked messages leave the list as soon as you tap
   Delete, Archive, Report spam, Not spam or Restore. "Working…" shows while
   Gmail catches up; if Gmail refuses, an error appears and the list reloads.

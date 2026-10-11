@@ -153,6 +153,7 @@ export default function ThreadView() {
   };
   const subject = msgs[0]?.subject || t('noSubject');
   const lastReal = msgs.map((m) => m.labelIds.includes('DRAFT')).lastIndexOf(false);
+  const lastMsg = lastReal >= 0 ? msgs[lastReal] : null; // Reply / Forward in the toolbar act on the latest message
   const isOpen = (m, i) => open[m.id] ?? (i === lastReal || m.labelIds.includes('UNREAD') || !!m.pointer);
 
   return (
@@ -172,6 +173,13 @@ export default function ThreadView() {
           onClick={() => act(() => gmail.modifyThread(threadId, labels.has('STARRED') ? [] : ['STARRED'], labels.has('STARRED') ? ['STARRED'] : []), false)}>
           ★ {labels.has('STARRED') ? t('starred') : t('star')}
         </button>
+        {lastMsg && (
+          <>
+            <Link className="btn" to={`/compose?thread=${threadId}&msg=${lastMsg.id}&mode=reply`}>{t('reply')}</Link>
+            {(lastMsg.to.length + lastMsg.cc.length > 1) && <Link className="btn" to={`/compose?thread=${threadId}&msg=${lastMsg.id}&mode=replyAll`}>{t('replyAll')}</Link>}
+            <Link className="btn" to={`/compose?thread=${threadId}&msg=${lastMsg.id}&mode=forward`}>{t('forward')}</Link>
+          </>
+        )}
       </div>
       <h1 className="thread-subject">{subject}</h1>
       <ol className="mcards">
