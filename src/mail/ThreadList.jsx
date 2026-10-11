@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import * as gmail from '@gmail';
 import { summarize } from '../gmail/mime.js';
@@ -10,6 +10,10 @@ import Icon from './icons.jsx';
 import { ContextMenu, IconButton, Menu, MenuItem, MenuSep, SubMenu } from './Menu.jsx';
 
 const PAGE = 25;
+const phone = () => window.matchMedia('(max-width: 600px)').matches;
+// Gmail-style letter avatar: the first letter of the name, on a colour picked from the address.
+const HUES = [4, 28, 45, 95, 145, 175, 200, 225, 260, 290, 320, 345];
+const hue = (str) => HUES[[...(str || '?')].reduce((h, c) => (h * 31 + c.codePointAt(0)) >>> 0, 7) % HUES.length];
 
 export default function ThreadList() {
   const { folder } = useParams();
@@ -66,10 +70,27 @@ export default function ThreadList() {
   const [busyBulk, setBusyBulk] = useState(false);
   const selected = sel.key === key ? sel.ids : new Set();
   const selRows = (rows || []).filter((r) => selected.has(r.id));
-  const toggle = (id) => {
-    const ids = new Set(selected);
+  const toggle = (id) => setSel((cur) => {
+    const ids = new Set(cur.key === key ? cur.ids : []);
     if (ids.has(id)) ids.delete(id); else ids.add(id);
-    setSel({ key, ids });
+    return { key, ids };
+  });
+  // Phones: a long press selects a row (and starts selection mode, where taps select too).
+  const press = useRef(null);
+  const startPress = (e, id) => {
+    if (e.pointerType !== 'touch') { press.current = null; return; }
+    const p = { x: e.clientX, y: e.clientY, fired: false, touch: true };
+    p.timer = setTimeout(() => { p.fired = true; toggle(id); navigator.vibrate?.(15); }, 500);
+    press.current = p;
+  };
+  const movePress = (e) => {
+    const p = press.current;
+    if (p && !p.fired && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10) clearTimeout(p.timer);
+  };
+  const endPress = () => { if (press.current && !press.current.fired) clearTimeout(press.current.timer); };
+  const tapRow = (e, id) => {
+    if (press.current?.fired) { e.preventDefault(); press.current = null; return; }
+    if (selected.size > 0 && phone()) { e.preventDefault(); toggle(id); }
   };
   const pick = (test) => setSel({ key, ids: new Set((rows || []).filter(test).map((r) => r.id)) });
   const allTicked = !!rows?.length && rows.every((r) => selected.has(r.id));
@@ -131,6 +152,7 @@ export default function ThreadList() {
   const openCtx = (e, r) => {
     if (e.shiftKey) return; // Shift + right-click: the browser's own menu
     e.preventDefault();
+    if (press.current?.touch) return; // a long press on a phone selects instead
     setCtx({ x: e.clientX, y: e.clientY, id: r.id });
   };
   const ctxMenu = () => {
@@ -200,7 +222,7 @@ export default function ThreadList() {
 
   return (
     <div className="threadlist">
-      <div className="list-head">
+      <div className={selected.size > 0 ? 'list-head selecting' : 'list-head'}>
         <div className="list-tools">
           {rows && rows.length > 0 && (
             <div className="selbox">
@@ -218,27 +240,29 @@ export default function ThreadList() {
           )}
           {selected.size > 0 ? (
             <div className="bulkbar" role="toolbar" aria-label={t('selectedActions')}>
+              <IconButton label={t('clearSelection')} className="phone-only" onClick={() => setSel({ key, ids: new Set() })}><Icon name="back" /></IconButton>
+              <span className="bulkcount">{t('nSelected', { n: selected.size })}</span>
               {canMove && selRows.some((r) => r.labelIds.includes('INBOX')) && (
                 <IconButton label={t('archive')} disabled={busyBulk} onClick={() => labelBulk([], ['INBOX'])}><Icon name="archive" /></IconButton>
               )}
               {inFolder('spam')
-                ? <IconButton label={t('notSpam')} disabled={busyBulk} onClick={() => labelBulk(['INBOX'], ['SPAM'])}><Icon name="inbox" /></IconButton>
-                : !inFolder('trash') && <IconButton label={t('reportSpam')} disabled={busyBulk} onClick={() => labelBulk(['SPAM'], ['INBOX'])}><Icon name="report" /></IconButton>}
+                ? <IconButton label={t('notSpam')} className="desk-only" disabled={busyBulk} onClick={() => labelBulk(['INBOX'], ['SPAM'])}><Icon name="inbox" /></IconButton>
+                : !inFolder('trash') && <IconButton label={t('reportSpam')} className="desk-only" disabled={busyBulk} onClick={() => labelBulk(['SPAM'], ['INBOX'])}><Icon name="report" /></IconButton>}
               {inFolder('trash')
                 ? <IconButton label={t('restore')} disabled={busyBulk} onClick={() => bulk((id) => gmail.untrashThread(id), [], ['TRASH'])}><Icon name="restore" /></IconButton>
                 : <IconButton label={t('trash')} disabled={busyBulk} onClick={() => bulk((id) => gmail.trashThread(id), ['TRASH'], ['INBOX'])}><Icon name="delete" /></IconButton>}
-              <span className="tool-sep" aria-hidden="true" />
+              <span className="tool-sep desk-only" aria-hidden="true" />
               {anyUnread
                 ? <IconButton label={t('markRead')} disabled={busyBulk} onClick={() => labelBulk([], ['UNREAD'])}><Icon name="read" /></IconButton>
                 : <IconButton label={t('markUnread')} disabled={busyBulk} onClick={() => labelBulk(['UNREAD'], [])}><Icon name="unread" /></IconButton>}
               {canMove && (
-                <Menu align="right" label={t('moveTo')} button={<Icon name="move" />}>
+                <Menu align="right" className="desk-only" label={t('moveTo')} button={<Icon name="move" />}>
                   {moveFrom !== 'INBOX' && <MenuItem onClick={() => moveTo('INBOX')}>{t('folder_inbox')}</MenuItem>}
                   {mail.userLabels.filter((l) => l.id !== viewLabel).map((l) => <MenuItem key={l.id} onClick={() => moveTo(l.id)}>{l.name}</MenuItem>)}
                   {!mail.userLabels.length && <p className="menu-note">{t('noLabels')}</p>}
                 </Menu>
               )}
-              <Menu align="right" label={t('labelAs')} button={<Icon name="label" />}>
+              <Menu align="right" className="desk-only" label={t('labelAs')} button={<Icon name="label" />}>
                 {mail.userLabels.map((l) => {
                   const st = labelState(l.id);
                   return <MenuItem key={l.id} checked={st} onClick={() => (st === true ? labelBulk([], [l.id]) : labelBulk([l.id], []))}>{l.name}</MenuItem>;
@@ -246,6 +270,26 @@ export default function ThreadList() {
                 {!mail.userLabels.length && <p className="menu-note">{t('noLabels')}</p>}
               </Menu>
               <Menu align="right" label={t('moreActions')} button={<Icon name="more" />}>
+                <div className="phone-only">
+                  {canMove && (
+                    <SubMenu label={t('moveTo')}>
+                      {moveFrom !== 'INBOX' && <MenuItem onClick={() => moveTo('INBOX')}>{t('folder_inbox')}</MenuItem>}
+                      {mail.userLabels.filter((l) => l.id !== viewLabel).map((l) => <MenuItem key={l.id} onClick={() => moveTo(l.id)}>{l.name}</MenuItem>)}
+                      {!mail.userLabels.length && <p className="menu-note">{t('noLabels')}</p>}
+                    </SubMenu>
+                  )}
+                  <SubMenu label={t('labelAs')}>
+                    {mail.userLabels.map((l) => {
+                      const st = labelState(l.id);
+                      return <MenuItem key={l.id} checked={st} onClick={() => (st === true ? labelBulk([], [l.id]) : labelBulk([l.id], []))}>{l.name}</MenuItem>;
+                    })}
+                    {!mail.userLabels.length && <p className="menu-note">{t('noLabels')}</p>}
+                  </SubMenu>
+                  {inFolder('spam')
+                    ? <MenuItem onClick={() => labelBulk(['INBOX'], ['SPAM'])}>{t('notSpam')}</MenuItem>
+                    : !inFolder('trash') && <MenuItem onClick={() => labelBulk(['SPAM'], ['INBOX'])}>{t('reportSpam')}</MenuItem>}
+                  {!allTicked && <MenuItem onClick={() => pick(() => true)}>{t('selectAll')}</MenuItem>}
+                </div>
                 {anyUnread && <MenuItem onClick={() => labelBulk([], ['UNREAD'])}>{t('markRead')}</MenuItem>}
                 {anyRead && <MenuItem onClick={() => labelBulk(['UNREAD'], [])}>{t('markUnread')}</MenuItem>}
                 {has('IMPORTANT') < selRows.length && <MenuItem onClick={() => labelBulk(['IMPORTANT'], [])}>{t('markImportant')}</MenuItem>}
@@ -253,7 +297,6 @@ export default function ThreadList() {
                 {has('STARRED') < selRows.length && <MenuItem onClick={() => labelBulk(['STARRED'], [])}>{t('addStar')}</MenuItem>}
                 {has('STARRED') > 0 && <MenuItem onClick={() => labelBulk([], ['STARRED'])}>{t('unstar')}</MenuItem>}
               </Menu>
-              <span className="bulkcount">{t('nSelected', { n: selected.size })}</span>
             </div>
           ) : busyBulk ? (
             <span className="bulkcount working" role="status">{t('working')}</span>
@@ -281,12 +324,26 @@ export default function ThreadList() {
       {rows && rows.length > 0 && (
         <ul className="msglist">
           {rows.map((r) => (
-            <li key={r.id} onContextMenu={(e) => openCtx(e, r)} className={`trow${r.unread ? ' trow-unread' : ''}${selected.has(r.id) ? ' trow-selected' : ''}${ctx?.id === r.id ? ' trow-ctx' : ''}`}>
+            <li key={r.id} onContextMenu={(e) => openCtx(e, r)}
+              onPointerDown={(e) => startPress(e, r.id)} onPointerMove={movePress} onPointerUp={endPress} onPointerCancel={endPress}
+              className={`trow${r.unread ? ' trow-unread' : ''}${selected.has(r.id) ? ' trow-selected' : ''}${ctx?.id === r.id ? ' trow-ctx' : ''}`}>
               <input type="checkbox" className="rowcheck" checked={selected.has(r.id)} onChange={() => toggle(r.id)}
                 aria-label={t('selectRow', { name: r.subject || t('noSubject') })} />
+              {(() => {
+                const who = r.people.find((p) => p.label !== 'me') || r.people[0];
+                const name = who ? (who.label === 'me' ? t('me') : who.label) : '?';
+                const on = selected.has(r.id);
+                return (
+                  <button type="button" className={on ? 'avatar avatar-on' : 'avatar'} aria-pressed={on}
+                    aria-label={t('selectRow', { name: r.subject || t('noSubject') })} onClick={() => toggle(r.id)}
+                    style={on ? undefined : { '--av': hue(who?.email || name) }}>
+                    {on ? <Icon name="check" size={20} /> : name.replace(/^[^\p{L}\p{N}]+/u, '').charAt(0).toUpperCase() || '?'}
+                  </button>
+                );
+              })()}
               <button type="button" className={r.starred ? 'star star-on' : 'star'} aria-pressed={r.starred}
                 aria-label={r.starred ? t('unstar') : t('star')} onClick={() => toggleStar(r)}>★</button>
-              <Link to={`/mail/${encodeURIComponent(folder)}/${r.id}${q ? `?q=${encodeURIComponent(q)}` : ''}`} className="trow-link">
+              <Link to={`/mail/${encodeURIComponent(folder)}/${r.id}${q ? `?q=${encodeURIComponent(q)}` : ''}`} className="trow-link" onClick={(e) => tapRow(e, r.id)} draggable={false}>
                 <span className="row-people">
                   {r.people.length ? r.people.map((p, i) => (
                     <span key={p.email + i}>
@@ -318,6 +375,9 @@ export default function ThreadList() {
         </ul>
       )}
       {ctx && ctxMenu()}
+      {selected.size === 0 && (
+        <Link to="/compose" className="fab" aria-label={t('compose')}><Icon name="edit" size={22} /><span>{t('compose')}</span></Link>
+      )}
     </div>
   );
 }

@@ -433,8 +433,8 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
   .tool-sep { margin: 0 2px; }
   .menu { max-width: calc(100vw - 32px); }
   .list-head .list-tools, .list-head .bulkbar { flex-wrap: nowrap; }
-  .list-head .list-tools { flex: 1 1 100%; }
-  .list-head .bulkbar .bulkcount { display: none; }
+  .list-head.selecting .list-tools { flex: 1 1 100%; }
+  .list-head { flex-wrap: nowrap; }
   .list-head .selmenu .ibtn { width: 22px; }
   .masthead { padding-top: 14px; padding-bottom: 14px; }
 }
@@ -512,6 +512,7 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .trow-selected { background: color-mix(in srgb, var(--lumen) 22%, var(--paper)); }
 .bulkbar { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
 .bulkcount { color: var(--slate); font-size: 0.875rem; margin: 0 8px; white-space: nowrap; }
+.bulkbar .bulkcount { order: 99; }
 
 /* Busy cursor while something the user started is still working (busy.js). */
 html.busy, html.busy * { cursor: progress !important; }
@@ -522,3 +523,40 @@ html.busy body::before {
 }
 @keyframes busybar { 0% { transform: translateX(-100%); } 100% { transform: translateX(290%); } }
 @media (prefers-reduced-motion: reduce) { html.busy body::before { animation: none; width: 100%; opacity: .6; } }
+
+/* Phones (Gmail app style): letter avatars that select, long-press, a selection bar, a Compose button */
+.avatar, .fab, .phone-only { display: none; }
+.avatar {
+  flex: none; width: 40px; height: 40px; margin: 0 4px 0 12px; border: 0; border-radius: 50%; padding: 0;
+  align-items: center; justify-content: center; cursor: pointer;
+  font: 600 1.125rem/1 var(--sans); color: #fff; background: hsl(var(--av, 200) 45% 45%);
+}
+.avatar-on { background: var(--link); }
+.fab {
+  position: fixed; right: 16px; bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 30;
+  align-items: center; gap: 10px; padding: 0 20px 0 16px; height: 56px; border-radius: 16px;
+  background: var(--paper); color: var(--ink); text-decoration: none; font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .25), 0 6px 18px rgba(0, 0, 0, .15);
+}
+@media (prefers-color-scheme: dark) { .fab { background: #24404b; } }
+@media (max-width: 600px) {
+  .avatar { display: inline-flex; }
+  .fab { display: inline-flex; }
+  .ibtn.phone-only { display: inline-flex; }
+  .menu .phone-only { display: block; }
+  .phone-only .menu-item { width: 100%; }
+  .desk-only, .list-head .desk-only { display: none; }
+  .trow:has(.avatar) .rowcheck, .threadlist:has(.avatar) .list-head .selbox { display: none; }
+  .trow { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .trow .star { order: 3; padding: 8px 12px 8px 4px; }
+  .trow-link { padding-left: 8px; }
+  .list-head.selecting {
+    position: sticky; top: 0; z-index: 25; background: var(--paper); margin: 0 -16px; padding: 4px 8px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .2);
+  }
+  .list-head.selecting .pager { display: none; }
+  .list-head .bulkbar { flex: 1; }
+  .list-head .bulkbar .bulkcount { display: inline; order: 0; font-size: 1.0625rem; color: var(--ink); margin: 0 auto 0 4px; }
+  .menu-right .submenu-panel, .submenu-panel { position: static; box-shadow: none; border: 0; padding: 0 0 4px 16px; min-width: 0; }
+  .threadlist { padding-bottom: 88px; }
+}

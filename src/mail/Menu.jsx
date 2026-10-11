@@ -24,7 +24,7 @@ export function Menu({ label, button, children, align = 'left', className = '' }
       <IconButton label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>{button}</IconButton>
       {open && (
         <div className={`menu menu-${align}`} role="menu" aria-label={label}
-          onClick={(e) => { if (e.target.closest('[role^="menuitem"]')) setOpen(false); }}>
+          onClick={(e) => { const it = e.target.closest('[role^="menuitem"]'); if (it && !it.hasAttribute('aria-haspopup')) setOpen(false); }}>
           {children}
         </div>
       )}
@@ -90,7 +90,8 @@ export function ContextMenu({ x, y, label, onClose, children }) {
 export function SubMenu({ label, icon, children }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="submenu" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+    <div className="submenu" onPointerEnter={(e) => { if (e.pointerType === 'mouse') setOpen(true); }}
+      onPointerLeave={(e) => { if (e.pointerType === 'mouse') setOpen(false); }}>
       <button type="button" role="menuitem" className="menu-item" aria-haspopup="menu" aria-expanded={open}
         onClick={() => setOpen((o) => !o)} onKeyDown={(e) => { if (e.key === 'ArrowRight') setOpen(true); }}>
         {icon}{label}<span className="menu-arrow" aria-hidden="true">▸</span>

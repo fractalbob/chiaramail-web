@@ -109,6 +109,13 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
     Shift + right-click gives the browser's own menu. An ECS message whose
     sender doesn't allow forwarding can't be forwarded as an attachment
     either, since the .eml would carry its key.
+  - **On a phone** it works like the Gmail app: each conversation has a
+    coloured letter avatar; tap it, or long-press the conversation, to select.
+    While anything is selected, taps select more instead of opening. A bar
+    at the top shows ← (clear), the count, Archive, Delete, Mark read/unread
+    and ⋮ (Move to, Label as, Report spam, Select all, important, star). A
+    floating **Compose** button sits at the bottom right. A long press never
+    opens the right-click menu.
   - Not available, because ChiaraMail's Gmail permission doesn't cover them:
     Snooze, Mute, Add to Tasks and Filter.
 - **Your address and account name** show in bold under the search bar, above
