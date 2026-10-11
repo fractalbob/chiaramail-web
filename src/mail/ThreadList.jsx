@@ -6,6 +6,7 @@ import { useMail } from './context.jsx';
 import { useI18n } from '../i18n.jsx';
 import { labelIdFor, isSystemFolder } from './folders.js';
 import { useEcsMarks } from './ecsCheck.js';
+import { markSpamHandled } from './prefs.js';
 import Icon from './icons.jsx';
 import { ContextMenu, IconButton, Menu, MenuItem, MenuSep, SubMenu } from './Menu.jsx';
 
@@ -50,6 +51,12 @@ export default function ThreadList() {
     });
     return () => { live = false; };
   }, [fetchPage, handle, key, t]);
+  // Mail moved behind the scenes (e.g. a verified ECS message rescued from Spam): reload.
+  useEffect(() => {
+    const on = () => load(true);
+    window.addEventListener('chiaramail:changed', on);
+    return () => window.removeEventListener('chiaramail:changed', on);
+  }, [load]);
   // New mail: refresh the first page every minute.
   useEffect(() => {
     if (pages.length > 1) return;
@@ -126,7 +133,10 @@ export default function ThreadList() {
       load(true);
     } finally { setBusyBulk(false); }
   };
-  const labelBulk = (add, remove, ids) => bulk((id) => gmail.modifyThread(id, add, remove), add, remove, ids);
+  const labelBulk = (add, remove, ids) => {
+    if (add.includes('SPAM')) markSpamHandled(ids || [...selected]); // reported: never pulled back out of Spam
+    return bulk((id) => gmail.modifyThread(id, add, remove), add, remove, ids);
+  };
   // Star and importance marker: flip one label on one row, at once.
   const flip = async (row, label, field) => {
     const on = !row[field];

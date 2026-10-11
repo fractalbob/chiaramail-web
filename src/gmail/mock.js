@@ -133,7 +133,14 @@ function visible(msgs, labelId) {
   if (has(msgs, 'SPAM') && msgs.every((m) => m.labelIds.includes('SPAM'))) return false;
   return labelId ? has(msgs, labelId) : true;
 }
-const text = (m) => JSON.stringify(m.payload.headers) + ' ' + m.snippet;
+// Like Gmail, search the whole plain-text body, not just the snippet.
+const bodyText = (part) => {
+  if (part.mimeType === 'text/plain' && part.body?.data) {
+    try { return new TextDecoder().decode(Uint8Array.from(atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))); } catch { return ''; }
+  }
+  return (part.parts || []).map(bodyText).join(' ');
+};
+const text = (m) => JSON.stringify(m.payload.headers) + ' ' + m.snippet + ' ' + bodyText(m.payload);
 // A little of Gmail's search syntax: from:, to:, subject:"…", plus free words.
 const header = (m, n) => (m.payload.headers.find((h) => h.name.toLowerCase() === n) || {}).value || '';
 function matches(m, needle) {

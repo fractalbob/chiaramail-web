@@ -4,6 +4,27 @@ import * as backend from '@backend';
 import { refreshContacts } from './contacts.js';
 import { useAuth } from '../auth.jsx';
 import { CATEGORIES } from './folders.js';
+import { summarize } from '../gmail/mime.js';
+import { verdictFor } from './ecsCheck.js';
+import { markSpamHandled, spamHandled } from './prefs.js';
+
+// Spam filters distrust ECS emails (short, mostly a link). ChiaraMail can do
+// better: an ECS message whose sender it has verified is moved back to the
+// Inbox. Forgeries, and anything the user reported themselves, stay in Spam.
+async function rescueVerifiedEcs(me) {
+  const { ids } = await gmail.listThreads({ labelId: 'SPAM', q: '"ECS message"', max: 20 });
+  const todo = ids.filter((id) => !spamHandled(id));
+  if (!todo.length) return 0;
+  let moved = 0;
+  for (const th of await gmail.getThreadsMeta(todo)) {
+    const row = summarize(th, me);
+    if (!row.ecs.length || (await verdictFor(row.ecs)) !== 'ok') continue;
+    await gmail.modifyThread(th.id, ['INBOX'], ['SPAM']);
+    markSpamHandled([th.id]);
+    moved += 1;
+  }
+  return moved;
+}
 
 const MailCtx = createContext(null);
 
@@ -34,6 +55,7 @@ export function MailProvider({ children }) {
     }));
   const onErr = (e) => { if (e.code === 'reconnect') setExpired(true); };
   const refreshCounts = useCallback(() => fetchCounts().then(setUnread).catch(onErr), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const rescue = useCallback(() => rescueVerifiedEcs(account).then((n) => { if (n) { refreshCounts(); window.dispatchEvent(new Event('chiaramail:changed')); } }).catch(onErr), [account, refreshCounts]);
 
   // List this address in the ECS directory, so others see it uses ECS.
   useEffect(() => {
@@ -58,9 +80,10 @@ export function MailProvider({ children }) {
       cats.current = CATEGORIES.filter((c) => l.some((x) => x.id === c.label));
       fetchCounts().then((c) => { if (live) setUnread(c); }).catch(onErr);
     }).catch(onErr);
-    const t = setInterval(refreshCounts, 60_000);
+    rescue();
+    const t = setInterval(() => { refreshCounts(); rescue(); }, 60_000);
     return () => { live = false; clearInterval(t); };
-  }, [status, refreshCounts]);
+  }, [status, refreshCounts, rescue]);
 
   const value = useMemo(() => ({
     status,

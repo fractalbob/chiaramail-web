@@ -35,8 +35,14 @@ Tick **ECS message** when writing.
   is too big, ChiaraMail suggests sending it as an ECS message.
 - **Recipients without ChiaraMail** get a short email with a link to the
   current version. They sign in with the address it was sent to.
-  The email and that page both invite them to get ChiaraMail themselves, so
-  every ECS message introduces the app to its readers.
+  The email is written as a plain personal note ("Robert Uomini sent you a
+  message: “…” Read it here: …"), with no styled button and no promotional
+  line, because spam filters distrust those. The reading page invites them
+  to get ChiaraMail themselves, so every ECS message introduces the app.
+- **Rescued from Spam.** Spam filters sometimes catch ECS emails. Every minute
+  ChiaraMail looks in Spam for ECS messages whose sender it can verify and
+  moves them back to the Inbox. Forgeries stay in Spam, and so does anything
+  you reported as spam yourself (remembered in `chiaramail.spamHandled`).
 - **Forwarding** is off unless the sender ticks "Let recipients forward it".
   It can be switched at any time from the message. When it's off, recipients
   can't forward it from ChiaraMail, and anyone they forward the email to can't
@@ -149,6 +155,7 @@ The app keeps a few things in your browser and nowhere else:
 | Recipient suggestions | `chiaramail.contacts.*` |
 | The "Always show images" setting | `chiaramail.alwaysImages` |
 | Which sidebar groups and labels are folded | `chiaramail.folded` |
+| Conversations to leave in Spam (reported by you, or already rescued once) | `chiaramail.spamHandled` |
 | Which deleted conversations came from the Inbox | `chiaramail.trashedFromInbox` |
 | Keys of ECS messages opened from a link | `chiaramail.ecsKey.{id}` |
 | Language | `chiaramail.lang` |

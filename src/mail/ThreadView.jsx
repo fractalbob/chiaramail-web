@@ -9,6 +9,7 @@ import LiveMessage from './LiveMessage.jsx';
 import PlainBody from './PlainBody.jsx';
 import { fmtSize } from '../lib.js';
 import { useIsEcsUser } from './ecsCheck.js';
+import { markSpamHandled } from './prefs.js';
 import Icon from './icons.jsx';
 import { IconButton, Menu, MenuItem } from './Menu.jsx';
 
@@ -181,7 +182,7 @@ export default function ThreadView() {
         {!labels.has('INBOX') && !labels.has('TRASH') && !labels.has('SPAM') && <IconButton label={t('moveToInbox')} onClick={() => act(() => gmail.modifyThread(threadId, ['INBOX'], []), false)}><Icon name="inbox" /></IconButton>}
         {labels.has('SPAM')
           ? <IconButton label={t('notSpam')} onClick={() => act(() => gmail.modifyThread(threadId, ['INBOX'], ['SPAM']))}><Icon name="inbox" /></IconButton>
-          : <IconButton label={t('reportSpam')} onClick={() => act(() => gmail.modifyThread(threadId, ['SPAM'], ['INBOX']))}><Icon name="report" /></IconButton>}
+          : <IconButton label={t('reportSpam')} onClick={() => { markSpamHandled([threadId]); act(() => gmail.modifyThread(threadId, ['SPAM'], ['INBOX'])); }}><Icon name="report" /></IconButton>}
         {labels.has('TRASH')
           ? <IconButton label={t('restore')} onClick={() => act(() => gmail.untrashThread(threadId))}><Icon name="restore" /></IconButton>
           : <IconButton label={t('trash')} onClick={() => act(() => gmail.trashThread(threadId))}><Icon name="delete" /></IconButton>}

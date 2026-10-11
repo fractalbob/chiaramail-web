@@ -384,11 +384,12 @@ const mailText = await page.evaluate((p) => {
   }
   return out.join('\n');
 }, pointer);
-await must(mailText.includes('Send your own ECS messages from your Gmail:') && mailText.includes(`${BASE}/`), 'the email invites the reader to ChiaraMail');
+await must(/sent you a message: “Committee meeting on Thursday”/.test(mailText), 'the email reads like a personal note');
+await must(!mailText.includes('Send your own ECS messages') && !mailText.includes('padding:10px'), 'no promotional line or styled button in the email (spam filters)');
 await page.getByRole('heading', { name: 'Send your own ECS messages' }).waitFor();
 await page.getByRole('link', { name: 'Get ChiaraMail' }).click();
 await page.waitForURL((u) => u.pathname === '/' || u.pathname.startsWith('/mail')); // the app's home (signed-in readers go on to their mail)
-log('readers are invited to get ChiaraMail, on the page and in the email');
+log('the email is a plain personal note; the reading page invites readers to get ChiaraMail');
 
 // ---- Eve forges an ECS message "from Alice" using content she stored herself
 await connectAs('eve@example.com');
@@ -540,6 +541,40 @@ if (await page.locator('.trow-unread').count()) {
 }
 await shot('m15-toolbar');
 log('toolbar: select ▾ menu, Label as, Move to, ⋮ Mark as important, Mark all as read, 1–N of total');
+
+// ---- Verified ECS messages are rescued from Spam; forgeries and reported ones stay
+const toSpam = (subj) => page.evaluate((sj) => {
+  const st = JSON.parse(localStorage.getItem('chiaramail.mock.gmail'));
+  const box = st.boxes['bob@example.com'];
+  for (const m of Object.values(box.messages)) {
+    if (m.payload.headers.some((h) => h.name === 'Subject' && h.value === sj)) m.labelIds = [...m.labelIds.filter((l) => l !== 'INBOX'), 'SPAM'];
+  }
+  localStorage.setItem('chiaramail.mock.gmail', JSON.stringify(st));
+}, subj);
+await toSpam('Hello from Eve');                 // verified sender
+await toSpam('Urgent: new bank details');       // forged
+await page.reload();
+await page.locator('.trow', { hasText: 'Hello from Eve' }).waitFor({ timeout: 10000 }); // back in the Inbox
+await page.locator('.folder', { hasText: 'Spam' }).click();
+await page.locator('.list-title', { hasText: 'Spam' }).waitFor();
+await page.locator('.trow', { hasText: 'Urgent: new bank details' }).waitFor();
+await must(!(await page.locator('.trow', { hasText: 'Hello from Eve' }).count()), 'verified ECS message left Spam');
+// …and once the user reports it as spam themselves, it stays there
+await page.locator('.folder', { hasText: 'Inbox' }).click();
+await page.locator('.trow', { hasText: 'Hello from Eve' }).locator('.rowcheck').check();
+await page.locator('.bulkbar').getByRole('button', { name: 'Report spam' }).click();
+await page.locator('.working').waitFor({ state: 'detached' });
+await page.reload();
+await page.locator('.trow').first().waitFor();
+await page.waitForTimeout(1500);
+await must(!(await page.locator('.trow', { hasText: 'Hello from Eve' }).count()), 'reported ECS message stays in Spam');
+await page.locator('.folder', { hasText: 'Spam' }).click();
+await page.locator('.trow', { hasText: 'Hello from Eve' }).locator('.rowcheck').check();
+await page.locator('.bulkbar').getByRole('button', { name: 'Not spam' }).click();
+await page.locator('.working').waitFor({ state: 'detached' });
+await page.locator('.folder', { hasText: 'Inbox' }).click();
+await page.locator('.trow').first().waitFor();
+log('verified ECS messages come back from Spam; forged and user-reported ones stay');
 
 // ---- Sidebar: Important, categories, foldable label tree
 await page.locator('.trow', { hasText: 'Liste pour samedi' }).getByRole('button', { name: 'Mark as important' }).click();
