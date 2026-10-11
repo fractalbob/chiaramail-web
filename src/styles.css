@@ -589,3 +589,6 @@ html.busy body::before {
   .menu-right .submenu-panel, .submenu-panel { position: static; box-shadow: none; border: 0; padding: 0 0 4px 16px; min-width: 0; }
   .threadlist { padding-bottom: 88px; }
 }
+
+.notice-line { margin: 8px 0; padding: 8px 12px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--lumen) 25%, var(--paper)); font-size: 0.9375rem; }
+.linklike { background: none; border: 0; padding: 0 4px; cursor: pointer; color: var(--slate); font-size: 1rem; }

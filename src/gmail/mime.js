@@ -280,3 +280,31 @@ export function htmlToText(html) {
 export const quote = (text) => text.split('\n').map((l) => `> ${l}`).join('\n');
 
 export const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/**
+ * The addresses a bounce (delivery failure report) says could not be reached.
+ * Reads X-Failed-Recipients, the machine-readable delivery-status part
+ * (Final-Recipient / Original-Recipient), and the usual wording of Gmail and
+ * other servers' reports. `msg` is a Gmail API message in "full" format.
+ */
+export function bouncedAddresses(msg) {
+  const found = new Set();
+  const add = (s) => { const e = (s || '').trim().replace(/^<|>$/g, '').replace(/[.,;:)]+$/, '').toLowerCase(); if (isEmail(e)) found.add(e); };
+  const h = headerMap(msg.payload?.headers);
+  (h['x-failed-recipients'] || '').split(',').forEach(add);
+  const texts = [];
+  const walk = (p) => {
+    if (!p) return;
+    if (p.body?.data && /^(text\/|message\/delivery-status)/i.test(p.mimeType || '')) {
+      try { texts.push(decodeBytes(b64urlToBytes(p.body.data))); } catch { /* skip */ }
+    }
+    (p.parts || []).forEach(walk);
+  };
+  walk(msg.payload);
+  const all = texts.join('\n');
+  for (const m of all.matchAll(/(?:Final|Original)-Recipient:\s*rfc822;\s*<?([^\s>]+)/gi)) add(m[1]);
+  if (!found.size) {
+    for (const m of all.matchAll(/(?:wasn['’]t delivered to|couldn['’]t be delivered to|delivery to the following recipients? failed(?: permanently)?:?|could not be delivered to|undeliverable to|failed recipient:?)\s*<?([^\s<>"']+@[^\s<>"']+)/gi)) add(m[1]);
+  }
+  return [...found];
+}

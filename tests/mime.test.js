@@ -128,3 +128,25 @@ test('ECS encryption round-trips text and bytes; wrong or missing key fails', as
   assert.equal(eb.length, bytes.length + 12 + 16);
   assert.deepEqual(await decryptBytes(k, eb), bytes);
 });
+
+test('bouncedAddresses reads failed recipients from bounce reports', async () => {
+  const { bouncedAddresses } = await import('../src/gmail/mime.js');
+  const b64 = (s) => Buffer.from(s).toString('base64url');
+  // Gmail's own report: header plus delivery-status part
+  const gmailBounce = {
+    payload: {
+      mimeType: 'multipart/report',
+      headers: [{ name: 'X-Failed-Recipients', value: 'Player.One@example.com' }],
+      parts: [
+        { mimeType: 'text/plain', body: { data: b64("The recipient's inbox is full and can't receive new messages right now.") } },
+        { mimeType: 'message/delivery-status', body: { data: b64('Final-Recipient: rfc822; player.one@example.com\nAction: failed\nStatus: 5.2.2') } },
+      ],
+    },
+  };
+  assert.deepEqual(bouncedAddresses(gmailBounce), ['player.one@example.com']);
+  // Another server: only the wording
+  const other = { payload: { mimeType: 'text/plain', headers: [], body: { data: b64('Delivery to the following recipient failed permanently:\n\n     two@example.org\n\nMailbox full') } } };
+  assert.deepEqual(bouncedAddresses(other), ['two@example.org']);
+  // An ordinary message: nothing
+  assert.deepEqual(bouncedAddresses({ payload: { mimeType: 'text/plain', headers: [], body: { data: b64('Hello') } } }), []);
+});

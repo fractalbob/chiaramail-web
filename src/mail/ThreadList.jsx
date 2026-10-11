@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import * as gmail from '@gmail';
-import { summarize } from '../gmail/mime.js';
+import { summarize, bouncedAddresses } from '../gmail/mime.js';
 import { useMail } from './context.jsx';
 import { useI18n } from '../i18n.jsx';
 import { labelIdFor, isSystemFolder } from './folders.js';
@@ -144,6 +144,25 @@ export default function ThreadList() {
     try { await gmail.modifyThread(row.id, on ? [label] : [], on ? [] : [label]); } catch (e) { handle(e); load(true); }
   };
   const toggleStar = (row) => flip(row, 'STARRED', 'starred');
+  // Bounce reports: copy the addresses that couldn't be reached, one per line,
+  // ready to paste into a spreadsheet column.
+  const [notice, setNotice] = useState('');
+  const copyBounced = async (ids = [...selected]) => {
+    setNotice(t('bouncedReading'));
+    try {
+      const found = new Set();
+      for (const id of ids) {
+        const th = await gmail.getThread(id);
+        th.messages.forEach((m) => bouncedAddresses(m).forEach((e) => found.add(e)));
+      }
+      const list = [...found];
+      if (!list.length) { setNotice(t('bouncedNone')); return; }
+      try { await navigator.clipboard.writeText(list.join('\n')); setNotice(t('bouncedCopied', { n: list.length })); } catch {
+        setNotice(t('bouncedCopyFailed'));
+        window.prompt(t('bouncedCopyFailed'), list.join(', '));
+      }
+    } catch (e) { if (!handle(e)) setNotice(t('errorGeneric', { msg: e.message })); }
+  };
 
   const title = q ? t('searchResults', { q }) : isSystemFolder(folder) ? t(`folder_${folder}`) : (mail.labels.find((l) => l.id === folder)?.name || folder);
   const anyUnread = selRows.some((r) => r.unread);
@@ -308,6 +327,7 @@ export default function ThreadList() {
                 {has('IMPORTANT') > 0 && <MenuItem onClick={() => labelBulk([], ['IMPORTANT'])}>{t('markNotImportant')}</MenuItem>}
                 {has('STARRED') < selRows.length && <MenuItem onClick={() => labelBulk(['STARRED'], [])}>{t('addStar')}</MenuItem>}
                 {has('STARRED') > 0 && <MenuItem onClick={() => labelBulk([], ['STARRED'])}>{t('unstar')}</MenuItem>}
+                <MenuItem onClick={() => copyBounced()}>{t('copyBounced')}</MenuItem>
               </Menu>
             </div>
           ) : busyBulk ? (
@@ -330,6 +350,7 @@ export default function ThreadList() {
           <IconButton label={t('older')} disabled={!state.next || state.key !== key} onClick={() => setPages([...pages, state.next])}><Icon name="right" /></IconButton>
         </div>
       </div>
+      {notice && <p className="notice-line" role="status">{notice} <button type="button" className="linklike" onClick={() => setNotice('')}>×</button></p>}
       {state.error && state.key === key && <p className="error" role="alert">{state.error === t('rateLimited') ? state.error : t('errorGeneric', { msg: state.error })}</p>}
       {!rows && !(state.error && state.key === key) && <p className="loading">{t('loading')}</p>}
       {rows && rows.length === 0 && <p className="empty">{q ? t('noResults') : t('emptyFolder')}</p>}
