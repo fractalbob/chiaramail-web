@@ -15,6 +15,7 @@ export function MailProvider({ children }) {
   const [unread, setUnread] = useState({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [grantFor, setGrantFor] = useState(null); // account signed in without Gmail access
 
   let status = 'checking';
   if (user !== undefined) {
@@ -59,12 +60,13 @@ export function MailProvider({ children }) {
     unread,
     busy,
     error,
+    grantFor,
     refreshCounts,
     connect: async (arg) => {
-      setBusy(true); setError('');
+      setBusy(true); setError(''); setGrantFor(null);
       try { const email = await gmail.connect(arg); setAccount(email); setExpired(false); } catch (e) {
         const quiet = ['popup_closed', 'popup_failed_to_open', 'access_denied'];
-        if (e.code === 'scope-denied') setError('scopeDenied');
+        if (e.code === 'scope-denied') { setError(e.email ? 'scopeDeniedFor' : 'scopeDenied'); setGrantFor(e.email || ''); }
         else if (e.code === 'popup_failed_to_open') setError('popupBlocked');
         else if (!quiet.includes(e.code)) setError(e.message);
       } finally { setBusy(false); }
@@ -72,7 +74,7 @@ export function MailProvider({ children }) {
     disconnect: async () => { await gmail.disconnect(); setAccount(null); setLabels([]); },
     // Call with any error from a Gmail call; returns true if it was handled.
     handle: (e) => { if (e?.code === 'reconnect') { setExpired(true); return true; } return false; },
-  }), [status, account, labels, unread, busy, error, refreshCounts]);
+  }), [status, account, labels, unread, busy, error, grantFor, refreshCounts]);
 
   return <MailCtx.Provider value={value}>{children}</MailCtx.Provider>;
 }

@@ -54,7 +54,12 @@ export default function MailLanding() {
           </button>
         )}
         {reconnecting && <button type="button" className="btn btn-quiet" onClick={mail.disconnect}>{t('signOut')}</button>}
-        {mail.error && <p className="error" role="alert">{t(mail.error) === mail.error ? t('errorGeneric', { msg: mail.error }) : t(mail.error)}</p>}
+        {mail.error && <p className="error" role="alert">{t(mail.error) === mail.error ? t('errorGeneric', { msg: mail.error }) : t(mail.error, { email: mail.grantFor || '' })}</p>}
+        {mail.grantFor !== null && !isMock && (
+          <button type="button" className="btn btn-primary" onClick={() => mail.connect({ consent: true, hint: mail.grantFor })} disabled={mail.busy}>
+            {t('grantGmail')}
+          </button>
+        )}
         <p className="fineprint">{t('privacyNote')}</p>
       </div>
     </div>

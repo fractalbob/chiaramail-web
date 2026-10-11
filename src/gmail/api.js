@@ -57,8 +57,8 @@ const setFlag = (k, on) => { try { if (on) localStorage.setItem(k, '1'); else lo
  * the last account without asking; after Sign out, or with { choose: true },
  * it shows the account chooser so another account can be picked.
  */
-export async function connect({ choose = false } = {}) {
-  const pick = choose || flag(CHOOSE_KEY);
+export async function connect({ choose = false, consent = false, hint = '' } = {}) {
+  const pick = !consent && (choose || flag(CHOOSE_KEY));
   await loadGis();
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   if (!clientId) throw new Error('VITE_GOOGLE_CLIENT_ID is not set in .env.local');
@@ -67,14 +67,22 @@ export async function connect({ choose = false } = {}) {
       client_id: clientId,
       scope: SCOPES,
       include_granted_scopes: true,
-      hint: pick ? undefined : (lastAccount() || undefined),
+      hint: hint || (pick ? undefined : (lastAccount() || undefined)),
       callback: (r) => (r.error ? reject(Object.assign(new Error(r.error_description || r.error), { code: r.error })) : resolve(r)),
       error_callback: (e) => reject(Object.assign(new Error(e.message || e.type), { code: e.type })),
     });
-    client.requestAccessToken({ prompt: pick ? 'select_account' : '' });
+    client.requestAccessToken({ prompt: consent ? 'consent' : pick ? 'select_account' : '' });
   });
   if (!window.google.accounts.oauth2.hasGrantedAllScopes(resp, GMAIL_SCOPE)) {
-    throw Object.assign(new Error('Gmail access was not granted'), { code: 'scope-denied' });
+    // Signed in without Gmail access (e.g. Google skipped its consent page after
+    // the account chooser). Find out which account, so the next tap can ask
+    // Google for Gmail access for exactly that account.
+    let email = '';
+    try {
+      const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: `Bearer ${resp.access_token}` } });
+      if (r.ok) email = (await r.json()).email || '';
+    } catch { /* ignore */ }
+    throw Object.assign(new Error('Gmail access was not granted'), { code: 'scope-denied', email });
   }
   // Sign in to ChiaraMail (Firebase) with the same Google account.
   const user = await backend.signInWithGoogleAccessToken(resp.access_token);
