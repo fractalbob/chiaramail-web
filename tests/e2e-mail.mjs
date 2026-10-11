@@ -542,8 +542,14 @@ await shot('m15-toolbar');
 log('toolbar: select ▾ menu, Label as, Move to, ⋮ Mark as important, Mark all as read, 1–N of total');
 
 // ---- Sidebar: Important, categories, foldable label tree
+await page.locator('.trow', { hasText: 'Liste pour samedi' }).getByRole('button', { name: 'Mark as important' }).click();
+await page.locator('.trow', { hasText: 'Liste pour samedi' }).locator('.imp-on').waitFor();
 await page.locator('.folder', { hasText: 'Important' }).click();
+await page.locator('.list-title', { hasText: 'Important' }).waitFor();
 await page.locator('.trow', { hasText: 'Print sizes for the exhibition' }).waitFor();
+await page.locator('.trow', { hasText: 'Liste pour samedi' }).waitFor();
+await must(await page.locator('.trow .imp-on').count() === await page.locator('.trow').count(), 'blue importance markers in Important');
+log('importance markers: shown on important rows, click to toggle');
 await page.locator('.folder', { hasText: 'Updates' }).click();
 await page.getByRole('heading', { name: 'Updates' }).waitFor();
 await page.locator('.trow', { hasText: 'deep zooms' }).waitFor();

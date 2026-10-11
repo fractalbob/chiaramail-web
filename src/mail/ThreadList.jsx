@@ -127,11 +127,13 @@ export default function ThreadList() {
     } finally { setBusyBulk(false); }
   };
   const labelBulk = (add, remove, ids) => bulk((id) => gmail.modifyThread(id, add, remove), add, remove, ids);
-  const toggleStar = async (row) => {
-    const on = !row.starred;
-    setState((s) => ({ ...s, rows: s.rows.map((r) => (r.id === row.id ? { ...r, starred: on, labelIds: on ? [...r.labelIds, 'STARRED'] : r.labelIds.filter((l) => l !== 'STARRED') } : r)) }));
-    try { await gmail.modifyThread(row.id, on ? ['STARRED'] : [], on ? [] : ['STARRED']); } catch (e) { handle(e); load(true); }
+  // Star and importance marker: flip one label on one row, at once.
+  const flip = async (row, label, field) => {
+    const on = !row[field];
+    setState((s) => ({ ...s, rows: s.rows.map((r) => (r.id === row.id ? { ...r, [field]: on, labelIds: on ? [...r.labelIds, label] : r.labelIds.filter((l) => l !== label) } : r)) }));
+    try { await gmail.modifyThread(row.id, on ? [label] : [], on ? [] : [label]); } catch (e) { handle(e); load(true); }
   };
+  const toggleStar = (row) => flip(row, 'STARRED', 'starred');
 
   const title = q ? t('searchResults', { q }) : isSystemFolder(folder) ? t(`folder_${folder}`) : (mail.labels.find((l) => l.id === folder)?.name || folder);
   const anyUnread = selRows.some((r) => r.unread);
@@ -343,6 +345,9 @@ export default function ThreadList() {
               })()}
               <button type="button" className={r.starred ? 'star star-on' : 'star'} aria-pressed={r.starred}
                 aria-label={r.starred ? t('unstar') : t('star')} onClick={() => toggleStar(r)}>★</button>
+              <button type="button" className={r.important ? 'imp imp-on' : 'imp'} aria-pressed={r.important}
+                aria-label={r.important ? t('markNotImportant') : t('markImportant')} title={r.important ? t('importantTitle') : t('markImportant')}
+                onClick={() => flip(r, 'IMPORTANT', 'important')}><Icon name="important" size={18} /></button>
               <Link to={`/mail/${encodeURIComponent(folder)}/${r.id}${q ? `?q=${encodeURIComponent(q)}` : ''}`} className="trow-link" onClick={(e) => tapRow(e, r.id)} draggable={false}>
                 <span className="row-people">
                   {r.people.length ? r.people.map((p, i) => (

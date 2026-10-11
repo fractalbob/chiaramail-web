@@ -120,6 +120,9 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
     opens the right-click menu.
   - Not available, because ChiaraMail's Gmail permission doesn't cover them:
     Snooze, Mute, Add to Tasks and Filter.
+- **Importance markers.** Next to the star, important conversations show
+  Gmail's blue marker; click it to mark or unmark (also beside the subject
+  of an opened conversation). Hidden on phones, as in the Gmail app.
 - **Gmail's sidebar.** Inbox, Starred, **Important**, Sent, Drafts, All mail,
   Spam, Trash; then **Categories** (Purchases, Social, Updates, Forums,
   Promotions, only those your account has, with unread counts); then your

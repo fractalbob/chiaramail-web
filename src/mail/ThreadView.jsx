@@ -200,7 +200,14 @@ export default function ThreadView() {
           </Menu>
         )}
       </div>
-      <h1 className="thread-subject">{subject}</h1>
+      <h1 className="thread-subject">
+        {subject}
+        <button type="button" className={labels.has('IMPORTANT') ? 'imp imp-on' : 'imp'} aria-pressed={labels.has('IMPORTANT')}
+          aria-label={labels.has('IMPORTANT') ? t('markNotImportant') : t('markImportant')} title={labels.has('IMPORTANT') ? t('importantTitle') : t('markImportant')}
+          onClick={() => act(() => gmail.modifyThread(threadId, labels.has('IMPORTANT') ? [] : ['IMPORTANT'], labels.has('IMPORTANT') ? ['IMPORTANT'] : []), false)}>
+          <Icon name="important" size={22} />
+        </button>
+      </h1>
       <ol className="mcards">
         {msgs.map((m, i) => (m.labelIds.includes('DRAFT') ? <DraftCard key={m.id} m={m} /> : (
           <MessageCard key={m.id} m={m} threadId={threadId} me={mail.account} isLast={i === lastReal}
