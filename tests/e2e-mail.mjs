@@ -665,6 +665,17 @@ await popup.getByRole('heading', { name: 'Ordinary note' }).waitFor();
 await popup.close();
 log('right-click: Open in new window');
 
+// ---- An ECS message can be just an attachment, with no text
+await page.getByRole('link', { name: 'Compose' }).click();
+await page.getByLabel('To', { exact: true }).fill('dave@example.com');
+await page.getByLabel('Subject', { exact: true }).fill('Just the file');
+await page.locator('input[type=file]').setInputFiles(`${SHOTS}/agenda.txt`);
+await send();
+await page.locator('.live-block').getByRole('button', { name: /agenda\.txt/ }).waitFor();
+await page.getByRole('button', { name: 'Withdraw' }).click();
+await page.getByText(/You withdrew this message/).waitFor();
+log('ECS message with an attachment and no text');
+
 // ---- Alice withdraws
 await connectAs('alice@example.com');
 await openRow('Committee meeting');

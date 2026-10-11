@@ -270,7 +270,7 @@ export default function Composer() {
     const bad = [...toL, ...ccL, ...bccL].filter((a) => !isEmail(a.email)).map(fmtAddr);
     if (bad.length) return setError(t('badAddresses', { list: bad.join(', ') }));
     if (!toL.length && !ccL.length && !bccL.length) return setError(t('needRecipient'));
-    if (changeable && !body.trim()) return setError(t('needBody'));
+    if (changeable && !body.trim() && !files.length) return setError(t('needBody'));
     const total = files.reduce((n, f) => n + f.size, 0);
     if (changeable) {
       if (files.length > MAX_ECS_FILES) return setError(t('tooManyFiles', { n: MAX_ECS_FILES }));

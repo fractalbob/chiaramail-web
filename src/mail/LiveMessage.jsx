@@ -72,7 +72,7 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
   const fresh = !isSender && lastSeen > 0 && lastSeen < d.edition && !d.withdrawn;
 
   const save = async () => {
-    if (!draft.trim()) return setError(t('needBody'));
+    if (!draft.trim() && !d.attachments?.length) return setError(t('needBody'));
     setBusy(true); setError('');
     try { await saveEcsEdition(pointer, d, { subject: d.subject, body: draft }, key); setEditing(false); setSaved(true); } catch (e) { setError(t('errorGeneric', { msg: e.message })); } finally { setBusy(false); }
   };
