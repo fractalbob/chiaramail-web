@@ -461,11 +461,14 @@ await page.locator('.bulkbar').waitFor({ state: 'detached' });
 await page.locator('.folder', { hasText: 'Inbox' }).click();
 await page.locator('.trow', { hasText: 'Note to self' }).waitFor();
 // …while mail you only sent goes back to Sent, not the Inbox
+const sentSubj = 'Outgoing only, for the restore test';
+await page.getByRole('link', { name: 'Compose' }).click();
+await page.getByLabel('To', { exact: true }).fill('dave@example.com');
+await page.getByLabel('Subject', { exact: true }).fill(sentSubj);
+await page.getByLabel('Message', { exact: true }).fill('Nothing to see here.');
+await send();
 await page.locator('.folder', { hasText: 'Sent' }).click();
-const sentRow = page.locator('.trow').filter({ hasNotText: 'Note to self' }).first();
-await sentRow.waitFor();
-const sentSubj = (await sentRow.locator('.subj').innerText()).trim();
-await sentRow.locator('.rowcheck').check();
+await page.locator('.trow', { hasText: sentSubj }).locator('.rowcheck').check();
 await page.locator('.bulkbar').getByRole('button', { name: 'Delete' }).click();
 await page.locator('.bulkbar').waitFor({ state: 'detached' });
 await page.locator('.folder', { hasText: 'Trash' }).click();
@@ -475,7 +478,8 @@ await page.locator('.bulkbar').waitFor({ state: 'detached' });
 await page.locator('.folder', { hasText: 'Sent' }).click();
 await page.locator('.trow', { hasText: sentSubj }).waitFor();
 await page.locator('.folder', { hasText: 'Inbox' }).click();
-await page.locator('.trow').first().waitFor();
+await page.locator('.list-title', { hasText: 'Inbox' }).waitFor();
+await page.locator('.trow', { hasText: 'Note to self' }).waitFor(); // the Inbox itself has loaded
 await must(!(await page.locator('.trow', { hasText: sentSubj }).count()), 'sent-only mail not pushed into the Inbox');
 log('restore: note to self returns to Inbox; sent-only mail returns to Sent only');
 

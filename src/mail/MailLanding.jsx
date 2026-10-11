@@ -48,6 +48,11 @@ export default function MailLanding() {
             {reconnecting ? t('reconnectGmail') : t('connectGmail')}
           </button>
         )}
+        {!isMock && (
+          <button type="button" className="linklike other-account" onClick={() => mail.connect({ choose: true })} disabled={mail.busy}>
+            {t('otherAccount')}
+          </button>
+        )}
         {reconnecting && <button type="button" className="btn btn-quiet" onClick={mail.disconnect}>{t('signOut')}</button>}
         {mail.error && <p className="error" role="alert">{t(mail.error) === mail.error ? t('errorGeneric', { msg: mail.error }) : t(mail.error)}</p>}
         <p className="fineprint">{t('privacyNote')}</p>

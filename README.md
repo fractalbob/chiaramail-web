@@ -179,6 +179,12 @@ reaches Google's screen. Verification is requested from Google Auth Platform
 
 Google's queue is about 4–6 weeks, and a security assessment (CASA) may follow.
 
+**Switching accounts.** After **Sign out**, the next sign-in shows Google's
+account chooser. The sign-in page also has **Use another Google account**.
+Signing out forgets this tab's Gmail access but keeps the permission granted to
+ChiaraMail, so signing back in doesn't repeat Google's consent screen. The
+permission can be removed at myaccount.google.com/permissions.
+
 Google's Gmail permission lasts about an hour per sign-in. After that,
 ChiaraMail asks you to click **Continue with Google** again (no password if
 you're already signed in to Google).

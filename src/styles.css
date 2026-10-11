@@ -423,8 +423,10 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
   .row-meta { grid-column: 2; grid-row: 1; }
   .row-subject { grid-column: 1 / -1; }
   .who { display: none; }
+  .mail-bar .who { display: block; max-width: 48vw; font-size: 0.8125rem; }
   .masthead { padding-top: 14px; padding-bottom: 14px; }
 }
+.other-account { display: block; margin-top: 10px; }
 @media (prefers-reduced-motion: reduce) {
   .edition-fresh { animation: none; }
 }

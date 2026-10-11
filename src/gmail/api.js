@@ -10,6 +10,7 @@ const BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const UPLOAD = 'https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=multipart';
 const TOKEN_KEY = 'chiaramail.gmailToken';
 const HINT_KEY = 'chiaramail.lastAccount';
+const CHOOSE_KEY = 'chiaramail.chooseAccount'; // set by Sign out: next sign-in shows Google's account chooser
 
 let token = null; // { accessToken, expiresAt, email }
 let gisLoaded = null;
@@ -48,8 +49,16 @@ export function restore() {
 
 export const lastAccount = () => { try { return localStorage.getItem(HINT_KEY) || ''; } catch { return ''; } };
 
-/** Opens Google's window (must be called from a click). */
-export async function connect() {
+const flag = (k) => { try { return localStorage.getItem(k) === '1'; } catch { return false; } };
+const setFlag = (k, on) => { try { if (on) localStorage.setItem(k, '1'); else localStorage.removeItem(k); } catch { /* ignore */ } };
+
+/**
+ * Opens Google's window (must be called from a click). Normally Google reuses
+ * the last account without asking; after Sign out, or with { choose: true },
+ * it shows the account chooser so another account can be picked.
+ */
+export async function connect({ choose = false } = {}) {
+  const pick = choose || flag(CHOOSE_KEY);
   await loadGis();
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   if (!clientId) throw new Error('VITE_GOOGLE_CLIENT_ID is not set in .env.local');
@@ -58,11 +67,11 @@ export async function connect() {
       client_id: clientId,
       scope: SCOPES,
       include_granted_scopes: true,
-      hint: lastAccount() || undefined,
+      hint: pick ? undefined : (lastAccount() || undefined),
       callback: (r) => (r.error ? reject(Object.assign(new Error(r.error_description || r.error), { code: r.error })) : resolve(r)),
       error_callback: (e) => reject(Object.assign(new Error(e.message || e.type), { code: e.type })),
     });
-    client.requestAccessToken({ prompt: '' });
+    client.requestAccessToken({ prompt: pick ? 'select_account' : '' });
   });
   if (!window.google.accounts.oauth2.hasGrantedAllScopes(resp, GMAIL_SCOPE)) {
     throw Object.assign(new Error('Gmail access was not granted'), { code: 'scope-denied' });
@@ -71,13 +80,19 @@ export async function connect() {
   const user = await backend.signInWithGoogleAccessToken(resp.access_token);
   saveToken({ accessToken: resp.access_token, expiresAt: Date.now() + Number(resp.expires_in) * 1000, email: user.email });
   try { localStorage.setItem(HINT_KEY, user.email); } catch { /* ignore */ }
+  setFlag(CHOOSE_KEY, false);
   return user.email;
 }
 
+/**
+ * Sign out: forget this tab's Gmail access and sign out of ChiaraMail. The
+ * permission granted to ChiaraMail is kept (revoking it made Google repeat
+ * its whole consent screen at every sign-in); it can be removed at
+ * myaccount.google.com/permissions. The next sign-in lets you choose the account.
+ */
 export async function disconnect() {
-  const t = token?.accessToken;
   saveToken(null);
-  try { if (t && window.google?.accounts?.oauth2) window.google.accounts.oauth2.revoke(t, () => {}); } catch { /* ignore */ }
+  setFlag(CHOOSE_KEY, true);
   await backend.signOut();
 }
 
