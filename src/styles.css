@@ -249,12 +249,14 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
   grid-template-areas: "bar bar" "side main";
 }
 .mail-bar { grid-area: bar; display: flex; align-items: center; gap: 12px; padding: 0 0 16px; }
+.mail-bar .signout { margin-left: auto; align-self: flex-start; margin-top: 4px; }
+.mail-bar .menu-btn { align-self: flex-start; margin-top: 4px; }
 .search { flex: 1; max-width: 560px; }
 .search input {
   width: 100%; padding: 10px 14px; border-radius: 999px; border: 1px solid var(--rule);
   background: var(--paper); color: var(--ink); font: 1rem/1.3 var(--sans);
 }
-.mail-bar .who { margin-left: auto; }
+.search-col .who { margin-left: 14px; max-width: none; font-size: 0.875rem; }
 .menu-btn { display: none; }
 .sidebar { grid-area: side; display: flex; flex-direction: column; gap: 12px; align-self: start; position: sticky; top: 12px; }
 .compose-btn { width: 100%; min-height: 46px; font-size: 1rem; }
@@ -423,7 +425,7 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
   .row-meta { grid-column: 2; grid-row: 1; }
   .row-subject { grid-column: 1 / -1; }
   .who { display: none; }
-  .mail-bar .who { display: block; max-width: 48vw; font-size: 0.8125rem; }
+  .search-col .who { display: block; font-size: 0.8125rem; }
   .masthead { padding-top: 14px; padding-bottom: 14px; }
 }
 .other-account { display: block; margin-top: 10px; }
@@ -460,3 +462,6 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .trow-selected { background: color-mix(in srgb, var(--lumen) 22%, var(--paper)); }
 .bulkbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .bulkcount { color: var(--slate); font-size: 0.9375rem; margin-right: 4px; }
+
+/* Busy cursor while something the user started is still working (busy.js). */
+html.busy, html.busy * { cursor: progress !important; }

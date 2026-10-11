@@ -2,6 +2,7 @@
 // Services), then the Gmail REST API, straight from the browser. Nothing is
 // stored on any server except the content of ChiaraMail's own ECS messages.
 import * as backend from '@backend';
+import { busy } from '../busy.js';
 
 export const mode = 'gmail';
 const SCOPES = 'openid email profile https://www.googleapis.com/auth/gmail.modify';
@@ -109,15 +110,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // "slow down", wait and try again a few times before giving up.
 const isRateLimit = (status, msg) => status === 429 || (status === 403 && /rate ?limit|quota/i.test(msg || ''));
 
-async function call(path, opts = {}) {
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      return await callOnce(path, opts);
-    } catch (e) {
-      if (!e.rateLimited || attempt >= 4) throw e;
-      await sleep(2000 * 2 ** attempt + Math.random() * 1000); // 2s, 4s, 8s, 16s
+function call(path, opts = {}) {
+  return busy(async () => {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await callOnce(path, opts);
+      } catch (e) {
+        if (!e.rateLimited || attempt >= 4) throw e;
+        await sleep(2000 * 2 ** attempt + Math.random() * 1000); // 2s, 4s, 8s, 16s
+      }
     }
-  }
+  });
 }
 
 async function callOnce(path, { method = 'GET', query, body, url } = {}) {
@@ -217,7 +220,8 @@ export async function untrashThread(id) {
 
 // ---- drafts -------------------------------------------------------------------
 const b64url = (raw) => btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-async function upload(path, method, meta, raw) {
+function upload(...args) { return busy(() => uploadOnce(...args)); }
+async function uploadOnce(path, method, meta, raw) {
   if (!token || token.expiresAt < Date.now() + 30_000) throw reconnectError();
   const b = `cm_${Date.now()}`;
   const res = await fetch(`https://gmail.googleapis.com/upload/gmail/v1/users/me${path}?uploadType=multipart`, {

@@ -518,5 +518,19 @@ await mp.screenshot({ path: `${SHOTS}/m12-mobile-thread.png`, fullPage: true });
 await must(!(await mp.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)), 'no horizontal scroll on mobile');
 log('mobile dark, no horizontal scroll');
 
+await page.waitForTimeout(400);
+await must(!(await page.evaluate(() => document.documentElement.classList.contains('busy'))), 'busy cursor cleared once work is done');
+// a slow action started by a click shows the busy cursor, then clears it
+await page.evaluate(() => { window.dispatchEvent(new PointerEvent('pointerdown')); window.__mockGmail.wait(900); });
+await page.waitForTimeout(400);
+await must(await page.evaluate(() => document.documentElement.classList.contains('busy')), 'busy cursor shown during a slow action');
+await page.waitForTimeout(900);
+await must(!(await page.evaluate(() => document.documentElement.classList.contains('busy'))), 'busy cursor cleared after it');
+// …but not for background work nobody asked for
+await page.waitForTimeout(1700);
+await page.evaluate(() => { window.__mockGmail.wait(900); });
+await page.waitForTimeout(400);
+await must(!(await page.evaluate(() => document.documentElement.classList.contains('busy'))), 'no busy cursor for background work');
+log('busy cursor while user-started work runs, never for background work');
 if (errors.length) { console.log('Browser errors:', errors); process.exitCode = 1; } else log('no console errors');
 await browser.close();

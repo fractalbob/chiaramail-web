@@ -1,4 +1,5 @@
 // Real backend: Firebase Auth + Cloud Firestore.
+import { busy } from '../busy.js';
 import { initializeApp } from 'firebase/app';
 import {
   getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup,
@@ -125,7 +126,7 @@ export function watchMessage(id, cb, onErr) {
 const fileRef = (id, i) => sref(storage, `ecs/${id}/${i}`);
 const fileMeta = (files) => files.map((f) => ({ name: f.name, type: f.type || 'application/octet-stream', size: f.size }));
 
-export async function createMessage(user, { recipients, subject, body, allowForward = false, attachments = [], enc = 0 }) {
+async function createMessage_(user, { recipients, subject, body, allowForward = false, attachments = [], enc = 0 }) {
   const ref = doc(messages);
   const batch = writeBatch(db);
   const data = {
@@ -151,7 +152,7 @@ export async function createMessage(user, { recipients, subject, body, allowForw
 
 // files: [{ name, type, bytes: Blob | Uint8Array }] in the same order as
 // createMessage's attachments. onProgress gets the fraction uploaded (0–1).
-export async function uploadAttachments(id, files, onProgress) {
+async function uploadAttachments_(id, files, onProgress) {
   const total = files.reduce((n, f) => n + (f.bytes.size ?? f.bytes.length), 0) || 1;
   const done = files.map(() => 0);
   await Promise.all(files.map((f, i) => new Promise((resolve, reject) => {
@@ -163,7 +164,7 @@ export async function uploadAttachments(id, files, onProgress) {
   })));
 }
 
-export function getAttachment(id, i) {
+function getAttachment_(id, i) {
   return getBlob(fileRef(id, i));
 }
 
@@ -171,7 +172,7 @@ const removeFiles = (id, count) => Promise.all(
   Array.from({ length: count }, (_, i) => deleteObject(fileRef(id, i)).catch(() => {})),
 );
 
-export async function saveEdition(id, current, { subject, body }) {
+async function saveEdition_(id, current, { subject, body }) {
   const ref = doc(messages, id);
   const next = current.edition + 1;
   const batch = writeBatch(db);
@@ -181,17 +182,17 @@ export async function saveEdition(id, current, { subject, body }) {
   return next;
 }
 
-export function setAllowForward(id, allow) {
+function setAllowForward_(id, allow) {
   return updateDoc(doc(messages, id), { allowForward: !!allow });
 }
 
-export async function withdraw(id) {
+async function withdraw_(id) {
   const snap = await getDoc(doc(messages, id));
   await updateDoc(doc(messages, id), { withdrawn: true, body: '', updatedAt: serverTimestamp() });
   await removeFiles(id, snap.data()?.attachments?.length || 0);
 }
 
-export async function deleteMessage(id, fileCount) {
+async function deleteMessage_(id, fileCount) {
   const ref = doc(messages, id);
   const count = fileCount ?? ((await getDoc(ref).catch(() => null))?.data()?.attachments?.length || 0);
   await removeFiles(id, count);
@@ -203,7 +204,7 @@ export async function deleteMessage(id, fileCount) {
   await deleteDoc(ref);
 }
 
-export async function listEditions(id) {
+async function listEditions_(id) {
   const s = await getDocs(query(collection(doc(messages, id), 'editions'), orderBy('edition', 'desc')));
   return s.docs.map((d) => {
     const e = d.data({ serverTimestamps: 'estimate' });
@@ -263,3 +264,13 @@ export function isEcsUser(email) {
   if (!ecsCache.has(e)) ecsCache.set(e, getDoc(doc(ecsUsers, e)).then((s) => s.exists()).catch(() => false));
   return ecsCache.get(e);
 }
+
+// User-visible actions show the busy cursor while they run (see busy.js).
+export const createMessage = (...a) => busy(() => createMessage_(...a));
+export const uploadAttachments = (...a) => busy(() => uploadAttachments_(...a));
+export const getAttachment = (...a) => busy(() => getAttachment_(...a));
+export const saveEdition = (...a) => busy(() => saveEdition_(...a));
+export const setAllowForward = (...a) => busy(() => setAllowForward_(...a));
+export const withdraw = (...a) => busy(() => withdraw_(...a));
+export const deleteMessage = (...a) => busy(() => deleteMessage_(...a));
+export const listEditions = (...a) => busy(() => listEditions_(...a));

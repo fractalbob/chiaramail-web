@@ -77,6 +77,10 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
   refreshed daily and kept in your browser only.
 - **Gmail rate limits.** Requests are retried automatically with increasing
   waits, and you get a plain-language message if Gmail is still busy.
+- **Busy cursor.** While something you started is still working (opening,
+  deleting, sending, switching folders), the pointer shows the busy cursor.
+  Background refreshes don't (`src/busy.js`).
+- **Your address** shows under the search bar, above **Always show images**.
 - **English and French.** There's a light and a dark theme, and the layout
   works on phones.
 - **Installable app.** `public/manifest.webmanifest` lets Chrome offer

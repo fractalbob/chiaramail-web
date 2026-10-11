@@ -4,11 +4,12 @@
 import PostalMime from 'postal-mime';
 import * as backend from '@backend';
 import { toB64url, bytesToB64, b64ToB64url, parseAddressList } from './mime.js';
+import { busy } from '../busy.js';
 
 export const mode = 'mock-gmail';
 const KEY = 'chiaramail.mock.gmail';
 const SESSION = 'chiaramail.mock.gmailSession';
-const later = (v) => new Promise((r) => setTimeout(() => r(v), 60));
+const later = (v) => busy(() => new Promise((r) => setTimeout(() => r(v), 60)));
 
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || { boxes: {}, seq: 1 }; } catch { return { boxes: {}, seq: 1 }; } };
 const save = (s) => localStorage.setItem(KEY, JSON.stringify(s));
@@ -333,4 +334,4 @@ export async function sendRaw(raw, threadId) {
 export const _debugAddresses = (str) => parseAddressList(str);
 
 // Test hook: lets the browser walkthrough deliver a hand-made (e.g. forged) email.
-if (typeof window !== 'undefined') window.__mockGmail = { sendRaw };
+if (typeof window !== 'undefined') window.__mockGmail = { sendRaw, wait: (ms) => busy(() => new Promise((r) => setTimeout(r, ms))) };

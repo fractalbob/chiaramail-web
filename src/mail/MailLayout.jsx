@@ -79,10 +79,10 @@ export default function MailLayout() {
         <button type="button" className="btn btn-quiet menu-btn" aria-expanded={open} onClick={() => setOpen(!open)}>{t('menu')}</button>
         <div className="search-col">
           <SearchBox key={loc.search} />
+          <span className="who" title={mail.account}>{mail.account}</span>
           <ImagesSetting />
         </div>
-        <span className="who" title={mail.account}>{mail.account}</span>
-        <button type="button" className="btn btn-quiet" onClick={mail.disconnect}>{t('signOut')}</button>
+        <button type="button" className="btn btn-quiet signout" onClick={mail.disconnect}>{t('signOut')}</button>
       </div>
       <Sidebar onNavigate={() => setOpen(false)} />
       <section className="mail-main">
