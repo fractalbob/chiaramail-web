@@ -492,6 +492,42 @@ await page.locator('.trow', { hasText: 'Note to self' }).waitFor(); // the Inbox
 await must(!(await page.locator('.trow', { hasText: sentSubj }).count()), 'sent-only mail not pushed into the Inbox');
 log('restore: note to self returns to Inbox; sent-only mail returns to Sent only');
 
+// ---- Gmail-style toolbar: select ▾ menu, icon actions, Label as / Move to, "1–N of total"
+await must(/^1–\d+ of \d+$/.test(await page.locator('.range').innerText()), 'range "1–N of total"');
+const unreadRows = await page.locator('.trow-unread').count();
+await page.getByRole('button', { name: 'Select', exact: true }).click();
+await page.getByRole('menuitem', { name: 'Unread' }).click();
+await must(unreadRows === 0 ? !(await page.locator('.bulkbar').count()) : (await page.locator('.trow-selected').count()) === unreadRows, 'select ▾ Unread ticks the unread rows');
+await page.getByRole('button', { name: 'Select', exact: true }).click();
+await page.getByRole('menuitem', { name: 'None' }).click();
+await page.locator('.bulkbar').waitFor({ state: 'detached' });
+await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.rowcheck').check();
+await page.locator('.bulkbar').getByRole('button', { name: 'Label as' }).click();
+await shot('m14-label-as');
+await page.getByRole('menuitemcheckbox', { name: 'Fractals' }).click();
+await page.locator('.working').waitFor({ state: 'detached' });
+await page.locator('.folder', { hasText: 'Fractals' }).click();
+await page.locator('.trow', { hasText: 'Ordinary note' }).waitFor();
+await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.rowcheck').check();
+await page.locator('.bulkbar').getByRole('button', { name: 'Move to' }).click();
+await page.getByRole('menuitem', { name: 'Inbox' }).click();
+await page.locator('.working').waitFor({ state: 'detached' });
+await must(!(await page.locator('.trow', { hasText: 'Ordinary note' }).count()), 'Move to Inbox takes it out of the label');
+await page.locator('.folder', { hasText: 'Inbox' }).click();
+await page.locator('.trow', { hasText: 'Ordinary note' }).waitFor();
+await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.rowcheck').check();
+await page.locator('.bulkbar').getByRole('button', { name: 'More' }).click();
+await page.getByRole('menuitem', { name: 'Mark as important' }).click();
+await page.locator('.working').waitFor({ state: 'detached' });
+if (await page.locator('.trow-unread').count()) {
+  await page.locator('.list-tools').getByRole('button', { name: 'More' }).click();
+  await page.getByRole('menuitem', { name: 'Mark all as read' }).click();
+  await page.locator('.working').waitFor({ state: 'detached' });
+  await must(!(await page.locator('.trow-unread').count()), 'mark all as read');
+}
+await shot('m15-toolbar');
+log('toolbar: select ▾ menu, Label as, Move to, ⋮ Mark as important, Mark all as read, 1–N of total');
+
 // ---- Alice withdraws
 await connectAs('alice@example.com');
 await openRow('Committee meeting');
@@ -526,6 +562,13 @@ await mp.locator('.thread-subject').waitFor();
 await mp.screenshot({ path: `${SHOTS}/m12-mobile-thread.png`, fullPage: true });
 await must(!(await mp.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)), 'no horizontal scroll on mobile');
 log('mobile dark, no horizontal scroll');
+await mp.goto(BASE + '/mail/inbox');
+await mp.locator('.trow').first().locator('.rowcheck').check();
+await mp.locator('.bulkbar').getByRole('button', { name: 'More' }).click();
+await mp.getByRole('menuitem').first().waitFor();
+await mp.screenshot({ path: `${SHOTS}/m16-mobile-select.png` });
+await must(!(await mp.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)), 'menus stay on screen on mobile');
+log('mobile: selection toolbar and ⋮ menu fit the screen');
 
 await page.waitForTimeout(400);
 await must(!(await page.evaluate(() => document.documentElement.classList.contains('busy'))), 'busy cursor cleared once work is done');

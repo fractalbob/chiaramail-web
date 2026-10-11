@@ -4,6 +4,8 @@ import * as gmail from '@gmail';
 import { headerMap, parseAddressList, displayName, decodeEntities } from '../gmail/mime.js';
 import { useMail } from './context.jsx';
 import { useI18n } from '../i18n.jsx';
+import Icon from './icons.jsx';
+import { IconButton } from './Menu.jsx';
 
 // The Drafts folder: Gmail's drafts, opened in the composer to continue writing.
 export default function DraftList() {
@@ -60,26 +62,26 @@ export default function DraftList() {
   return (
     <div className="threadlist">
       <div className="list-head">
-        <div className="list-head-left">
+        <div className="list-tools">
           {rows && rows.length > 0 && (
-            <input type="checkbox" className="rowcheck" aria-label={t('selectAll')} checked={allTicked}
-              ref={(el) => { if (el) el.indeterminate = selected.size > 0 && !allTicked; }}
-              onChange={() => setSel({ key, ids: allTicked ? new Set() : new Set(rows.map((r) => r.id)) })} />
+            <div className="selbox">
+              <input type="checkbox" className="rowcheck" aria-label={t('selectAll')} title={t('selectAll')} checked={allTicked}
+                ref={(el) => { if (el) el.indeterminate = selected.size > 0 && !allTicked; }}
+                onChange={() => setSel({ key, ids: allTicked ? new Set() : new Set(rows.map((r) => r.id)) })} />
+            </div>
           )}
-          <h1 className="list-title">{t('folder_drafts')}</h1>
+          {selected.size > 0 && (
+            <div className="bulkbar" role="toolbar" aria-label={t('selectedActions')}>
+              <IconButton label={t('deleteSelected')} onClick={removeSelected}><Icon name="delete" /></IconButton>
+              <span className="bulkcount">{t('nSelected', { n: selected.size })}</span>
+            </div>
+          )}
         </div>
-        {selected.size > 0 ? (
-          <div className="bulkbar" role="toolbar" aria-label={t('selectedActions')}>
-            <span className="bulkcount">{t('nSelected', { n: selected.size })}</span>
-            <button type="button" className="btn btn-danger" onClick={removeSelected}>{t('deleteSelected')}</button>
-            <button type="button" className="btn btn-quiet" onClick={() => setSel({ key, ids: new Set() })}>{t('cancel')}</button>
-          </div>
-        ) : (
         <div className="pager">
-          <button type="button" className="btn btn-quiet" disabled={pages.length < 2} onClick={() => setPages(pages.slice(0, -1))}>{t('newer')}</button>
-          <button type="button" className="btn btn-quiet" disabled={!state.next || state.key !== key} onClick={() => setPages([...pages, state.next])}>{t('older')}</button>
+          <h1 className="list-title">{t('folder_drafts')}</h1>
+          <IconButton label={t('newer')} disabled={pages.length < 2} onClick={() => setPages(pages.slice(0, -1))}><Icon name="left" /></IconButton>
+          <IconButton label={t('older')} disabled={!state.next || state.key !== key} onClick={() => setPages([...pages, state.next])}><Icon name="right" /></IconButton>
         </div>
-        )}
       </div>
       {state.error && <p className="error" role="alert">{t('errorGeneric', { msg: state.error })}</p>}
       {!rows && !state.error && <p className="loading">{t('loading')}</p>}

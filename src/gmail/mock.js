@@ -146,7 +146,7 @@ export async function listThreads({ labelId, q, pageToken, max = 25 }) {
     .filter(([, ms]) => !needle || ms.some((m) => text(m).toLowerCase().includes(needle)))
     .sort(([, a], [, c]) => Number(c[c.length - 1].internalDate) - Number(a[a.length - 1].internalDate));
   const start = Number(pageToken || 0);
-  return { ids: all.slice(start, start + max).map(([id]) => id), nextPageToken: start + max < all.length ? String(start + max) : null };
+  return { ids: all.slice(start, start + max).map(([id]) => id), nextPageToken: start + max < all.length ? String(start + max) : null, estimate: all.length };
 }
 const threadJson = (b, id) => {
   const msgs = threadsOf(b)[id];

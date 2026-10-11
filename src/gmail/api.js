@@ -162,7 +162,7 @@ export const getLabel = (id) => call(`/labels/${encodeURIComponent(id)}`);
 
 export async function listThreads({ labelId, q, pageToken, max = 25 }) {
   const r = await call('/threads', { query: { labelIds: labelId, q, pageToken, maxResults: max } });
-  return { ids: (r.threads || []).map((t) => t.id), nextPageToken: r.nextPageToken || null };
+  return { ids: (r.threads || []).map((t) => t.id), nextPageToken: r.nextPageToken || null, estimate: r.resultSizeEstimate || 0 };
 }
 
 const META = ['From', 'To', 'Subject', 'Date', 'X-ChiaraMail-Content-Pointer'];

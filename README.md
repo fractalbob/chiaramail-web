@@ -82,14 +82,26 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
   cursor and a thin bar moves along the top of the screen, which is the sign
   that shows on phones. Background refreshes don't trigger either
   (`src/busy.js`).
-- **Reply and Forward at the top.** The toolbar above an opened conversation
-  has **Reply**, **Reply all** (when there are several recipients) and
-  **Forward** for the latest message, next to Archive and Delete. They wrap
-  onto the next line when there's no room. Each message also keeps its own
-  row of these buttons underneath it.
-- **Instant bulk actions.** Ticked messages leave the list as soon as you tap
-  Delete, Archive, Report spam, Not spam or Restore. "Working…" shows while
-  Gmail catches up; if Gmail refuses, an error appears and the list reloads.
+- **Gmail-style toolbars with icons** (`src/mail/icons.jsx`, `src/mail/Menu.jsx`;
+  hover for the name of each).
+  - Above the list: the select-all box with a ▾ menu (All, None, Read,
+    Unread, Starred, Unstarred), Refresh, and ⋮ **Mark all as read**. On the
+    right, the folder name, "1–25 of N" and ‹ › for newer and older pages. N is
+    the folder's own total, or Gmail's estimate for searches and All mail
+    ("of many" when Gmail can't say).
+  - With messages ticked: Archive, Report spam (Not spam in Spam), Delete
+    (Restore in Trash), Mark as read/unread, **Move to** (Inbox or a label;
+    takes it out of where it is now), **Label as** (tick or untick labels) and
+    ⋮ (read/unread, important/not important, add/remove star).
+  - The list updates as soon as you click; "Working…" shows while Gmail
+    catches up, and if Gmail refuses, an error appears and the list reloads.
+  - In an opened conversation: Back, Archive or Move to inbox, Report spam,
+    Delete or Restore, Mark unread, Star, Label as, and on the right
+    **Reply**, **Reply all** (when there are several recipients) and
+    **Forward** for the latest message. Each message also keeps its own
+    Reply / Forward buttons underneath it.
+  - Not available, because ChiaraMail's Gmail permission doesn't cover them:
+    Snooze, Mute, Add to Tasks and Filter.
 - **Your address and account name** show in bold under the search bar, above
   **Always show images**, e.g. "ruomini@gmail.com (Robert Uomini)".
 - **English and French.** There's a light and a dark theme, and the layout

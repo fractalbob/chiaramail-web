@@ -241,6 +241,7 @@ export function summarize(thread, me) {
     draft: labels.has('DRAFT'),
     starred: labels.has('STARRED'),
     important: labels.has('IMPORTANT'),
+    labelIds: [...labels],
     live: ecs.length > 0,
     ecs,
     hasAttachment: msgs.some((m) => hasAttachment(m.payload)),

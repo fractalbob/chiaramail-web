@@ -9,6 +9,8 @@ import LiveMessage from './LiveMessage.jsx';
 import PlainBody from './PlainBody.jsx';
 import { fmtSize } from '../lib.js';
 import { useIsEcsUser } from './ecsCheck.js';
+import Icon from './icons.jsx';
+import { IconButton, Menu, MenuItem } from './Menu.jsx';
 
 
 function Attachments({ message }) {
@@ -159,26 +161,35 @@ export default function ThreadView() {
   return (
     <article className="thread">
       <div className="toolbar" role="toolbar" aria-label={t('threadActions')}>
-        <Link to={back} className="btn btn-quiet">{t('backToList')}</Link>
-        {labels.has('INBOX') && <button type="button" className="btn" onClick={() => act(() => gmail.modifyThread(threadId, [], ['INBOX']))}>{t('archive')}</button>}
-        {!labels.has('INBOX') && !labels.has('TRASH') && !labels.has('SPAM') && <button type="button" className="btn" onClick={() => act(() => gmail.modifyThread(threadId, ['INBOX'], []), false)}>{t('moveToInbox')}</button>}
+        <Link to={back} className="ibtn" aria-label={t('backToList')} title={t('backToList')}><Icon name="back" /></Link>
+        {labels.has('INBOX') && <IconButton label={t('archive')} onClick={() => act(() => gmail.modifyThread(threadId, [], ['INBOX']))}><Icon name="archive" /></IconButton>}
+        {!labels.has('INBOX') && !labels.has('TRASH') && !labels.has('SPAM') && <IconButton label={t('moveToInbox')} onClick={() => act(() => gmail.modifyThread(threadId, ['INBOX'], []), false)}><Icon name="inbox" /></IconButton>}
         {labels.has('SPAM')
-          ? <button type="button" className="btn" onClick={() => act(() => gmail.modifyThread(threadId, ['INBOX'], ['SPAM']))}>{t('notSpam')}</button>
-          : <button type="button" className="btn" onClick={() => act(() => gmail.modifyThread(threadId, ['SPAM'], ['INBOX']))}>{t('reportSpam')}</button>}
+          ? <IconButton label={t('notSpam')} onClick={() => act(() => gmail.modifyThread(threadId, ['INBOX'], ['SPAM']))}><Icon name="inbox" /></IconButton>
+          : <IconButton label={t('reportSpam')} onClick={() => act(() => gmail.modifyThread(threadId, ['SPAM'], ['INBOX']))}><Icon name="report" /></IconButton>}
         {labels.has('TRASH')
-          ? <button type="button" className="btn" onClick={() => act(() => gmail.untrashThread(threadId))}>{t('restore')}</button>
-          : <button type="button" className="btn" onClick={() => act(() => gmail.trashThread(threadId))}>{t('trash')}</button>}
-        <button type="button" className="btn" onClick={() => act(() => gmail.modifyThread(threadId, ['UNREAD'], []))}>{t('markUnread')}</button>
-        <button type="button" className={labels.has('STARRED') ? 'btn star-btn star-on' : 'btn star-btn'} aria-pressed={labels.has('STARRED')}
+          ? <IconButton label={t('restore')} onClick={() => act(() => gmail.untrashThread(threadId))}><Icon name="restore" /></IconButton>
+          : <IconButton label={t('trash')} onClick={() => act(() => gmail.trashThread(threadId))}><Icon name="delete" /></IconButton>}
+        <span className="tool-sep" aria-hidden="true" />
+        <IconButton label={t('markUnread')} onClick={() => act(() => gmail.modifyThread(threadId, ['UNREAD'], []))}><Icon name="unread" /></IconButton>
+        <IconButton label={labels.has('STARRED') ? t('unstar') : t('star')} className={labels.has('STARRED') ? 'star-on' : ''} aria-pressed={labels.has('STARRED')}
           onClick={() => act(() => gmail.modifyThread(threadId, labels.has('STARRED') ? [] : ['STARRED'], labels.has('STARRED') ? ['STARRED'] : []), false)}>
-          ★ {labels.has('STARRED') ? t('starred') : t('star')}
-        </button>
+          <Icon name="star" />
+        </IconButton>
+        {!labels.has('TRASH') && !labels.has('SPAM') && mail.userLabels.length > 0 && (
+          <Menu align="right" label={t('labelAs')} button={<Icon name="label" />}>
+            {mail.userLabels.map((l) => (
+              <MenuItem key={l.id} checked={labels.has(l.id)}
+                onClick={() => act(() => gmail.modifyThread(threadId, labels.has(l.id) ? [] : [l.id], labels.has(l.id) ? [l.id] : []), false)}>{l.name}</MenuItem>
+            ))}
+          </Menu>
+        )}
         {lastMsg && (
-          <>
-            <Link className="btn" to={`/compose?thread=${threadId}&msg=${lastMsg.id}&mode=reply`}>{t('reply')}</Link>
-            {(lastMsg.to.length + lastMsg.cc.length > 1) && <Link className="btn" to={`/compose?thread=${threadId}&msg=${lastMsg.id}&mode=replyAll`}>{t('replyAll')}</Link>}
-            <Link className="btn" to={`/compose?thread=${threadId}&msg=${lastMsg.id}&mode=forward`}>{t('forward')}</Link>
-          </>
+          <span className="toolbar-reply">
+            <Link className="ibtn" to={`/compose?thread=${threadId}&msg=${lastMsg.id}&mode=reply`} aria-label={t('reply')} title={t('reply')}><Icon name="reply" /></Link>
+            {(lastMsg.to.length + lastMsg.cc.length > 1) && <Link className="ibtn" to={`/compose?thread=${threadId}&msg=${lastMsg.id}&mode=replyAll`} aria-label={t('replyAll')} title={t('replyAll')}><Icon name="replyAll" /></Link>}
+            <Link className="ibtn" to={`/compose?thread=${threadId}&msg=${lastMsg.id}&mode=forward`} aria-label={t('forward')} title={t('forward')}><Icon name="forward" /></Link>
+          </span>
         )}
       </div>
       <h1 className="thread-subject">{subject}</h1>
