@@ -280,10 +280,12 @@ test('withdrawing or deleting a counted message gives its space back, once', asy
   await assertSucceeds(updateDoc(doc(db, 'messages/m3'), { withdrawn: true, body: '', updatedAt: serverTimestamp() }));
 });
 
-test('uploads: at most 25 MB per file', async () => {
+test('at most 25 MB per file; several files add up', async () => {
   const big = [{ name: 'v', type: 'video/mp4', size: 30 * 1024 * 1024 }];
-  await assertSucceeds(sendWithFiles(ctx(ALICE), 'm1', big));
-  await assertFails(store(ALICE).ref('ecs/m1/0').put(new Uint8Array(26 * 1024 * 1024)));
+  await assertFails(sendWithFiles(ctx(ALICE), 'm1', big));
+  const three = [FILES[0], { name: 'b', type: 'x', size: 1000 }, { name: 'c', type: 'x', size: 20 * 1024 * 1024 }];
+  await assertSucceeds(sendWithFiles(ctx(ALICE), 'm2', three));
+  await assertFails(sendWithFiles(ctx(ALICE), 'm3', [{ name: 'n', type: 'x', size: -5 }, FILES[0]], sum(three)));
 });
 
 // ---- ECS directory -----------------------------------------------------------

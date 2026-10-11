@@ -41,41 +41,87 @@ service cloud.firestore {
     // usage/{uid}.bytes is their running total: a new ECS message with files
     // must raise it by exactly the files' declared sizes (storage.rules makes
     // sure the uploads aren't bigger), and withdrawing or deleting one lowers it.
+    // (No ternaries and no out-of-range indexing below: every list access is
+    // guarded by a short-circuiting && or ||.)
     function quotaBytes() {
       return 1073741824;
     }
-    function att(a, i) {
-      return a.size() > i ? a[i]['size'] : 0;
+    // Every declared size is a whole number of bytes, at most 25 MB.
+    function filesOk(a) {
+      return a.size() >= 1 && a.size() <= 20
+        && (a.size() <= 0 || (a[0]['size'] is int && a[0]['size'] >= 0 && a[0]['size'] <= 26215424))
+        && (a.size() <= 1 || (a[1]['size'] is int && a[1]['size'] >= 0 && a[1]['size'] <= 26215424))
+        && (a.size() <= 2 || (a[2]['size'] is int && a[2]['size'] >= 0 && a[2]['size'] <= 26215424))
+        && (a.size() <= 3 || (a[3]['size'] is int && a[3]['size'] >= 0 && a[3]['size'] <= 26215424))
+        && (a.size() <= 4 || (a[4]['size'] is int && a[4]['size'] >= 0 && a[4]['size'] <= 26215424))
+        && (a.size() <= 5 || (a[5]['size'] is int && a[5]['size'] >= 0 && a[5]['size'] <= 26215424))
+        && (a.size() <= 6 || (a[6]['size'] is int && a[6]['size'] >= 0 && a[6]['size'] <= 26215424))
+        && (a.size() <= 7 || (a[7]['size'] is int && a[7]['size'] >= 0 && a[7]['size'] <= 26215424))
+        && (a.size() <= 8 || (a[8]['size'] is int && a[8]['size'] >= 0 && a[8]['size'] <= 26215424))
+        && (a.size() <= 9 || (a[9]['size'] is int && a[9]['size'] >= 0 && a[9]['size'] <= 26215424))
+        && (a.size() <= 10 || (a[10]['size'] is int && a[10]['size'] >= 0 && a[10]['size'] <= 26215424))
+        && (a.size() <= 11 || (a[11]['size'] is int && a[11]['size'] >= 0 && a[11]['size'] <= 26215424))
+        && (a.size() <= 12 || (a[12]['size'] is int && a[12]['size'] >= 0 && a[12]['size'] <= 26215424))
+        && (a.size() <= 13 || (a[13]['size'] is int && a[13]['size'] >= 0 && a[13]['size'] <= 26215424))
+        && (a.size() <= 14 || (a[14]['size'] is int && a[14]['size'] >= 0 && a[14]['size'] <= 26215424))
+        && (a.size() <= 15 || (a[15]['size'] is int && a[15]['size'] >= 0 && a[15]['size'] <= 26215424))
+        && (a.size() <= 16 || (a[16]['size'] is int && a[16]['size'] >= 0 && a[16]['size'] <= 26215424))
+        && (a.size() <= 17 || (a[17]['size'] is int && a[17]['size'] >= 0 && a[17]['size'] <= 26215424))
+        && (a.size() <= 18 || (a[18]['size'] is int && a[18]['size'] >= 0 && a[18]['size'] <= 26215424))
+        && (a.size() <= 19 || (a[19]['size'] is int && a[19]['size'] >= 0 && a[19]['size'] <= 26215424));
     }
-    // Sum of the declared sizes (at most 20 files; rules have no loops).
-    function attTotal(a) {
-      return att(a, 0) + att(a, 1) + att(a, 2) + att(a, 3) + att(a, 4)
-        + att(a, 5) + att(a, 6) + att(a, 7) + att(a, 8) + att(a, 9)
-        + att(a, 10) + att(a, 11) + att(a, 12) + att(a, 13) + att(a, 14)
-        + att(a, 15) + att(a, 16) + att(a, 17) + att(a, 18) + att(a, 19);
-    }
-    function sizesOk(a) {
-      return a.size() <= 20 && attTotal(a) is int && attTotal(a) >= 0;
+    // The declared sizes add up to exactly t (rules have no loops).
+    function sumIs(a, t) {
+      return (a.size() == 1 && t == a[0]['size'])
+        || (a.size() == 2 && t == a[0]['size'] + a[1]['size'])
+        || (a.size() == 3 && t == a[0]['size'] + a[1]['size'] + a[2]['size'])
+        || (a.size() == 4 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'])
+        || (a.size() == 5 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'] + a[4]['size'])
+        || (a.size() == 6 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'] + a[4]['size'] + a[5]['size'])
+        || (a.size() == 7 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'] + a[4]['size'] + a[5]['size'] + a[6]['size'])
+        || (a.size() == 8 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'] + a[4]['size'] + a[5]['size'] + a[6]['size'] + a[7]['size'])
+        || (a.size() == 9 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'] + a[4]['size'] + a[5]['size'] + a[6]['size'] + a[7]['size'] + a[8]['size'])
+        || (a.size() == 10 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'] + a[4]['size'] + a[5]['size'] + a[6]['size'] + a[7]['size'] + a[8]['size'] + a[9]['size'])
+        || (a.size() == 11 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'] + a[4]['size'] + a[5]['size'] + a[6]['size'] + a[7]['size'] + a[8]['size'] + a[9]['size'] + a[10]['size'])
+        || (a.size() == 12 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'] + a[4]['size'] + a[5]['size'] + a[6]['size'] + a[7]['size'] + a[8]['size'] + a[9]['size'] + a[10]['size'] + a[11]['size'])
+        || (a.size() == 13 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'] + a[4]['size'] + a[5]['size'] + a[6]['size'] + a[7]['size'] + a[8]['size'] + a[9]['size'] + a[10]['size'] + a[11]['size'] + a[12]['size'])
+        || (a.size() == 14 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'] + a[4]['size'] + a[5]['size'] + a[6]['size'] + a[7]['size'] + a[8]['size'] + a[9]['size'] + a[10]['size'] + a[11]['size'] + a[12]['size'] + a[13]['size'])
+        || (a.size() == 15 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'] + a[4]['size'] + a[5]['size'] + a[6]['size'] + a[7]['size'] + a[8]['size'] + a[9]['size'] + a[10]['size'] + a[11]['size'] + a[12]['size'] + a[13]['size'] + a[14]['size'])
+        || (a.size() == 16 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'] + a[4]['size'] + a[5]['size'] + a[6]['size'] + a[7]['size'] + a[8]['size'] + a[9]['size'] + a[10]['size'] + a[11]['size'] + a[12]['size'] + a[13]['size'] + a[14]['size'] + a[15]['size'])
+        || (a.size() == 17 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'] + a[4]['size'] + a[5]['size'] + a[6]['size'] + a[7]['size'] + a[8]['size'] + a[9]['size'] + a[10]['size'] + a[11]['size'] + a[12]['size'] + a[13]['size'] + a[14]['size'] + a[15]['size'] + a[16]['size'])
+        || (a.size() == 18 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'] + a[4]['size'] + a[5]['size'] + a[6]['size'] + a[7]['size'] + a[8]['size'] + a[9]['size'] + a[10]['size'] + a[11]['size'] + a[12]['size'] + a[13]['size'] + a[14]['size'] + a[15]['size'] + a[16]['size'] + a[17]['size'])
+        || (a.size() == 19 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'] + a[4]['size'] + a[5]['size'] + a[6]['size'] + a[7]['size'] + a[8]['size'] + a[9]['size'] + a[10]['size'] + a[11]['size'] + a[12]['size'] + a[13]['size'] + a[14]['size'] + a[15]['size'] + a[16]['size'] + a[17]['size'] + a[18]['size'])
+        || (a.size() == 20 && t == a[0]['size'] + a[1]['size'] + a[2]['size'] + a[3]['size'] + a[4]['size'] + a[5]['size'] + a[6]['size'] + a[7]['size'] + a[8]['size'] + a[9]['size'] + a[10]['size'] + a[11]['size'] + a[12]['size'] + a[13]['size'] + a[14]['size'] + a[15]['size'] + a[16]['size'] + a[17]['size'] + a[18]['size'] + a[19]['size']);
     }
     function usagePath(uid) {
       return /databases/$(database)/documents/usage/$(uid);
     }
-    function usedBefore(uid) {
-      return exists(usagePath(uid)) ? get(usagePath(uid)).data.bytes : 0;
+    // A new message's files raise the sender's total by exactly their sizes,
+    // staying within the allowance.
+    function countedOk(uid, a) {
+      let p = usagePath(uid);
+      let after = getAfter(p).data.bytes;
+      return filesOk(a)
+        && after is int
+        && after <= quotaBytes()
+        && ((!exists(p) && sumIs(a, after))
+            || (exists(p) && sumIs(a, after - get(p).data.bytes)));
     }
 
     // Lowering a sender's total: only together with withdrawing or deleting
     // one of their counted messages (named in `freed`), by exactly its files.
     function freedOk(uid) {
       let m = request.resource.data.get('freed', '');
+      let p = usagePath(uid);
       let path = /databases/$(database)/documents/messages/$(m);
       return m is string && m != ''
+        && exists(p)
         && exists(path)
         && get(path).data.senderUid == uid
         && get(path).data.withdrawn == false
         && get(path).data.get('counted', false) == true
         && (!existsAfter(path) || getAfter(path).data.withdrawn == true)
-        && request.resource.data.bytes == usedBefore(uid) - attTotal(get(path).data.attachments);
+        && sumIs(get(path).data.attachments, get(p).data.bytes - request.resource.data.bytes);
     }
 
     // ---- Old ChiaraMail (Android app, 2020): device registrations. ----------
@@ -111,7 +157,9 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['bytes', 'freed'])
         && request.resource.data.bytes is int
         && request.resource.data.bytes >= 0
-        && (request.resource.data.bytes >= usedBefore(uid) || freedOk(uid));
+        && (!exists(usagePath(uid))
+            || request.resource.data.bytes >= get(usagePath(uid)).data.bytes
+            || freedOk(uid));
     }
 
     match /messages/{id} {
@@ -138,12 +186,9 @@ service cloud.firestore {
             || (request.resource.data.attachments is list
                 && request.resource.data.attachments.size() >= 1
                 && request.resource.data.attachments.size() <= 20
-                && sizesOk(request.resource.data.attachments)
                 // counted against the sender's allowance, in the same batch
                 && request.resource.data.get('counted', false) == true
-                && getAfter(usagePath(request.auth.uid)).data.bytes
-                     == usedBefore(request.auth.uid) + attTotal(request.resource.data.attachments)
-                && getAfter(usagePath(request.auth.uid)).data.bytes <= quotaBytes()))
+                && countedOk(request.auth.uid, request.resource.data.attachments)))
         && (!('counted' in request.resource.data) || 'attachments' in request.resource.data)
         && (!('senderName' in request.resource.data)
             || (request.resource.data.senderName is string
