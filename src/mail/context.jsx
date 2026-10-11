@@ -67,7 +67,7 @@ export function MailProvider({ children }) {
   useEffect(() => {
     if (status !== 'connected' || !account) return;
     // Let the inbox load first.
-    const t = setTimeout(() => refreshContacts(account.toLowerCase()).catch(() => {}), 8000);
+    const t = setTimeout(() => refreshContacts(account.toLowerCase()).catch(() => {}), 3000);
     return () => clearTimeout(t);
   }, [status, account]);
 

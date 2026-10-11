@@ -175,9 +175,11 @@ export const getRawMessage = (id) => call(`/messages/${id}`, { query: { format: 
 export async function recentAddresses(q, max) {
   const r = await call('/messages', { query: { q, maxResults: max } });
   const ids = (r.messages || []).map((m) => m.id);
-  // Gently: two at a time, so building suggestions never crowds out reading mail.
-  return mapLimit(ids, 2, (id) => call(`/messages/${id}`, { query: { format: 'metadata', metadataHeaders: ['From', 'To', 'Cc', 'Bcc'] } }))
-    .then((msgs) => msgs.map((m) => ({ date: Number(m.internalDate), headers: m.payload?.headers || [] })));
+  // Six at a time, asking only for the address headers; a message that fails is skipped.
+  return mapLimit(ids, 6, (id) => call(`/messages/${id}`, {
+    query: { format: 'metadata', metadataHeaders: ['From', 'To', 'Cc', 'Bcc'], fields: 'internalDate,payload/headers' },
+  }).catch(() => null))
+    .then((msgs) => msgs.filter(Boolean).map((m) => ({ date: Number(m.internalDate), headers: m.payload?.headers || [] })));
 }
 export async function getAttachment(messageId, attachmentId) {
   return (await call(`/messages/${messageId}/attachments/${attachmentId}`)).data;

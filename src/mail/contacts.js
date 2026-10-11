@@ -4,7 +4,7 @@
 import * as gmail from '@gmail';
 import { headerMap, parseAddressList } from '../gmail/mime.js';
 
-const KEY = (me) => `chiaramail.contacts.${me}`;
+const KEY = (me) => `chiaramail.contacts.v2.${me}`; // v2: includes your own address
 const MAX_AGE = 24 * 3600 * 1000; // rebuilt at most once a day
 
 function load(me) {
@@ -16,7 +16,9 @@ function save(me, book) {
 
 function note(people, a, kind, date, me) {
   const email = (a.email || '').trim().toLowerCase();
-  if (!email.includes('@') || email === me || /no-?reply|mailer-daemon|notifications?@/.test(email)) return;
+  // Your own address is kept too (Gmail suggests it as well): people write to themselves.
+  if (!email.includes('@') || /no-?reply|mailer-daemon|notifications?@/.test(email)) return;
+  if (email === me && kind === 'received') return;
   const p = people[email] || (people[email] = { email, name: '', sent: 0, received: 0, last: 0 });
   if (a.name && !a.name.includes('@') && (!p.name || kind === 'sent')) p.name = a.name;
   p[kind] += 1;
@@ -41,9 +43,10 @@ async function build(me) {
   const book = load(me);
   const people = {};
   const [sent, received] = await Promise.all([
-    gmail.recentAddresses('in:sent', 80),
-    gmail.recentAddresses('in:inbox -category:promotions -category:social', 40),
+    gmail.recentAddresses('in:sent', 100).catch(() => []),
+    gmail.recentAddresses('in:inbox -category:promotions -category:social', 40).catch(() => []),
   ]);
+  if (!sent.length && !received.length) return Object.values(book.people); // Gmail unreachable: keep what we had
   sent.forEach(({ date, headers }) => {
     const h = headerMap(headers);
     [...parseAddressList(h.to), ...parseAddressList(h.cc), ...parseAddressList(h.bcc)].forEach((a) => note(people, a, 'sent', date, me));
@@ -51,6 +54,8 @@ async function build(me) {
   received.forEach(({ date, headers }) => {
     parseAddressList(headerMap(headers).from).forEach((a) => note(people, a, 'received', date, me));
   });
+  // Your own address is always there (people write to themselves), as in Gmail.
+  if (me && me.includes('@') && !people[me]) people[me] = { email: me, name: '', sent: 0, received: 0, last: 0 };
   // Keep counts from addresses added locally since the last refresh.
   Object.values(book.people).forEach((p) => { if (!people[p.email] && p.local) people[p.email] = p; });
   save(me, { at: Date.now(), people });

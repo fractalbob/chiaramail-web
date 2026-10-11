@@ -162,7 +162,7 @@ The app keeps a few things in your browser and nowhere else:
 
 | What | Where (localStorage) |
 |---|---|
-| Recipient suggestions | `chiaramail.contacts.*` |
+| Recipient suggestions (including your own address) | `chiaramail.contacts.v2.*` |
 | The "Always show images" setting | `chiaramail.alwaysImages` |
 | Which sidebar groups and labels are folded | `chiaramail.folded` |
 | Conversations to leave in Spam (reported by you, or already rescued once) | `chiaramail.spamHandled` |

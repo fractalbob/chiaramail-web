@@ -235,6 +235,10 @@ await toBox.press('Backspace');
 await must((await chips.count()) === 2, 'backspace removes last chip');
 await page.getByRole('button', { name: /Remove Paul Martin/ }).click();
 await must((await chips.count()) === 1, 'x removes a chip');
+await toBox.pressSequentially('alic');
+await page.getByRole('option', { name: /alice@example\.com/ }).waitFor(); // your own address too, as in Gmail
+await toBox.press('Escape');
+await toBox.fill('');
 await page.getByRole('button', { name: 'Bcc' }).click();
 await page.getByRole('combobox', { name: 'Bcc' }).waitFor();
 log('recipient chips: suggestions, Enter/click/comma to add, Backspace and × to remove, invalid flagged');
