@@ -3,7 +3,8 @@ import { NavLink, Link, Navigate, Route, Routes, useNavigate, useSearchParams, u
 import { useMail } from './context.jsx';
 import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
-import { FOLDERS } from './folders.js';
+import { CATEGORIES, FOLDERS, labelTree } from './folders.js';
+import Icon from './icons.jsx';
 import { useAlwaysImages, setAlwaysImages } from './prefs.js';
 import ThreadList from './ThreadList.jsx';
 import DraftList from './DraftList.jsx';
@@ -48,34 +49,100 @@ function ImagesSetting() {
   );
 }
 
+const FOLD_KEY = 'chiaramail.folded';
+function useFolded() {
+  const [folded, setFolded] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(FOLD_KEY) || '[]')); } catch { return new Set(); }
+  });
+  const toggle = (k) => setFolded((cur) => {
+    const next = new Set(cur);
+    if (next.has(k)) next.delete(k); else next.add(k);
+    try { localStorage.setItem(FOLD_KEY, JSON.stringify([...next])); } catch { /* private mode */ }
+    return next;
+  });
+  return [folded, toggle];
+}
+
+function FoldButton({ open, name, onClick }) {
+  const { t } = useI18n();
+  return (
+    <button type="button" className="fold" aria-expanded={open} onClick={onClick}
+      aria-label={t(open ? 'collapseLabel' : 'expandLabel', { name })} title={t(open ? 'collapseLabel' : 'expandLabel', { name })}>
+      <Icon name={open ? 'drop' : 'right'} size={18} />
+    </button>
+  );
+}
+
+function FolderLink({ to, onNavigate, children, count, depth = 0 }) {
+  return (
+    <NavLink to={to} onClick={onNavigate} style={depth ? { '--depth': depth } : undefined}
+      className={({ isActive }) => (isActive ? 'folder folder-on' : 'folder')}>
+      <span className="folder-name">{children}</span>
+      {count > 0 && <span className="count">{count.toLocaleString()}</span>}
+    </NavLink>
+  );
+}
+
+function LabelNode({ node, depth, folded, toggle, onNavigate }) {
+  const open = !folded.has(`label:${node.path}`);
+  const kids = node.children.length > 0;
+  return (
+    <li className={kids ? 'has-kids' : undefined}>
+      <div className="folder-row">
+        {kids ? <FoldButton open={open} name={node.name} onClick={() => toggle(`label:${node.path}`)} /> : <span className="fold-space" />}
+        {node.label
+          ? <FolderLink to={`/mail/${encodeURIComponent(node.label.id)}`} onNavigate={onNavigate} depth={depth}>{node.name}</FolderLink>
+          : <span className="folder folder-plain" style={{ '--depth': depth }}>{node.name}</span>}
+      </div>
+      {kids && open && (
+        <ul className="folders">
+          {node.children.map((c) => <LabelNode key={c.path} node={c} depth={depth + 1} folded={folded} toggle={toggle} onNavigate={onNavigate} />)}
+        </ul>
+      )}
+    </li>
+  );
+}
+
 function Sidebar({ onNavigate }) {
   const { t } = useI18n();
   const mail = useMail();
-  const count = { inbox: mail.unread.inbox, spam: mail.unread.spam, drafts: mail.unread.drafts };
+  const [folded, toggle] = useFolded();
+  const count = mail.unread;
+  const cats = CATEGORIES.filter((c) => mail.labels.some((l) => l.id === c.label));
+  const catsOpen = !folded.has('categories');
+  const tree = labelTree(mail.userLabels);
   return (
     <nav className="sidebar" aria-label={t('folders')}>
       <Link to="/compose" className="btn btn-primary compose-btn" onClick={onNavigate}>{t('compose')}</Link>
       <ul className="folders">
         {FOLDERS.map((f) => (
           <li key={f.key}>
-            <NavLink to={`/mail/${f.key}`} onClick={onNavigate} className={({ isActive }) => (isActive ? 'folder folder-on' : 'folder')}>
-              <span>{t(`folder_${f.key}`)}</span>
-              {count[f.key] > 0 && <span className="count">{count[f.key]}</span>}
-            </NavLink>
+            <FolderLink to={`/mail/${f.key}`} onNavigate={onNavigate} count={count[f.key]}>{t(`folder_${f.key}`)}</FolderLink>
           </li>
         ))}
       </ul>
-      {mail.userLabels.length > 0 && (
+      {cats.length > 0 && (
         <>
-          <h2 className="sidebar-title">{t('labels')}</h2>
-          <ul className="folders">
-            {mail.userLabels.map((l) => (
-              <li key={l.id}>
-                <NavLink to={`/mail/${encodeURIComponent(l.id)}`} onClick={onNavigate} className={({ isActive }) => (isActive ? 'folder folder-on' : 'folder')}>
-                  <span>{l.name}</span>
-                </NavLink>
-              </li>
-            ))}
+          <div className="sidebar-group">
+            <FoldButton open={catsOpen} name={t('categories')} onClick={() => toggle('categories')} />
+            <h2 className="sidebar-title">{t('categories')}</h2>
+          </div>
+          {catsOpen && (
+            <ul className="folders folders-indent">
+              {cats.map((c) => (
+                <li key={c.key}>
+                  <FolderLink to={`/mail/${c.key}`} onNavigate={onNavigate} count={count[c.key]}>{t(`folder_${c.key}`)}</FolderLink>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+      {tree.length > 0 && (
+        <>
+          <h2 className="sidebar-title sidebar-title-labels">{t('labels')}</h2>
+          <ul className="folders label-tree">
+            {tree.map((n) => <LabelNode key={n.path} node={n} depth={0} folded={folded} toggle={toggle} onNavigate={onNavigate} />)}
           </ul>
         </>
       )}

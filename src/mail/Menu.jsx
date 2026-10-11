@@ -61,13 +61,17 @@ export function ContextMenu({ x, y, label, onClose, children }) {
     const away = () => onClose();
     document.addEventListener('pointerdown', off);
     document.addEventListener('keydown', esc);
+    // Close when the user scrolls (not on scrolls the page makes by itself, e.g. after a reload).
+    const wheel = (e) => { if (!ref.current?.contains(e.target)) onClose(); };
     window.addEventListener('resize', away);
-    window.addEventListener('scroll', away, true);
+    window.addEventListener('wheel', wheel, { passive: true });
+    window.addEventListener('touchmove', wheel, { passive: true });
     return () => {
       document.removeEventListener('pointerdown', off);
       document.removeEventListener('keydown', esc);
       window.removeEventListener('resize', away);
-      window.removeEventListener('scroll', away, true);
+      window.removeEventListener('wheel', wheel);
+      window.removeEventListener('touchmove', wheel);
     };
   }, [onClose]);
   const keys = (e) => {

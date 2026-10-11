@@ -118,6 +118,12 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
     opens the right-click menu.
   - Not available, because ChiaraMail's Gmail permission doesn't cover them:
     Snooze, Mute, Add to Tasks and Filter.
+- **Gmail's sidebar.** Inbox, Starred, **Important**, Sent, Drafts, All mail,
+  Spam, Trash; then **Categories** (Purchases, Social, Updates, Forums,
+  Promotions, only those your account has, with unread counts); then your
+  **labels as a tree**: "Work/Projects" shows as Projects under Work. The ▸/▾
+  arrows fold Categories and any label with sub-labels, and folding is
+  remembered in this browser (`chiaramail.folded`).
 - **Your address and account name** show in bold under the search bar, above
   **Always show images**, e.g. "ruomini@gmail.com (Robert Uomini)".
 - **English and French.** There's a light and a dark theme, and the layout
@@ -137,6 +143,7 @@ The app keeps a few things in your browser and nowhere else:
 |---|---|
 | Recipient suggestions | `chiaramail.contacts.*` |
 | The "Always show images" setting | `chiaramail.alwaysImages` |
+| Which sidebar groups and labels are folded | `chiaramail.folded` |
 | Which deleted conversations came from the Inbox | `chiaramail.trashedFromInbox` |
 | Keys of ECS messages opened from a link | `chiaramail.ecsKey.{id}` |
 | Language | `chiaramail.lang` |

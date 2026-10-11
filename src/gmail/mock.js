@@ -75,7 +75,11 @@ function msgJson(s, b, { threadId, from, to, subject, text, html, labels, minute
 }
 
 function seed(s, b, addr) {
-  b.labels = [{ id: 'Label_1', name: 'Fractals', type: 'user' }];
+  b.labels = [
+    { id: 'Label_1', name: 'Fractals', type: 'user' },
+    { id: 'Label_2', name: 'Fractals/Julia sets', type: 'user' },
+    { id: 'Label_3', name: 'Exhibitions', type: 'user' },
+  ];
   msgJson(s, b, {
     from: 'Fractal Forums Digest <digest@fractalforums.example>', to: addr,
     subject: 'This week: deep zooms and the Mandelbrot set',
@@ -94,7 +98,7 @@ function seed(s, b, addr) {
     from: 'Paul Martin <paul@atelier.example>', to: addr,
     subject: 'Print sizes for the exhibition',
     text: 'Hi Bob,\n\nCould you send the final print sizes for the three Julia set pieces?\n\nPaul',
-    labels: ['INBOX'], minutesAgo: 2000,
+    labels: ['INBOX', 'Label_2', 'IMPORTANT'], minutesAgo: 2000,
   });
   const d = msgJson(s, b, {
     from: `Me <${addr}>`, to: 'Paul Martin <paul@atelier.example>',
@@ -111,7 +115,7 @@ function seed(s, b, addr) {
 }
 
 // ---- reading ---------------------------------------------------------------------
-const SYSTEM = ['INBOX', 'STARRED', 'SENT', 'SPAM', 'TRASH', 'UNREAD', 'IMPORTANT', 'DRAFT'];
+const SYSTEM = ['INBOX', 'STARRED', 'SENT', 'SPAM', 'TRASH', 'UNREAD', 'IMPORTANT', 'DRAFT', 'CATEGORY_PERSONAL', 'CATEGORY_SOCIAL', 'CATEGORY_UPDATES', 'CATEGORY_FORUMS', 'CATEGORY_PROMOTIONS'];
 export async function listLabels() {
   const s = load();
   return [...SYSTEM.map((id) => ({ id, name: id, type: 'system' })), ...mine(s).labels];

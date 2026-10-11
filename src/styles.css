@@ -258,7 +258,7 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 }
 .search-col .who { margin-left: 14px; max-width: none; font-size: 0.875rem; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu-btn { display: none; }
-.sidebar { grid-area: side; display: flex; flex-direction: column; gap: 12px; align-self: start; position: sticky; top: 12px; }
+.sidebar { grid-area: side; display: flex; flex-direction: column; gap: 12px; align-self: start; position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }
 .compose-btn { width: 100%; min-height: 46px; font-size: 1rem; }
 .folders { list-style: none; margin: 0; padding: 0; }
 .folder {
@@ -269,6 +269,20 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .folder-on { background: color-mix(in srgb, var(--lumen) 40%, var(--paper)); font-weight: 600; }
 .count { font-weight: 600; font-size: 0.875rem; }
 .sidebar-title { font: 600 0.8125rem/1 var(--sans); color: var(--slate); margin: 8px 14px 0; }
+.sidebar-group { display: flex; align-items: center; margin-top: 10px; }
+.sidebar-group .sidebar-title { margin: 0; }
+.sidebar-title-labels { margin-top: 18px; margin-bottom: 6px; }
+.fold {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin-left: -4px;
+  padding: 0; border: 0; border-radius: 50%; background: none; color: var(--slate); cursor: pointer;
+}
+.fold:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+.fold-space { flex: none; width: 20px; }
+.folder-row { display: flex; align-items: center; }
+.folder-row .folder { flex: 1; min-width: 0; padding-left: calc(10px + var(--depth, 0) * 14px); }
+.folder-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.folder-plain { color: var(--slate); }
+.folders-indent .folder { padding-left: 34px; }
 .search-col { flex: 1; max-width: 560px; display: flex; flex-direction: column; gap: 6px; }
 .search-col .search { max-width: none; }
 .setting { display: inline-flex; gap: 6px; align-items: center; align-self: flex-start; margin-left: 14px; font: 0.875rem/1.3 var(--sans); color: var(--slate); cursor: pointer; }
@@ -401,7 +415,7 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
   .mail { grid-template-columns: minmax(0, 1fr); grid-template-areas: "bar" "main"; }
   .mail-menu-open { grid-template-areas: "bar" "side" "main"; }
   .menu-btn { display: inline-flex; }
-  .sidebar { display: none; position: static; padding-bottom: 16px; }
+  .sidebar { display: none; position: static; padding-bottom: 16px; max-height: none; overflow: visible; }
   .mail-menu-open .sidebar { display: flex; }
   .mail-bar { flex-wrap: wrap; }
   .search-col { order: 3; flex-basis: 100%; max-width: none; }
@@ -542,6 +556,7 @@ html.busy body::before {
 @media (max-width: 600px) {
   .avatar { display: inline-flex; }
   .fab { display: inline-flex; }
+  .sidebar .compose-btn { display: none; }
   .ibtn.phone-only { display: inline-flex; }
   .menu .phone-only { display: block; }
   .phone-only .menu-item { width: 100%; }

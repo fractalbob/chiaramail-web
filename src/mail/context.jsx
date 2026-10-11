@@ -1,8 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import * as gmail from '@gmail';
 import * as backend from '@backend';
 import { refreshContacts } from './contacts.js';
 import { useAuth } from '../auth.jsx';
+import { CATEGORIES } from './folders.js';
 
 const MailCtx = createContext(null);
 
@@ -24,10 +25,15 @@ export function MailProvider({ children }) {
     else status = 'disconnected';
   }
 
-  const fetchCounts = () => Promise.all([gmail.getLabel('INBOX'), gmail.getLabel('SPAM'), gmail.getLabel('DRAFT')])
-    .then(([inbox, spam, drafts]) => ({ inbox: inbox.threadsUnread || 0, spam: spam.threadsUnread || 0, drafts: drafts.messagesTotal || 0 }));
+  const cats = useRef([]); // the inbox categories this account has
+  const fetchCounts = () => Promise.all([gmail.getLabel('INBOX'), gmail.getLabel('SPAM'), gmail.getLabel('DRAFT'),
+    ...cats.current.map((c) => gmail.getLabel(c.label).catch(() => null))])
+    .then(([inbox, spam, drafts, ...catLabels]) => ({
+      inbox: inbox.threadsUnread || 0, spam: spam.threadsUnread || 0, drafts: drafts.messagesTotal || 0,
+      ...Object.fromEntries(cats.current.map((c, i) => [c.key, catLabels[i]?.threadsUnread || 0])),
+    }));
   const onErr = (e) => { if (e.code === 'reconnect') setExpired(true); };
-  const refreshCounts = useCallback(() => fetchCounts().then(setUnread).catch(onErr), []);
+  const refreshCounts = useCallback(() => fetchCounts().then(setUnread).catch(onErr), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // List this address in the ECS directory, so others see it uses ECS.
   useEffect(() => {
@@ -46,8 +52,12 @@ export function MailProvider({ children }) {
   useEffect(() => {
     if (status !== 'connected') return;
     let live = true;
-    gmail.listLabels().then((l) => { if (live) setLabels(l); }).catch(onErr);
-    fetchCounts().then((c) => { if (live) setUnread(c); }).catch(onErr);
+    gmail.listLabels().then((l) => {
+      if (!live) return;
+      setLabels(l);
+      cats.current = CATEGORIES.filter((c) => l.some((x) => x.id === c.label));
+      fetchCounts().then((c) => { if (live) setUnread(c); }).catch(onErr);
+    }).catch(onErr);
     const t = setInterval(refreshCounts, 60_000);
     return () => { live = false; clearInterval(t); };
   }, [status, refreshCounts]);

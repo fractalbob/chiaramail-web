@@ -511,7 +511,7 @@ await page.locator('.bulkbar').waitFor({ state: 'detached' });
 await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.rowcheck').check();
 await page.locator('.bulkbar').getByRole('button', { name: 'Label as' }).click();
 await shot('m14-label-as');
-await page.getByRole('menuitemcheckbox', { name: 'Fractals' }).click();
+await page.getByRole('menuitemcheckbox', { name: 'Fractals', exact: true }).click();
 await page.locator('.working').waitFor({ state: 'detached' });
 await page.locator('.folder', { hasText: 'Fractals' }).click();
 await page.locator('.trow', { hasText: 'Ordinary note' }).waitFor();
@@ -535,12 +535,36 @@ if (await page.locator('.trow-unread').count()) {
 await shot('m15-toolbar');
 log('toolbar: select ▾ menu, Label as, Move to, ⋮ Mark as important, Mark all as read, 1–N of total');
 
+// ---- Sidebar: Important, categories, foldable label tree
+await page.locator('.folder', { hasText: 'Important' }).click();
+await page.locator('.trow', { hasText: 'Print sizes for the exhibition' }).waitFor();
+await page.locator('.folder', { hasText: 'Updates' }).click();
+await page.getByRole('heading', { name: 'Updates' }).waitFor();
+await page.locator('.trow', { hasText: 'deep zooms' }).waitFor();
+await must(!(await page.locator('.folder', { hasText: 'Purchases' }).count()), 'only categories the account has');
+await page.getByRole('button', { name: 'Hide Categories' }).click();
+await page.locator('.folder', { hasText: 'Updates' }).waitFor({ state: 'detached' });
+await page.getByRole('button', { name: 'Show Categories' }).click();
+await page.locator('.folder', { hasText: 'Julia sets' }).click();
+await page.locator('.trow', { hasText: 'Print sizes for the exhibition' }).waitFor();
+await shot('m18-sidebar');
+await page.getByRole('button', { name: 'Hide Fractals' }).click();
+await page.locator('.folder', { hasText: 'Julia sets' }).waitFor({ state: 'detached' });
+await page.reload();
+await page.locator('.folder', { hasText: 'Exhibitions' }).waitFor();
+await must(!(await page.locator('.folder', { hasText: 'Julia sets' }).count()), 'folded label stays folded after reload');
+await page.getByRole('button', { name: 'Show Fractals' }).click();
+await page.locator('.folder', { hasText: 'Julia sets' }).waitFor();
+await page.locator('.folder', { hasText: 'Inbox' }).click();
+await page.locator('.trow').first().waitFor();
+log('sidebar: Important, categories (foldable), nested labels fold and stay folded');
+
 // ---- Right-click menu on a row
 const rowMenu = page.getByRole('menu', { name: 'Conversation menu' });
 const ordinary = page.locator('.trow', { hasText: 'Ordinary note' });
 await ordinary.click({ button: 'right' });
 await rowMenu.waitFor();
-await shot('m17-right-click');
+await page.screenshot({ path: `${SHOTS}/m17-right-click.png` }); // not full-page: resizing the window closes the menu
 await must(await rowMenu.getByRole('menuitem', { name: 'Forward as attachment' }).count() === 1, 'Forward as attachment in the menu');
 await rowMenu.getByRole('menuitem', { name: 'Mark unread' }).click();
 await rowMenu.waitFor({ state: 'detached' });
@@ -548,7 +572,7 @@ await page.locator('.trow-unread', { hasText: 'Ordinary note' }).waitFor();
 await page.locator('.working').waitFor({ state: 'detached' });
 await ordinary.click({ button: 'right' });
 await rowMenu.getByRole('menuitem', { name: 'Label as' }).hover();
-await rowMenu.getByRole('menuitemcheckbox', { name: 'Fractals' }).click();
+await rowMenu.getByRole('menuitemcheckbox', { name: 'Fractals', exact: true }).click();
 await page.locator('.working').waitFor({ state: 'detached' });
 await page.locator('.folder', { hasText: 'Fractals' }).click();
 await page.locator('.trow', { hasText: 'Ordinary note' }).waitFor();
