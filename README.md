@@ -100,6 +100,15 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
     **Reply**, **Reply all** (when there are several recipients) and
     **Forward** for the latest message. Each message also keeps its own
     Reply / Forward buttons underneath it.
+  - **Right-click a conversation** in the list for Gmail's menu: Reply,
+    Reply all, Forward, **Forward as attachment** (each message as an .eml
+    file), Archive, Delete (Restore in Trash), Mark read/unread, Add/Remove
+    star, Move to ▸, Label as ▸, **Find emails from** the sender, **Find emails
+    with this subject**, and **Open in new window**. If the conversation is
+    one of several ticked ones, the actions apply to all of them.
+    Shift + right-click gives the browser's own menu. An ECS message whose
+    sender doesn't allow forwarding can't be forwarded as an attachment
+    either, since the .eml would carry its key.
   - Not available, because ChiaraMail's Gmail permission doesn't cover them:
     Snooze, Mute, Add to Tasks and Filter.
 - **Your address and account name** show in bold under the search bar, above

@@ -87,6 +87,23 @@ export default function Composer() {
     if (!threadParam || !msgParam || draftParam) return;
     let live = true;
     gmail.getThread(threadParam).then(async (th) => {
+      if (mode === 'forwardAttach') {
+        // Gmail's "Forward as attachment": each message of the conversation as an .eml file.
+        const real = th.messages.filter((x) => !(x.labelIds || []).includes('DRAFT'));
+        const parsed = real.map(parseMessage);
+        // An ECS message travels with its key, so the sender's "don't forward" applies here too.
+        for (const pm of parsed.filter((x) => x.pointer)) {
+          const info = await openEcs(await liveInfo(pm.pointer), pm.key).catch(() => null);
+          if (info && info.senderUid !== user.uid && (info.withdrawn || info.allowForward !== true)) setForwardBlocked(true);
+        }
+        if (!live) return;
+        const subj = parsed[0]?.subject || '';
+        setSubject(forwardSubject(subj));
+        const base = (subj || 'message').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) || 'message';
+        setOrig(parsed[parsed.length - 1] || {});
+        setFiles(real.map((x, i) => ({ name: real.length > 1 ? `${base} (${i + 1}).eml` : `${base}.eml`, type: 'message/rfc822', size: x.sizeEstimate || 0, eml: { messageId: x.id } })));
+        return;
+      }
       const raw = th.messages.find((m) => m.id === msgParam) || th.messages[th.messages.length - 1];
       const m = parseMessage(raw);
       // Quote what the reader actually saw: the current content of an ECS message.
@@ -159,6 +176,7 @@ export default function Composer() {
     if (b64Ref.current.has(f)) return b64Ref.current.get(f);
     const v = f.file ? await readFile(f.file)
       : f.ecs ? bytesToB64(new Uint8Array(await (await getEcsAttachment(f.ecs.id, f.ecs.i, f.ecs.message, f.ecs.key)).arrayBuffer()))
+        : f.eml ? b64urlToB64(await gmail.getRawMessage(f.eml.messageId))
         : b64urlToB64(f.fwd.data || await gmail.getAttachment(f.fwd.messageId, f.fwd.attachmentId));
     b64Ref.current.set(f, v);
     return v;
@@ -298,7 +316,7 @@ export default function Composer() {
 
   // Replies, forwards and drafts can't be sent until they've been filled in.
   const preparing = !ready && !error;
-  const title = draftParam ? t('draft') : { new: t('newMessage'), reply: t('reply'), replyAll: t('replyAll'), forward: t('forward') }[mode];
+  const title = draftParam ? t('draft') : { new: t('newMessage'), reply: t('reply'), replyAll: t('replyAll'), forward: t('forward'), forwardAttach: t('forwardAttach') }[mode];
 
   return (
     <form className="compose" onSubmit={send}>

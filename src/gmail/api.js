@@ -168,6 +168,8 @@ export async function listThreads({ labelId, q, pageToken, max = 25 }) {
 const META = ['From', 'To', 'Subject', 'Date', 'X-ChiaraMail-Content-Pointer'];
 export const getThreadsMeta = (ids) => mapLimit(ids, 6, (id) => call(`/threads/${id}`, { query: { format: 'metadata', metadataHeaders: META } }));
 export const getThread = (id) => call(`/threads/${id}`, { query: { format: 'full' } });
+/** The message exactly as received (RFC 822), base64url — for Forward as attachment. */
+export const getRawMessage = (id) => call(`/messages/${id}`, { query: { format: 'raw' } }).then((r) => r.raw);
 
 /** Address headers of recent messages matching a Gmail query (for recipient suggestions). */
 export async function recentAddresses(q, max) {

@@ -130,6 +130,17 @@ function visible(msgs, labelId) {
   return labelId ? has(msgs, labelId) : true;
 }
 const text = (m) => JSON.stringify(m.payload.headers) + ' ' + m.snippet;
+// A little of Gmail's search syntax: from:, to:, subject:"…", plus free words.
+const header = (m, n) => (m.payload.headers.find((h) => h.name.toLowerCase() === n) || {}).value || '';
+function matches(m, needle) {
+  const terms = needle.match(/(\w+:)?("[^"]*"|\S+)/g) || [];
+  return terms.every((term) => {
+    const [, op, val] = term.match(/^(?:(\w+):)?(.*)$/);
+    const v = val.replace(/^"|"$/g, '').toLowerCase();
+    if (op === 'from' || op === 'to' || op === 'subject') return header(m, op).toLowerCase().includes(v);
+    return text(m).toLowerCase().includes(term.replace(/"/g, '').toLowerCase());
+  });
+}
 export async function getLabel(id) {
   const s = load();
   const b = mine(s);
@@ -143,7 +154,7 @@ export async function listThreads({ labelId, q, pageToken, max = 25 }) {
   const needle = (q || '').toLowerCase().replace(/^in:\w+\s*/, '').trim();
   const all = Object.entries(threadsOf(mine(s)))
     .filter(([, ms]) => visible(ms, labelId))
-    .filter(([, ms]) => !needle || ms.some((m) => text(m).toLowerCase().includes(needle)))
+    .filter(([, ms]) => !needle || ms.some((m) => matches(m, needle)))
     .sort(([, a], [, c]) => Number(c[c.length - 1].internalDate) - Number(a[a.length - 1].internalDate));
   const start = Number(pageToken || 0);
   return { ids: all.slice(start, start + max).map(([id]) => id), nextPageToken: start + max < all.length ? String(start + max) : null, estimate: all.length };
@@ -164,6 +175,17 @@ export async function recentAddresses(q, max) {
 }
 export async function getThreadsMeta(ids) { const s = load(); return ids.map((id) => threadJson(mine(s), id)); }
 export async function getThread(id) { await later(); const s = load(); return threadJson(mine(s), id); }
+export async function getRawMessage(id) {
+  const s = load();
+  const m = mine(s).messages[id];
+  if (!m) throw Object.assign(new Error('Message not found'), { status: 404 });
+  const walk = (p) => (p.mimeType === 'text/plain' && p.body?.data ? p : (p.parts || []).map(walk).find(Boolean));
+  const textPart = walk(m.payload);
+  const text = textPart ? new TextDecoder().decode(Uint8Array.from(atob(textPart.body.data.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))) : (m.snippet || '');
+  const head = m.payload.headers.map((h) => `${h.name}: ${h.value}`).join('\r\n');
+  const raw = `${head}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${text}`;
+  return bytesToB64(new TextEncoder().encode(raw)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 export async function getAttachment(_messageId, attachmentId) { const s = load(); return mine(s).attachments[attachmentId]; }
 export const getProfile = async () => ({ emailAddress: me });
 

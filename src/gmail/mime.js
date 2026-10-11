@@ -242,6 +242,7 @@ export function summarize(thread, me) {
     starred: labels.has('STARRED'),
     important: labels.has('IMPORTANT'),
     labelIds: [...labels],
+    lastId: ([...msgs].reverse().find((m) => !(m.labelIds || []).includes('DRAFT')) || last)?.id || null,
     live: ecs.length > 0,
     ecs,
     hasAttachment: msgs.some((m) => hasAttachment(m.payload)),

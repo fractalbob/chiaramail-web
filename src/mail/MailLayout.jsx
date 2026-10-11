@@ -14,7 +14,11 @@ function SearchBox() {
   const { t } = useI18n();
   const nav = useNavigate();
   const [params] = useSearchParams();
-  const [q, setQ] = useState(params.get('q') || '');
+  const urlQ = params.get('q') || '';
+  const [q, setQ] = useState(urlQ);
+  // Follow searches started elsewhere (e.g. "Find emails from…" in the right-click menu).
+  const [seen, setSeen] = useState(urlQ);
+  if (seen !== urlQ) { setSeen(urlQ); setQ(urlQ); }
   return (
     <form role="search" className="search" onSubmit={(e) => { e.preventDefault(); nav(q.trim() ? `/mail/all?q=${encodeURIComponent(q.trim())}` : '/mail/inbox'); }}>
       <label className="sr-only" htmlFor="search">{t('search')}</label>

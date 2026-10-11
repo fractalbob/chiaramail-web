@@ -499,6 +499,14 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 }
 .menu-item:hover, .menu-item:focus-visible { background: color-mix(in srgb, var(--ink) 8%, transparent); }
 .menu-check { width: 1.1em; color: var(--slate); }
+.ctxmenu { position: fixed; overflow: visible; max-height: none; min-width: 240px; }
+.menu-item .icon { color: var(--slate); flex: none; }
+.menu-sep { height: 1px; margin: 6px 0; background: var(--rule); }
+.submenu { position: relative; }
+.menu-arrow { margin-left: auto; padding-left: 16px; color: var(--slate); }
+.submenu-panel { top: -6px; left: 100%; }
+.ctx-flip .submenu-panel { left: auto; right: 100%; }
+.trow-ctx { background: color-mix(in srgb, var(--ink) 7%, var(--paper)); }
 .menu-note { margin: 4px 16px; color: var(--slate); font-size: 0.875rem; white-space: normal; }
 .rowcheck { width: 18px; height: 18px; margin: 0 4px 0 10px; accent-color: var(--ink); cursor: pointer; flex: none; }
 .trow-selected { background: color-mix(in srgb, var(--lumen) 22%, var(--paper)); }

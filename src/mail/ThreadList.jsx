@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import * as gmail from '@gmail';
 import { summarize } from '../gmail/mime.js';
 import { useMail } from './context.jsx';
@@ -7,7 +7,7 @@ import { useI18n } from '../i18n.jsx';
 import { labelIdFor, isSystemFolder } from './folders.js';
 import { useEcsMarks } from './ecsCheck.js';
 import Icon from './icons.jsx';
-import { IconButton, Menu, MenuItem } from './Menu.jsx';
+import { ContextMenu, IconButton, Menu, MenuItem, MenuSep, SubMenu } from './Menu.jsx';
 
 const PAGE = 25;
 
@@ -120,9 +120,80 @@ export default function ThreadList() {
   const canMove = !inFolder('trash') && !inFolder('spam');
   // "Move to" takes the conversation out of where it is now: this label if it's one you can remove, else the inbox.
   const moveFrom = viewLabel === 'INBOX' || (viewLabel && !isSystemFolder(folder)) ? viewLabel : 'INBOX';
-  const moveTo = (target) => labelBulk([target], target === moveFrom ? [] : [moveFrom]);
+  const moveTo = (target, ids) => labelBulk([target], target === moveFrom ? [] : [moveFrom], ids);
   const first = (pages.length - 1) * PAGE + 1;
   const last = first + (rows?.length || 0) - 1;
+  // Right-click on a row (Gmail's context menu). It acts on the ticked rows when
+  // the row is one of them, otherwise on that row alone.
+  const nav = useNavigate();
+  const [ctx, setCtx] = useState(null); // { x, y, id }
+  const closeCtx = useCallback(() => setCtx(null), []);
+  const openCtx = (e, r) => {
+    if (e.shiftKey) return; // Shift + right-click: the browser's own menu
+    e.preventDefault();
+    setCtx({ x: e.clientX, y: e.clientY, id: r.id });
+  };
+  const ctxMenu = () => {
+    const row = rows?.find((r) => r.id === ctx.id);
+    if (!row) return null;
+    const ids = selected.has(row.id) ? [...selected] : [row.id];
+    const targets = rows.filter((r) => ids.includes(r.id));
+    const one = ids.length === 1;
+    const n = (l) => targets.filter((r) => r.labelIds.includes(l)).length;
+    const lstate = (l) => (n(l) === 0 ? false : n(l) === targets.length ? true : 'mixed');
+    const compose = (mode) => nav(`/compose?thread=${row.id}&msg=${row.lastId}&mode=${mode}`);
+    const sender = row.people.find((p) => p.label !== 'me') || row.people[0];
+    const find = (query) => nav(`/mail/all?q=${encodeURIComponent(query)}`);
+    const openUrl = `/mail/${encodeURIComponent(folder)}/${row.id}${q ? `?q=${encodeURIComponent(q)}` : ''}`;
+    return (
+      <ContextMenu x={ctx.x} y={ctx.y} label={t('rowMenu')} onClose={closeCtx}>
+        {one && row.lastId && (
+          <>
+            <MenuItem icon={<Icon name="reply" size={18} />} onClick={() => compose('reply')}>{t('reply')}</MenuItem>
+            <MenuItem icon={<Icon name="replyAll" size={18} />} onClick={() => compose('replyAll')}>{t('replyAll')}</MenuItem>
+            <MenuItem icon={<Icon name="forward" size={18} />} onClick={() => compose('forward')}>{t('forward')}</MenuItem>
+            <MenuItem icon={<Icon name="attach" size={18} />} onClick={() => compose('forwardAttach')}>{t('forwardAttach')}</MenuItem>
+            <MenuSep />
+          </>
+        )}
+        {canMove && n('INBOX') > 0 && <MenuItem icon={<Icon name="archive" size={18} />} onClick={() => labelBulk([], ['INBOX'], ids)}>{t('archive')}</MenuItem>}
+        {inFolder('trash')
+          ? <MenuItem icon={<Icon name="restore" size={18} />} onClick={() => bulk((id) => gmail.untrashThread(id), [], ['TRASH'], ids)}>{t('restore')}</MenuItem>
+          : <MenuItem icon={<Icon name="delete" size={18} />} onClick={() => bulk((id) => gmail.trashThread(id), ['TRASH'], ['INBOX'], ids)}>{t('trash')}</MenuItem>}
+        {inFolder('spam') && <MenuItem icon={<Icon name="inbox" size={18} />} onClick={() => labelBulk(['INBOX'], ['SPAM'], ids)}>{t('notSpam')}</MenuItem>}
+        {targets.some((r) => r.unread)
+          ? <MenuItem icon={<Icon name="read" size={18} />} onClick={() => labelBulk([], ['UNREAD'], ids)}>{t('markRead')}</MenuItem>
+          : <MenuItem icon={<Icon name="unread" size={18} />} onClick={() => labelBulk(['UNREAD'], [], ids)}>{t('markUnread')}</MenuItem>}
+        {n('STARRED') < targets.length
+          ? <MenuItem icon={<Icon name="star" size={18} />} onClick={() => labelBulk(['STARRED'], [], ids)}>{t('addStar')}</MenuItem>
+          : <MenuItem icon={<Icon name="star" size={18} />} onClick={() => labelBulk([], ['STARRED'], ids)}>{t('unstar')}</MenuItem>}
+        <MenuSep />
+        {canMove && (
+          <SubMenu label={t('moveTo')} icon={<Icon name="move" size={18} />}>
+            {moveFrom !== 'INBOX' && <MenuItem onClick={() => moveTo('INBOX', ids)}>{t('folder_inbox')}</MenuItem>}
+            {mail.userLabels.filter((l) => l.id !== viewLabel).map((l) => <MenuItem key={l.id} onClick={() => moveTo(l.id, ids)}>{l.name}</MenuItem>)}
+            {!mail.userLabels.length && <p className="menu-note">{t('noLabels')}</p>}
+          </SubMenu>
+        )}
+        <SubMenu label={t('labelAs')} icon={<Icon name="label" size={18} />}>
+          {mail.userLabels.map((l) => (
+            <MenuItem key={l.id} checked={lstate(l.id)} onClick={() => (lstate(l.id) === true ? labelBulk([], [l.id], ids) : labelBulk([l.id], [], ids))}>{l.name}</MenuItem>
+          ))}
+          {!mail.userLabels.length && <p className="menu-note">{t('noLabels')}</p>}
+        </SubMenu>
+        {one && (
+          <>
+            <MenuSep />
+            {sender && <MenuItem icon={<Icon name="search" size={18} />} onClick={() => find(`from:${sender.email}`)}>{t('findFrom', { name: sender.label === 'me' ? t('me') : sender.label })}</MenuItem>}
+            {row.subject && <MenuItem icon={<Icon name="search" size={18} />} onClick={() => find(`subject:"${row.subject.replace(/"/g, '')}"`)}>{t('findSubject')}</MenuItem>}
+            <MenuSep />
+            <MenuItem icon={<Icon name="openNew" size={18} />} onClick={() => window.open(openUrl, '_blank', 'popup,width=960,height=840')}>{t('openNewWindow')}</MenuItem>
+          </>
+        )}
+      </ContextMenu>
+    );
+  };
+
   const range = !rows?.length ? ''
     : !state.exact && state.next && state.total <= last ? t('rangeOfMany', { a: first, b: last })
       : t('rangeOf', { a: first, b: last, n: Math.max(state.total, last).toLocaleString() });
@@ -210,7 +281,7 @@ export default function ThreadList() {
       {rows && rows.length > 0 && (
         <ul className="msglist">
           {rows.map((r) => (
-            <li key={r.id} className={`trow${r.unread ? ' trow-unread' : ''}${selected.has(r.id) ? ' trow-selected' : ''}`}>
+            <li key={r.id} onContextMenu={(e) => openCtx(e, r)} className={`trow${r.unread ? ' trow-unread' : ''}${selected.has(r.id) ? ' trow-selected' : ''}${ctx?.id === r.id ? ' trow-ctx' : ''}`}>
               <input type="checkbox" className="rowcheck" checked={selected.has(r.id)} onChange={() => toggle(r.id)}
                 aria-label={t('selectRow', { name: r.subject || t('noSubject') })} />
               <button type="button" className={r.starred ? 'star star-on' : 'star'} aria-pressed={r.starred}
@@ -246,6 +317,7 @@ export default function ThreadList() {
           ))}
         </ul>
       )}
+      {ctx && ctxMenu()}
     </div>
   );
 }

@@ -275,6 +275,13 @@ await page.locator('.folder', { hasText: 'Inbox' }).click();
 await openRow('Committee meeting');
 await page.getByText('The sender doesn’t allow this message to be forwarded.').waitFor();
 await must(page.locator('.mcard').first().getByRole('button', { name: 'Forward' }).isDisabled(), 'forward disabled');
+await page.getByRole('link', { name: 'Back' }).click();
+await page.locator('.trow', { hasText: 'Committee meeting' }).click({ button: 'right' });
+await page.getByRole('menu', { name: 'Conversation menu' }).getByRole('menuitem', { name: 'Forward as attachment' }).click();
+await page.getByRole('alert').filter({ hasText: /forward/i }).waitFor();
+await must(page.getByRole('button', { name: /Send|Loading/ }).isDisabled(), 'forward as attachment blocked too');
+await page.goBack();
+await openRow('Committee meeting');
 log('forwarding blocked by default for recipients');
 
 // Alice allows forwarding
@@ -527,6 +534,56 @@ if (await page.locator('.trow-unread').count()) {
 }
 await shot('m15-toolbar');
 log('toolbar: select ▾ menu, Label as, Move to, ⋮ Mark as important, Mark all as read, 1–N of total');
+
+// ---- Right-click menu on a row
+const rowMenu = page.getByRole('menu', { name: 'Conversation menu' });
+const ordinary = page.locator('.trow', { hasText: 'Ordinary note' });
+await ordinary.click({ button: 'right' });
+await rowMenu.waitFor();
+await shot('m17-right-click');
+await must(await rowMenu.getByRole('menuitem', { name: 'Forward as attachment' }).count() === 1, 'Forward as attachment in the menu');
+await rowMenu.getByRole('menuitem', { name: 'Mark unread' }).click();
+await rowMenu.waitFor({ state: 'detached' });
+await page.locator('.trow-unread', { hasText: 'Ordinary note' }).waitFor();
+await page.locator('.working').waitFor({ state: 'detached' });
+await ordinary.click({ button: 'right' });
+await rowMenu.getByRole('menuitem', { name: 'Label as' }).hover();
+await rowMenu.getByRole('menuitemcheckbox', { name: 'Fractals' }).click();
+await page.locator('.working').waitFor({ state: 'detached' });
+await page.locator('.folder', { hasText: 'Fractals' }).click();
+await page.locator('.trow', { hasText: 'Ordinary note' }).waitFor();
+log('right-click: Mark unread, Label as ▸');
+await page.locator('.trow', { hasText: 'Ordinary note' }).click({ button: 'right' });
+await rowMenu.getByRole('menuitem', { name: /Find emails from alice@example\.com/ }).click();
+await page.getByRole('heading', { name: /Results for/ }).waitFor();
+await must((await page.getByLabel('Search mail').inputValue()) === 'from:alice@example.com', 'search box shows the query');
+await page.locator('.trow', { hasText: 'Ordinary note' }).waitFor();
+await page.locator('.trow', { hasText: 'Ordinary note' }).click({ button: 'right' });
+await rowMenu.getByRole('menuitem', { name: 'Find emails with this subject' }).click();
+await page.waitForFunction(() => document.getElementById('search').value.startsWith('subject:'));
+await page.waitForFunction(() => document.querySelectorAll('.trow').length === 1, null, { timeout: 5000 }).catch(() => { throw new Error('subject search finds just that conversation'); });
+await page.locator('.trow', { hasText: 'Ordinary note' }).waitFor();
+log('right-click: Find emails from the sender / with this subject (search box follows)');
+await page.locator('.trow', { hasText: 'Ordinary note' }).click({ button: 'right' });
+await rowMenu.getByRole('menuitem', { name: 'Forward as attachment' }).click();
+await page.getByRole('heading', { name: 'Forward as attachment' }).waitFor();
+await page.locator('.attachments .chip', { hasText: 'Ordinary note.eml' }).waitFor();
+await must((await page.getByLabel('Subject', { exact: true }).inputValue()).startsWith('Fwd'), 'Fwd: subject');
+await page.getByLabel('To', { exact: true }).fill('dave@example.com');
+await send();
+await connectAs('dave@example.com');
+await openRow('Ordinary note');
+await page.getByRole('button', { name: /Ordinary note\.eml/ }).waitFor();
+log('right-click: Forward as attachment sends the conversation as an .eml file');
+await connectAs('bob@example.com');
+await page.locator('.trow').first().waitFor();
+const [popup] = await Promise.all([page.waitForEvent('popup'), (async () => {
+  await page.locator('.trow', { hasText: 'Ordinary note' }).click({ button: 'right' });
+  await rowMenu.getByRole('menuitem', { name: 'Open in new window' }).click();
+})()]);
+await popup.getByRole('heading', { name: 'Ordinary note' }).waitFor();
+await popup.close();
+log('right-click: Open in new window');
 
 // ---- Alice withdraws
 await connectAs('alice@example.com');
