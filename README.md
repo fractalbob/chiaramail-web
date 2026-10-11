@@ -80,7 +80,8 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
 - **Busy cursor.** While something you started is still working (opening,
   deleting, sending, switching folders), the pointer shows the busy cursor.
   Background refreshes don't (`src/busy.js`).
-- **Your address** shows under the search bar, above **Always show images**.
+- **Your address and account name** show in bold under the search bar, above
+  **Always show images**, e.g. "ruomini@gmail.com (Robert Uomini)".
 - **English and French.** There's a light and a dark theme, and the layout
   works on phones.
 - **Installable app.** `public/manifest.webmanifest` lets Chrome offer

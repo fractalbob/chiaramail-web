@@ -256,7 +256,7 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
   width: 100%; padding: 10px 14px; border-radius: 999px; border: 1px solid var(--rule);
   background: var(--paper); color: var(--ink); font: 1rem/1.3 var(--sans);
 }
-.search-col .who { margin-left: 14px; max-width: none; font-size: 0.875rem; }
+.search-col .who { margin-left: 14px; max-width: none; font-size: 0.875rem; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu-btn { display: none; }
 .sidebar { grid-area: side; display: flex; flex-direction: column; gap: 12px; align-self: start; position: sticky; top: 12px; }
 .compose-btn { width: 100%; min-height: 46px; font-size: 1rem; }

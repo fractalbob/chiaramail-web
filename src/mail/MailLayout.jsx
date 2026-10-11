@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Link, Navigate, Route, Routes, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useMail } from './context.jsx';
+import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
 import { FOLDERS } from './folders.js';
 import { useAlwaysImages, setAlwaysImages } from './prefs.js';
@@ -20,6 +21,16 @@ function SearchBox() {
       <input id="search" type="search" placeholder={t('searchPlaceholder')} value={q} onChange={(e) => setQ(e.target.value)} />
     </form>
   );
+}
+
+// The connected address, followed by the account's name from Google, e.g.
+// "ruomini@gmail.com (Robert Uomini)".
+function AccountLine() {
+  const mail = useMail();
+  const { user } = useAuth();
+  const name = user && user.email === mail.account ? (user.name || '').trim() : '';
+  const text = name ? `${mail.account} (${name})` : mail.account;
+  return <span className="who account-line" title={text}>{text}</span>;
 }
 
 function ImagesSetting() {
@@ -79,7 +90,7 @@ export default function MailLayout() {
         <button type="button" className="btn btn-quiet menu-btn" aria-expanded={open} onClick={() => setOpen(!open)}>{t('menu')}</button>
         <div className="search-col">
           <SearchBox key={loc.search} />
-          <span className="who" title={mail.account}>{mail.account}</span>
+          <AccountLine />
           <ImagesSetting />
         </div>
         <button type="button" className="btn btn-quiet signout" onClick={mail.disconnect}>{t('signOut')}</button>
