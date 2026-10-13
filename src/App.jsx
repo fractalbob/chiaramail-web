@@ -19,7 +19,7 @@ function Header() {
     <header className="masthead">
       <Link to="/" className="wordmark" aria-label="ChiaraMail">
         <span className="wordmark-glyph" aria-hidden="true" />
-        <span>Chiara<span className="wordmark-mail">Mail</span></span>
+        <span>Chiara<span className="wordmark-mail">Mail</span><sup className="wordmark-tm">™</sup></span>
       </Link>
       {onReaderPage && user && (
         <nav className="masthead-nav">
@@ -37,7 +37,7 @@ function Footer() {
     <footer className="foot">
       {gmail.mode === 'mock-gmail' && <p className="testmode">{t('testModeMail')}</p>}
       <p>
-        ChiaraMail · The Fractal Images Company
+        ChiaraMail™ · The Fractal Images Company
         <a className="footlink" href="/privacy.html">{t('privacy')}</a>
         <a className="footlink" href="/terms.html">{t('terms')}</a>
         <button type="button" className="linklike" onClick={toggle}>{t('language')}</button>

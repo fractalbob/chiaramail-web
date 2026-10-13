@@ -61,6 +61,7 @@ a { color: var(--link); }
   font: 600 1.375rem/1 var(--serif); color: var(--ink); text-decoration: none; letter-spacing: -0.01em;
 }
 .wordmark-mail { font-weight: 400; color: var(--slate); }
+.wordmark-tm { font-size: 0.45em; font-weight: 400; color: var(--slate); margin-left: 1px; vertical-align: super; line-height: 0; }
 .wordmark-glyph {
   width: 14px; height: 14px; border-radius: 50%;
   background: var(--lumen); box-shadow: 0 0 0 3px color-mix(in srgb, var(--lumen) 35%, transparent);
