@@ -465,21 +465,34 @@ await sbox.press('Control+a');
 await sbox.press('Backspace');
 await page.waitForTimeout(300);
 await must(/[?&]q=/.test(page.url()), 'results stay while retyping');
-// …but the box's × button goes back to the whole inbox.
+// …and so does the box's ×, as in Gmail: it only empties the box.
 await sbox.fill('liste');
 await sbox.press('Enter');
 await page.getByRole('heading', { name: /Results for/ }).waitFor();
 await page.getByRole('button', { name: 'Clear search' }).click();
+await must((await sbox.inputValue()) === '', 'box empty after ×');
+await must(await sbox.evaluate((e) => e === document.activeElement), 'box keeps the focus after ×');
+await page.waitForTimeout(300);
+await must(/[?&]q=/.test(page.url()), 'results stay after ×');
+await page.getByRole('heading', { name: /Results for/ }).waitFor();
+// Escape leaves the search, like ←.
+await sbox.press('Escape');
 await page.getByRole('heading', { name: 'Inbox' }).waitFor();
-await must((await sbox.inputValue()) === '', 'box empty after clearing');
-// …and so does Escape.
+await must(!(await sbox.inputValue()), 'search box empty after Escape');
+log('× only empties the search box; Escape returns to the inbox');
+// Gmail's ←: appears when the box is touched, and always goes back to the whole inbox.
+await must(!(await page.getByRole('button', { name: 'Back to Inbox' }).count()), 'no ← before the box is touched');
+await sbox.click();
+await page.getByRole('button', { name: 'Back to Inbox' }).waitFor();
 await sbox.fill('liste');
 await sbox.press('Enter');
 await page.getByRole('heading', { name: /Results for/ }).waitFor();
-await sbox.press('Escape');
+await page.getByRole('button', { name: 'Back to Inbox' }).click();
 await page.getByRole('heading', { name: 'Inbox' }).waitFor();
-await must(!(await sbox.inputValue()), 'search box empty after ×');
-log('× in the search box returns to the inbox');
+await must(!(await sbox.inputValue()), 'box empty after ←');
+await page.waitForTimeout(200);
+await must(!(await page.getByRole('button', { name: 'Back to Inbox' }).count()), '← goes away afterwards');
+log('← in the search box returns to the inbox');
 await sbox.fill('liste');
 await sbox.press('Enter');
 await page.getByRole('heading', { name: /Results for/ }).waitFor();
@@ -877,15 +890,24 @@ await mp.locator('.bulkbar').waitFor({ state: 'detached' });
 await mp.locator('.trow-link', { hasText: 'Ordinary note' }).tap();
 await mp.locator('.thread-subject').waitFor();
 await mp.goBack();
-// Search, then tap × : back to the whole inbox.
+// Search, then tap ×: the box empties, the results stay.
 await mp.getByLabel('Search mail').fill('committee');
 await mp.getByLabel('Search mail').press('Enter');
 await mp.getByRole('heading', { name: /Results for/ }).waitFor();
 await mp.getByRole('button', { name: 'Clear search' }).tap();
+await must(!(await mp.getByLabel('Search mail').inputValue()), 'phone: box empty after ×');
+await mp.getByRole('heading', { name: /Results for/ }).waitFor();
+await mp.getByRole('button', { name: 'Back to Inbox' }).tap();
+await mp.getByRole('heading', { name: 'Inbox' }).waitFor();
+await mp.getByLabel('Search mail').tap();
+await mp.getByLabel('Search mail').fill('committee');
+await mp.getByLabel('Search mail').press('Enter');
+await mp.getByRole('heading', { name: /Results for/ }).waitFor();
+await mp.getByRole('button', { name: 'Back to Inbox' }).tap();
 await mp.getByRole('heading', { name: 'Inbox' }).waitFor();
 await mp.locator('.fab').tap();
 await mp.getByLabel('To', { exact: true }).waitFor();
-log('phone: avatars, long-press to select, taps add to the selection, ⋮ Select all, ← clears, tapping × clears a search, Compose button');
+log('phone: avatars, long-press to select, taps add to the selection, ⋮ Select all, ← clears, tapping × empties the search box, ← leaves the search, Compose button');
 
 await page.waitForTimeout(400);
 await must(!(await page.evaluate(() => document.documentElement.classList.contains('busy'))), 'busy cursor cleared once work is done');

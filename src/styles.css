@@ -284,6 +284,14 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
   color: var(--slate); font: 400 1.375rem/1 var(--sans); cursor: pointer;
 }
 .search-clear:hover { background: color-mix(in srgb, var(--slate) 14%, transparent); color: var(--ink); }
+.search-back {
+  position: absolute; left: 6px; top: 50%; transform: translateY(-50%);
+  width: 32px; height: 32px; border: 0; border-radius: 50%; background: transparent;
+  color: var(--slate); display: grid; place-items: center; cursor: pointer; padding: 0;
+}
+.search-back:hover { background: color-mix(in srgb, var(--slate) 14%, transparent); color: var(--ink); }
+.search-back:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.search.search-open input { padding-left: 44px; }
 .search-clear:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .search input {
   width: 100%; padding: 10px 44px 10px 14px; border-radius: 999px; border: 1px solid var(--rule);

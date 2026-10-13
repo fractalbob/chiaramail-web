@@ -20,22 +20,37 @@ function SearchBox() {
   // Follow searches started elsewhere (e.g. "Find emails from…" in the right-click menu).
   const [seen, setSeen] = useState(urlQ);
   if (seen !== urlQ) { setSeen(urlQ); setQ(urlQ); }
-  // Clearing the box (the × button, or Escape) while showing results goes back to the inbox,
-  // as in Gmail. Deleting the text by hand doesn't, so a new search can be typed in its place.
+  // As in Gmail: touching the box shows a ← on its left, which always goes back to the
+  // whole Inbox (so does Escape). The × only empties the box, so a new search can be typed;
+  // the results stay until the ← is used or a new search is made.
   // The × is our own: browsers' built-in ones behave differently, especially on phones.
   const box = useRef(null);
-  const clear = () => {
-    setQ('');
-    if (urlQ) nav('/mail/inbox'); else box.current?.focus();
+  const [focused, setFocused] = useState(false);
+  const clear = () => { setQ(''); box.current?.focus(); };
+  const back = () => {
+    setQ(''); setFocused(false); box.current?.blur();
+    if (urlQ) nav('/mail/inbox');
   };
+  const keep = (e) => e.preventDefault(); // pressing a button doesn't take the focus from the box
+  const open = focused || !!urlQ;
   return (
-    <form role="search" className="search" onSubmit={(e) => { e.preventDefault(); nav(q.trim() ? `/mail/all?q=${encodeURIComponent(q.trim())}` : '/mail/inbox'); }}>
+    <form role="search" className={open ? 'search search-open' : 'search'}
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setFocused(false); }}
+      onSubmit={(e) => { e.preventDefault(); box.current?.blur(); nav(q.trim() ? `/mail/all?q=${encodeURIComponent(q.trim())}` : '/mail/inbox'); }}>
+      {open && (
+        <button type="button" className="search-back" aria-label={t('backToInbox')} title={t('backToInbox')}
+          onPointerDown={keep} onMouseDown={keep} onClick={back}>
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor" /></svg>
+        </button>
+      )}
       <label className="sr-only" htmlFor="search">{t('search')}</label>
       <input id="search" ref={box} type="search" placeholder={t('searchPlaceholder')} value={q}
         onChange={(e) => setQ(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Escape' && (q || urlQ)) { e.preventDefault(); clear(); } }} />
-      {(q || urlQ) && (
-        <button type="button" className="search-clear" aria-label={t('clearSearch')} title={t('clearSearch')} onClick={clear}>×</button>
+        onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); back(); } }} />
+      {q && (
+        <button type="button" className="search-clear" aria-label={t('clearSearch')} title={t('clearSearch')}
+          onPointerDown={keep} onMouseDown={keep} onClick={clear}>×</button>
       )}
     </form>
   );
