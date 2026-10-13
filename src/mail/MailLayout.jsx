@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { NavLink, Link, Navigate, Route, Routes, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useMail } from './context.jsx';
 import { useAuth } from '../auth.jsx';
@@ -20,10 +20,23 @@ function SearchBox() {
   // Follow searches started elsewhere (e.g. "Find emails from…" in the right-click menu).
   const [seen, setSeen] = useState(urlQ);
   if (seen !== urlQ) { setSeen(urlQ); setQ(urlQ); }
+  // Clearing the box (the × button, or Escape) while showing results goes back to the inbox,
+  // as in Gmail. Deleting the text by hand doesn't, so a new search can be typed in its place.
+  // The × is our own: browsers' built-in ones behave differently, especially on phones.
+  const box = useRef(null);
+  const clear = () => {
+    setQ('');
+    if (urlQ) nav('/mail/inbox'); else box.current?.focus();
+  };
   return (
     <form role="search" className="search" onSubmit={(e) => { e.preventDefault(); nav(q.trim() ? `/mail/all?q=${encodeURIComponent(q.trim())}` : '/mail/inbox'); }}>
       <label className="sr-only" htmlFor="search">{t('search')}</label>
-      <input id="search" type="search" placeholder={t('searchPlaceholder')} value={q} onChange={(e) => setQ(e.target.value)} />
+      <input id="search" ref={box} type="search" placeholder={t('searchPlaceholder')} value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Escape' && (q || urlQ)) { e.preventDefault(); clear(); } }} />
+      {(q || urlQ) && (
+        <button type="button" className="search-clear" aria-label={t('clearSearch')} title={t('clearSearch')} onClick={clear}>×</button>
+      )}
     </form>
   );
 }

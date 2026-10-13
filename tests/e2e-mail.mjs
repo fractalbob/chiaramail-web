@@ -458,6 +458,37 @@ await page.getByLabel('Search mail').press('Enter');
 await page.getByRole('heading', { name: /Results for/ }).waitFor();
 await page.locator('.trow', { hasText: 'Liste pour samedi' }).waitFor();
 log('search');
+// Deleting the words by hand keeps the results (to type a new search)…
+const sbox = page.getByLabel('Search mail');
+await sbox.click();
+await sbox.press('Control+a');
+await sbox.press('Backspace');
+await page.waitForTimeout(300);
+await must(/[?&]q=/.test(page.url()), 'results stay while retyping');
+// …but the box's × button goes back to the whole inbox.
+await sbox.fill('liste');
+await sbox.press('Enter');
+await page.getByRole('heading', { name: /Results for/ }).waitFor();
+await page.getByRole('button', { name: 'Clear search' }).click();
+await page.getByRole('heading', { name: 'Inbox' }).waitFor();
+await must((await sbox.inputValue()) === '', 'box empty after clearing');
+// …and so does Escape.
+await sbox.fill('liste');
+await sbox.press('Enter');
+await page.getByRole('heading', { name: /Results for/ }).waitFor();
+await sbox.press('Escape');
+await page.getByRole('heading', { name: 'Inbox' }).waitFor();
+await must(!(await sbox.inputValue()), 'search box empty after ×');
+log('× in the search box returns to the inbox');
+await sbox.fill('liste');
+await sbox.press('Enter');
+await page.getByRole('heading', { name: /Results for/ }).waitFor();
+await sbox.press('Escape');
+await page.getByRole('heading', { name: 'Inbox' }).waitFor();
+log('Escape in the search box returns to the inbox');
+await sbox.fill('liste');
+await sbox.press('Enter');
+await page.locator('.trow', { hasText: 'Liste pour samedi' }).waitFor();
 await openRow('Liste pour samedi');
 await page.getByRole('button', { name: 'Delete' }).click();
 await page.locator('.folder', { hasText: 'Inbox' }).click();
@@ -846,9 +877,15 @@ await mp.locator('.bulkbar').waitFor({ state: 'detached' });
 await mp.locator('.trow-link', { hasText: 'Ordinary note' }).tap();
 await mp.locator('.thread-subject').waitFor();
 await mp.goBack();
+// Search, then tap × : back to the whole inbox.
+await mp.getByLabel('Search mail').fill('committee');
+await mp.getByLabel('Search mail').press('Enter');
+await mp.getByRole('heading', { name: /Results for/ }).waitFor();
+await mp.getByRole('button', { name: 'Clear search' }).tap();
+await mp.getByRole('heading', { name: 'Inbox' }).waitFor();
 await mp.locator('.fab').tap();
 await mp.getByLabel('To', { exact: true }).waitFor();
-log('phone: avatars, long-press to select, taps add to the selection, ⋮ Select all, ← clears, Compose button');
+log('phone: avatars, long-press to select, taps add to the selection, ⋮ Select all, ← clears, tapping × clears a search, Compose button');
 
 await page.waitForTimeout(400);
 await must(!(await page.evaluate(() => document.documentElement.classList.contains('busy'))), 'busy cursor cleared once work is done');
