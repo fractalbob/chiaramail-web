@@ -6,6 +6,8 @@ import { useI18n } from '../i18n.jsx';
 import { parseRecipients } from '../lib.js';
 import { watchEcs, saveEcsEdition } from '../ecs.js';
 import { keyFor } from '../ecsKeys.js';
+import RichEditor from '../mail/RichEditor.jsx';
+import { bodyHtml, storeRich, richIsEmpty } from '../richtext.js';
 
 export default function Compose({ editing = false }) {
   const { user } = useAuth();
@@ -25,19 +27,19 @@ export default function Compose({ editing = false }) {
     return watchEcs(id, keyFor(id), (m) => {
       if (!m || m.senderUid !== user.uid || m.withdrawn || m.locked) { nav(`/m/${id}`, { replace: true }); return; }
       setOriginal(m);
-      if (first) { setSubject(m.subject); setBody(m.body); first = false; }
+      if (first) { setSubject(m.subject); setBody(bodyHtml(m.body)); first = false; }
     }, () => nav(`/m/${id}`, { replace: true }));
   }, [editing, id, user.uid, nav]);
 
   const submit = async (ev) => {
     ev.preventDefault();
     setError('');
-    if (!body.trim()) return setError(t('needBody'));
+    if (richIsEmpty(body)) return setError(t('needBody'));
     try {
       if (editing) {
         if (!original) return;
         setBusy(true);
-        await saveEcsEdition(id, original, { subject: subject.trim(), body }, keyFor(id));
+        await saveEcsEdition(id, original, { subject: subject.trim(), body: storeRich(body) }, keyFor(id));
         nav(`/m/${id}?send=updated`);
       } else {
         const { good, bad } = parseRecipients(to);
@@ -45,7 +47,7 @@ export default function Compose({ editing = false }) {
         if (!good.length) return setError(t('needRecipient'));
         if (good.length > 50) return setError(t('tooMany'));
         setBusy(true);
-        const newId = await backend.createMessage(user, { recipients: good, subject: subject.trim(), body });
+        const newId = await backend.createMessage(user, { recipients: good, subject: subject.trim(), body: storeRich(body) });
         nav(`/m/${newId}?send=new`);
       }
     } catch (e) {
@@ -79,9 +81,7 @@ export default function Compose({ editing = false }) {
         <input id="subject" type="text" maxLength={300} value={subject} onChange={(e) => setSubject(e.target.value)} />
       </div>
       <div className="field">
-        <label htmlFor="body">{t('message')}</label>
-        <textarea id="body" className="letter-input" rows={14} maxLength={100000} value={body}
-          onChange={(e) => setBody(e.target.value)} />
+        <RichEditor id="body" label={t('message')} value={body} onChange={setBody} />
       </div>
       {error && <p className="error" role="alert">{error}</p>}
       <div className="actions">

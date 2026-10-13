@@ -4,7 +4,7 @@ import * as gmail from '@gmail';
 import * as backend from '@backend';
 import {
   buildRaw, parseMessage, parseAddressList, isEmail, replySubject, forwardSubject,
-  htmlToText, quote, bytesToB64, b64ToBytes, b64urlToB64, escapeHtml, CONTENT_POINTER, CONTENT_KEY, displayName,
+  htmlToText, bytesToB64, b64ToBytes, b64urlToB64, escapeHtml, CONTENT_POINTER, CONTENT_KEY, displayName,
 } from '../gmail/mime.js';
 import { messageUrl, fmtSize } from '../lib.js';
 import { createEcs, openEcs, getEcsAttachment } from '../ecs.js';
@@ -12,6 +12,8 @@ import { useAuth } from '../auth.jsx';
 import { useMail } from './context.jsx';
 import { useI18n } from '../i18n.jsx';
 import RecipientField from './RecipientField.jsx';
+import RichEditor, { focusStart } from './RichEditor.jsx';
+import { bodyHtml, textToRich, fromEmailHtml, storeRich, richToText, richIsEmpty, emailHtml } from '../richtext.js';
 import { cachedContacts, refreshContacts, rememberRecipients } from './contacts.js';
 
 const MAX_TOTAL = 24 * 1024 * 1024; // what Gmail lets an ordinary email (or a draft) carry
@@ -53,7 +55,7 @@ export default function Composer() {
   const [showCc, setShowCc] = useState(false);
   const [showBcc, setShowBcc] = useState(false);
   const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
+  const [body, setBody] = useState(''); // HTML from the editor (see richtext.js)
   const [files, setFiles] = useState([]); // { name, type, size, file? , fwd? }
   const [changeable, setChangeable] = useState(mode === 'new' && !note);
   const [allowFwd, setAllowFwd] = useState(false);
@@ -115,12 +117,12 @@ export default function Composer() {
         setForwardBlocked(true);
       }
       setOrig(m);
-      const origText = current ?? (m.text || htmlToText(m.html));
+      const origHtml = current != null ? bodyHtml(current) : textToRich(m.text || htmlToText(m.html));
       const notMe = (a) => a.email.toLowerCase() !== me;
       const sender = m.replyTo[0] || m.from;
       if (mode === 'forward') {
         setSubject(forwardSubject(m.subject));
-        setBody(`\n\n${t('fwdHeader')}\n${t('from')}: ${m.from ? fmtAddr(m.from) : ''}\n${t('date')}: ${formatDate(m.date)}\n${t('subject')}: ${m.subject}\n${t('to')}: ${m.to.map(fmtAddr).join(', ')}\n\n${origText}`);
+        setBody(textToRich(`\n\n${t('fwdHeader')}\n${t('from')}: ${m.from ? fmtAddr(m.from) : ''}\n${t('date')}: ${formatDate(m.date)}\n${t('subject')}: ${m.subject}\n${t('to')}: ${m.to.map(fmtAddr).join(', ')}\n`) + origHtml);
         const stored = info && !info.withdrawn && !info.locked ? (info.attachments || []) : [];
         setFiles([
           ...m.attachments.map((a) => ({ name: a.filename, type: a.mimeType, size: a.size, fwd: { messageId: m.id, attachmentId: a.attachmentId, data: a.data } })),
@@ -140,9 +142,9 @@ export default function Composer() {
         setThread({ threadId: m.threadId, inReplyTo: m.messageId, references: `${m.references} ${m.messageId}`.trim() });
         setSubject(replySubject(m.subject));
         const intro = note === 'updated' ? `${t('updateNoteBody')}\n` : '\n';
-        setBody(`${intro}\n${t('wroteOn', { date: formatDate(m.date), name: displayName(m.from) })}\n${quote(origText)}`);
+        setBody(`${textToRich(`${intro}\n${t('wroteOn', { date: formatDate(m.date), name: displayName(m.from) })}`)}<blockquote>${origHtml}</blockquote>`);
       }
-      setTimeout(() => { bodyRef.current?.focus(); bodyRef.current?.setSelectionRange(0, 0); }, 0);
+      setTimeout(() => focusStart(bodyRef.current), 0);
     }).catch((e) => { if (!mail.handle(e)) setError(e.message); });
     return () => { live = false; };
   }, [threadParam, msgParam, mode, note]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -162,7 +164,7 @@ export default function Composer() {
       if (m.cc.length) setShowCc(true);
       if (m.bcc.length) setShowBcc(true);
       setSubject(m.subject);
-      setBody(m.text || htmlToText(m.html));
+      setBody(m.html ? fromEmailHtml(m.html) : textToRich(m.text));
       setFiles(files);
       setChangeable(m.headers[DRAFT_CHANGEABLE.toLowerCase()] === '1');
       setAllowFwd(m.headers[DRAFT_ALLOW_FWD.toLowerCase()] === '1');
@@ -199,7 +201,7 @@ export default function Composer() {
         const attachments = await Promise.all(v.files.map(async (f) => ({ filename: f.name, mimeType: f.type, base64: await ensureB64(f) })));
         const ok = (l) => l.filter((a) => isEmail(a.email));
         const raw = buildRaw({
-          to: ok(v.to), cc: ok(v.cc), bcc: v.changeable ? [] : ok(v.bcc), subject: v.subject, text: v.body, attachments,
+          to: ok(v.to), cc: ok(v.cc), bcc: v.changeable ? [] : ok(v.bcc), subject: v.subject, text: richToText(v.body), html: emailHtml(v.body), attachments,
           headers: { [DRAFT_CHANGEABLE]: v.changeable ? '1' : '0', [DRAFT_ALLOW_FWD]: v.allowFwd ? '1' : '0' },
           inReplyTo: v.thread?.inReplyTo || undefined, references: v.thread?.references || undefined,
         });
@@ -270,7 +272,7 @@ export default function Composer() {
     const bad = [...toL, ...ccL, ...bccL].filter((a) => !isEmail(a.email)).map(fmtAddr);
     if (bad.length) return setError(t('badAddresses', { list: bad.join(', ') }));
     if (!toL.length && !ccL.length && !bccL.length) return setError(t('needRecipient'));
-    if (changeable && !body.trim() && !files.length) return setError(t('needBody'));
+    if (changeable && richIsEmpty(body) && !files.length) return setError(t('needBody'));
     const total = files.reduce((n, f) => n + f.size, 0);
     if (changeable) {
       if (files.length > MAX_ECS_FILES) return setError(t('tooManyFiles', { n: MAX_ECS_FILES }));
@@ -287,8 +289,8 @@ export default function Composer() {
     try {
       // ECS attachments go to ChiaraMail, not into the email.
       let attachments = changeable ? [] : await Promise.all(files.map(async (f) => ({ filename: f.name, mimeType: f.type, base64: await ensureB64(f) })));
-      let text = body;
-      let html;
+      let text = richToText(body);
+      let html = emailHtml(body);
       const headers = {};
       if (changeable) {
         // ECS: the body and attachments are encrypted here and go to ChiaraMail;
@@ -298,7 +300,7 @@ export default function Composer() {
         const blobs = await Promise.all(files.map(async (f) => ({
           name: f.name, type: f.type, size: f.size, bytes: f.file || b64ToBytes(await ensureB64(f)),
         })));
-        const made = await createEcs(user, { recipients, subject: subject.trim(), body, allowForward: allowFwd, files: blobs },
+        const made = await createEcs(user, { recipients, subject: subject.trim(), body: storeRich(body), allowForward: allowFwd, files: blobs },
           (p) => setProgress(Math.round(p * 100)));
         pointer = made.id;
         headers[CONTENT_POINTER] = pointer;
@@ -361,8 +363,7 @@ export default function Composer() {
         <input id="subject" type="text" maxLength={300} value={subject} onChange={(e) => setSubject(e.target.value)} />
       </div>
       <div className="field">
-        <label htmlFor="body">{t('message')}</label>
-        <textarea id="body" ref={bodyRef} className="letter-input" rows={14} value={body} onChange={(e) => setBody(e.target.value)} />
+        <RichEditor id="body" label={t('message')} value={body} onChange={setBody} editorRef={bodyRef} />
       </div>
 
       <label className={changeable ? 'livetoggle livetoggle-on' : 'livetoggle'}>

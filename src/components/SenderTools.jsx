@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import * as backend from '@backend';
 import { useI18n } from '../i18n.jsx';
-import { toParagraphs } from '../lib.js';
+import RichBody from '../mail/RichBody.jsx';
 import { listEcsEditions } from '../ecs.js';
 
 export function Readers({ message }) {
@@ -49,9 +49,7 @@ export function Editions({ message, ecsKey }) {
             </summary>
             <div className="ed-body">
               {e.subject && <p className="ed-subject">{e.subject}</p>}
-              {toParagraphs(e.body).map((parts, i) => (
-                <p key={i}>{parts.map((p, j) => <span key={j}>{p.href || p.text}</span>)}</p>
-              ))}
+              <RichBody body={e.body} />
             </div>
           </details>
         </li>

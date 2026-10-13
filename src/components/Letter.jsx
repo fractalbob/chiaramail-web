@@ -1,5 +1,5 @@
 import { useI18n } from '../i18n.jsx';
-import { toParagraphs } from '../lib.js';
+import RichBody from '../mail/RichBody.jsx';
 import EcsAttachments from './EcsAttachments.jsx';
 
 // An ECS message, set like a letter, with its edition mark.
@@ -31,13 +31,7 @@ export default function Letter({ message, myEmail, banner, ecsKey }) {
       {banner}
       {m.withdrawn ? null : (
         <div className="letter-body">
-          {toParagraphs(m.body).map((parts, i) => (
-            <p key={i}>
-              {parts.map((p, j) => (p.href
-                ? <a key={j} href={p.href} target="_blank" rel="noopener noreferrer nofollow">{p.href}</a>
-                : <span key={j}>{p.text}</span>))}
-            </p>
-          ))}
+          <RichBody body={m.body} />
         </div>
       )}
       <EcsAttachments id={m.id} message={m} ecsKey={ecsKey} />

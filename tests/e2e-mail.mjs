@@ -15,7 +15,7 @@ page.on('dialog', (d) => d.accept());
 const shot = (n) => page.screenshot({ path: `${SHOTS}/${n}.png`, fullPage: true });
 const must = async (cond, msg) => { if (!(await cond)) throw new Error(msg); };
 const waitValue = async (loc, pred, msg) => {
-  for (let i = 0; i < 50; i += 1) { if (pred(await loc.inputValue())) return; await page.waitForTimeout(100); }
+  for (let i = 0; i < 50; i += 1) { if (pred(await loc.evaluate((e) => (e.isContentEditable ? e.innerText.replace(/\n+$/, '') : e.value)))) return; await page.waitForTimeout(100); }
   throw new Error(msg);
 };
 
@@ -32,7 +32,20 @@ const send = async () => {
   await page.waitForURL(/\/mail\/sent\//);
   await page.locator('.mcard').first().waitFor();
 };
+// Ordinary emails written in ChiaraMail are HTML (they can carry formatting), so they show in the sandboxed frame.
+const inMail = (txt) => page.frameLocator('.htmlbody iframe').last().getByText(txt).first().waitFor();
 const openRow = (text) => page.locator('.trow-link', { hasText: text }).first().click();
+// Every MIME part of the emails with this subject: [{ type, text }].
+const partsOf = (subject) => page.evaluate((subj) => {
+  const s = JSON.parse(localStorage.getItem('chiaramail.mock.gmail'));
+  const dec = (d) => decodeURIComponent(escape(atob(d.replace(/-/g, '+').replace(/_/g, '/'))));
+  const out = [];
+  const walk = (part) => { if (part.body?.data) out.push({ type: part.mimeType, text: dec(part.body.data) }); (part.parts || []).forEach(walk); };
+  for (const box of Object.values(s.boxes)) for (const m of Object.values(box.messages)) {
+    if (m.payload.headers.some((h) => h.name.toLowerCase() === 'subject' && h.value === subj)) walk(m.payload);
+  }
+  return out;
+}, subject);
 // The pointer an ECS email with this subject carries, read from the test-mode mailbox.
 const pointerFor = (subject) => page.evaluate((subj) => {
   const s = JSON.parse(localStorage.getItem('chiaramail.mock.gmail'));
@@ -147,7 +160,7 @@ await page.locator('.trow-link', { hasText: 'Framing quote' }).click();
 await waitValue(page.getByLabel('Subject', { exact: true }), (v) => v === 'Framing quote', 'draft loaded for sending');
 await page.getByLabel(/^ECS message/).uncheck();
 await send();
-await page.getByText('three oak frames').waitFor();
+await inMail('three oak frames');
 await draftsFolder.click();
 await page.getByText('No drafts.').waitFor();
 log('sending a draft removes it from Drafts');
@@ -247,7 +260,7 @@ await page.getByLabel(/^ECS message/).uncheck();
 await page.getByLabel('Subject', { exact: true }).fill('Ordinary note');
 await page.getByLabel('Message', { exact: true }).fill('Just a normal email.');
 await send();
-await page.getByText('Just a normal email.').waitFor();
+await inMail('Just a normal email.');
 await must(!(await page.locator('.live-block').count()), 'ordinary mail has no live block');
 log('ordinary message sent');
 
@@ -275,11 +288,11 @@ await page.getByRole('link', { name: 'Reply', exact: true }).last().click();
 await page.locator('.rfield', { has: page.locator('#to') }).locator('.rchip', { hasText: 'alice@example.com' }).waitFor();
 await must((await page.getByLabel('Subject', { exact: true }).inputValue()) === 'Re: Committee meeting on Thursday', 'reply subject');
 await must(!(await page.getByLabel(/^ECS message/).isChecked()), 'replies default to ordinary');
-await waitValue(page.getByLabel('Message', { exact: true }), (v) => v.includes('> The committee meets on Thursday'), 'reply quotes live text');
+await waitValue(page.getByLabel('Message', { exact: true }), (v) => v.includes('The committee meets on Thursday'), 'reply quotes live text');
 await page.getByLabel('Message', { exact: true }).press('Control+Home');
 await page.getByLabel('Message', { exact: true }).type('Thursday works for me. ');
 await send();
-await page.getByText('Thursday works for me.').waitFor();
+await inMail('Thursday works for me.');
 log('reply sent in the same conversation');
 
 // Forwarding not allowed yet: Forward is greyed out on Alice's message
@@ -328,11 +341,11 @@ log('Gmail layout: reply arrow and ⋮ per message, big buttons only at the bott
 // ---- Alice edits
 await connectAs('alice@example.com');
 await openRow('Committee meeting');
-await page.getByText('Thursday works for me.').waitFor();
+await inMail('Thursday works for me.');
 await page.locator('.live-details summary', { hasText: 'Readers' }).click();
 await page.getByText('read the latest edition').waitFor();
 await page.getByRole('button', { name: 'Edit' }).click();
-await page.locator('.live-edit textarea').fill('Hi both,\n\nChange of plan: the committee meets on Friday at 18:00 in the library.\n\nAlice');
+await page.locator('.live-edit [role=textbox]').fill('Hi both,\n\nChange of plan: the committee meets on Friday at 18:00 in the library.\n\nAlice');
 await page.getByRole('button', { name: 'Save new edition' }).click();
 await page.getByText('Edition 2 saved.').waitFor();
 await page.getByText('Edition 2', { exact: true }).waitFor();
@@ -360,7 +373,7 @@ await must(!(await page.getByText('Updated since you last read it').count()), 'n
 log('second recipient sees latest edition');
 await connectAs('dave@example.com');
 await openRow('Committee meeting');
-await page.getByText('The committee meets on Thursday').first().waitFor();
+await inMail('The committee meets on Thursday');
 await must(!(await page.getByText('Change of plan').count()), 'outsider must not see later live edits');
 await must(!(await page.locator('.live-block').count()), 'forward is an ordinary email');
 await page.getByRole('button', { name: /agenda\.txt/ }).waitFor();
@@ -693,6 +706,92 @@ await must(!(await page.getByRole('button', { name: /agenda\.txt/ }).count()), '
 await must(!(await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('chiaramail.mock.files') || '{}')).length)), 'stored files erased on withdraw');
 await must(!(await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('chiaramail.mock.db')).usage || {}).reduce((a, b) => a + b, 0))), 'withdrawing gives the space back');
 log('withdraw erases the live text for readers');
+
+// ---- Formatting: bold, italic, lists, links; pasted styles are stripped
+await connectAs('alice@example.com');
+await page.getByRole('link', { name: 'Compose' }).click();
+await page.getByRole('combobox', { name: 'To' }).fill('bob@example.com');
+await page.getByLabel('Subject', { exact: true }).fill('Formatted note');
+const ed = page.getByRole('textbox', { name: 'Message', exact: true });
+await ed.click();
+await ed.pressSequentially('Please read ');
+await ed.press('Control+i');
+await ed.pressSequentially('carefully');
+await ed.press('Control+i');
+await must((await page.getByRole('button', { name: 'Italic' }).getAttribute('aria-pressed')) === 'false', 'italic off again');
+await ed.pressSequentially(' and ');
+await page.getByRole('button', { name: 'Bold' }).click();
+await must((await page.getByRole('button', { name: 'Bold' }).getAttribute('aria-pressed')) === 'true', 'bold button shows as on');
+await ed.pressSequentially('soon');
+await page.getByRole('button', { name: 'Bold' }).click();
+await ed.press('Enter');
+await page.getByRole('button', { name: 'Bulleted list' }).click();
+await ed.pressSequentially('first point');
+await ed.press('Enter');
+await ed.pressSequentially('second point');
+await ed.press('Enter');
+await ed.press('Enter');
+page.removeAllListeners('dialog');
+page.once('dialog', (d) => d.accept('example.org/plan'));
+await page.getByRole('button', { name: 'Link' }).click();
+page.on('dialog', (d) => d.accept());
+// Paste from a web page: keep the emphasis, drop styles, scripts and handlers.
+await ed.evaluate((el) => {
+  const dt = new DataTransfer();
+  dt.setData('text/html', '<span style="color:red;font-size:40px">pasted <em>bit</em></span><script>window.bad=1</script><img src=x onerror="window.bad=1">');
+  dt.setData('text/plain', 'pasted bit');
+  el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+});
+const html = await ed.innerHTML();
+await must(/<i>carefully<\/i>/.test(html) && /<b>soon<\/b>/.test(html), `italic and bold in the editor: ${html}`);
+await must(/<ul><li>first point<\/li><li>second point<\/li><\/ul>/.test(html), `bulleted list: ${html}`);
+await must(html.includes('href="https://example.org/plan"'), `link added: ${html}`);
+await must(html.includes('<em>bit</em>') && !/style=|<script|<img|onerror/.test(html), `paste sanitised: ${html}`);
+await send();
+let live = page.locator('.live-body');
+await live.locator('i', { hasText: 'carefully' }).waitFor();
+await live.locator('b', { hasText: 'soon' }).waitFor();
+await live.locator('ul li', { hasText: 'second point' }).waitFor();
+await must((await live.locator('a[href="https://example.org/plan"]').getAttribute('target')) === '_blank', 'links open in a new tab');
+log('formatting written with the toolbar and keyboard, pasted styles stripped');
+
+// The sender edits it: the formatting is still there to edit, and survives.
+await page.getByRole('button', { name: 'Edit' }).click();
+const ed2 = page.locator('.live-edit [role=textbox]');
+await must((await ed2.innerHTML()).includes('<i>carefully</i>'), 'formatting kept for editing');
+await ed2.locator('b').click();
+await ed2.press('End');
+await ed2.pressSequentially(', please');
+await page.getByRole('button', { name: 'Save new edition' }).click();
+await page.getByText('Edition 2 saved.').waitFor();
+await live.locator('b', { hasText: 'soon' }).waitFor();
+await live.getByText(', please').waitFor();
+
+// The recipient reads it formatted; the email itself still carries no content.
+await connectAs('bob@example.com');
+await openRow('Formatted note');
+live = page.locator('.live-body');
+await live.locator('i', { hasText: 'carefully' }).waitFor();
+await live.getByText(', please').waitFor();
+const fmtParts = await partsOf('Formatted note');
+await must(fmtParts.length && !fmtParts.some((x) => x.text.includes('carefully')), 'content not in the email');
+log('recipient sees the formatted edition; nothing of it in the email');
+
+// An ordinary email: formatted HTML plus a plain-text copy.
+await page.getByRole('link', { name: 'Compose' }).click();
+await page.getByRole('combobox', { name: 'To' }).fill('alice@example.com');
+await page.getByLabel('Subject', { exact: true }).fill('Plain and fancy');
+await page.getByLabel(/^ECS message/).uncheck();
+await page.getByRole('textbox', { name: 'Message', exact: true }).click();
+await page.keyboard.type('Totally ');
+await page.keyboard.press('Control+b');
+await page.keyboard.type('bold');
+await send();
+await page.frameLocator('.htmlbody iframe').last().locator('b', { hasText: 'bold' }).waitFor();
+const parts = await partsOf('Plain and fancy');
+const plain = parts.find((x) => x.type === 'text/plain'); const rich = parts.find((x) => x.type === 'text/html');
+await must(plain && plain.text.includes('Totally bold') && rich && rich.text.includes('<b>bold</b>'), `text and HTML parts: ${JSON.stringify(parts)}`);
+log('ordinary email sent as HTML with a plain-text copy');
 
 // French + mobile dark
 await page.getByRole('button', { name: 'Français' }).click();

@@ -155,6 +155,30 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .help { margin: 0; font-size: 0.875rem; color: var(--slate); }
 .static { margin: 0; padding: 10px 0; }
 .letter-input { font: 1.0625rem/1.65 var(--serif); min-height: 18rem; resize: vertical; }
+
+/* formatting editor */
+.rich { display: grid; gap: 6px; }
+.rich > label { font-size: 0.875rem; color: var(--slate); font-weight: 500; }
+.rich-box { border: 1px solid var(--rule); border-radius: var(--radius-s); background: var(--paper); }
+.rich-box:focus-within { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent); }
+.rich-bar { display: flex; flex-wrap: wrap; gap: 2px; padding: 4px; border-bottom: 1px solid var(--rule); }
+.fmt {
+  min-width: 34px; height: 32px; padding: 0 8px; border: 1px solid transparent; border-radius: var(--radius-s);
+  background: transparent; color: var(--ink); font: 600 0.9375rem/1 var(--sans); cursor: pointer;
+}
+.fmt:hover { border-color: var(--rule); }
+.fmt:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.fmt[aria-pressed="true"] { background: color-mix(in srgb, var(--focus) 16%, transparent); border-color: color-mix(in srgb, var(--focus) 40%, transparent); }
+.fmt-i { font-style: italic; font-family: var(--serif); }
+.fmt-u { text-decoration: underline; }
+.fmt-link, .fmt-clear { font-weight: 400; }
+.rich-input { padding: 10px 12px; color: var(--ink); outline: none; overflow-wrap: anywhere; resize: none; cursor: text; }
+.rich-input blockquote, .richbody blockquote { margin: 0.4em 0 0.4em 0.2em; padding-left: 0.9em; border-left: 3px solid var(--rule); color: var(--slate); }
+.rich-input ul, .rich-input ol, .richbody ul, .richbody ol { margin: 0.3em 0; padding-left: 1.6em; }
+.rich-input a, .richbody a { color: var(--link, #1d58b5); }
+.richbody { overflow-wrap: anywhere; }
+.richbody p { margin: 0 0 0.8em; white-space: normal; }
+.letter-body .plainbody { font: inherit; }
 .note { margin: 0; padding: 12px 14px; border-left: 3px solid var(--lumen); background: var(--paper); border-radius: 0 var(--radius-s) var(--radius-s) 0; max-width: 64ch; }
 
 /* reading */

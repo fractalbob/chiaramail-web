@@ -5,6 +5,9 @@ import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
 import { Readers, Editions } from '../components/SenderTools.jsx';
 import PlainBody from './PlainBody.jsx';
+import RichBody from './RichBody.jsx';
+import RichEditor from './RichEditor.jsx';
+import { bodyHtml, storeRich, richIsEmpty } from '../richtext.js';
 import EcsAttachments from '../components/EcsAttachments.jsx';
 import { watchEcs, saveEcsEdition } from '../ecs.js';
 
@@ -72,9 +75,9 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
   const fresh = !isSender && lastSeen > 0 && lastSeen < d.edition && !d.withdrawn;
 
   const save = async () => {
-    if (!draft.trim() && !d.attachments?.length) return setError(t('needBody'));
+    if (richIsEmpty(draft) && !d.attachments?.length) return setError(t('needBody'));
     setBusy(true); setError('');
-    try { await saveEcsEdition(pointer, d, { subject: d.subject, body: draft }, key); setEditing(false); setSaved(true); } catch (e) { setError(t('errorGeneric', { msg: e.message })); } finally { setBusy(false); }
+    try { await saveEcsEdition(pointer, d, { subject: d.subject, body: storeRich(draft) }, key); setEditing(false); setSaved(true); } catch (e) { setError(t('errorGeneric', { msg: e.message })); } finally { setBusy(false); }
   };
   const withdraw = async () => {
     if (!window.confirm(t('withdrawConfirm'))) return;
@@ -116,8 +119,7 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
         <p className="notice">{isSender ? t('withdrawnMine', { date: formatDate(d.updatedAt) }) : t('withdrawnBy', { name: d.senderName || d.senderEmail, date: formatDate(d.updatedAt) })}</p>
       ) : editing ? (
         <div className="live-edit">
-          <label className="sr-only" htmlFor={`edit-${pointer}`}>{t('message')}</label>
-          <textarea id={`edit-${pointer}`} className="letter-input" rows={10} value={draft} onChange={(e) => setDraft(e.target.value)} />
+          <RichEditor id={`edit-${pointer}`} label={t('message')} labelClass="sr-only" value={draft} onChange={setDraft} minRows={10} />
           <p className="help">{t('editNote')}</p>
           <div className="actions">
             <button type="button" className="btn btn-primary" disabled={busy} onClick={save}>{busy ? t('saving') : t('saveEdition')}</button>
@@ -125,7 +127,7 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
           </div>
         </div>
       ) : (
-        <div className="letter-body live-body"><PlainBody text={d.body} /></div>
+        <div className="letter-body live-body"><RichBody body={d.body} /></div>
       )}
       {!d.locked && <EcsAttachments id={pointer} message={d} ecsKey={key} />}
 
@@ -141,7 +143,7 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
           )}
           {!d.withdrawn && !editing && (
             <div className="actions">
-              {!d.locked && <button type="button" className="btn btn-primary" onClick={() => { setDraft(d.body); setEditing(true); setSaved(false); }}>{t('edit')}</button>}
+              {!d.locked && <button type="button" className="btn btn-primary" onClick={() => { setDraft(bodyHtml(d.body)); setEditing(true); setSaved(false); }}>{t('edit')}</button>}
               <button type="button" className="btn btn-danger" onClick={withdraw}>{t('withdraw')}</button>
             </div>
           )}
