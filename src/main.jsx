@@ -18,14 +18,23 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 );
 
-// The start screen (index.html, installed app only) stays briefly so the name can be read,
-// then fades out over the app.
+// The start screen (index.html, installed app only) stays long enough for the name and the
+// tagline to be read, counted from when it actually appeared (not from launch: the phone's own
+// icon-only splash uses up part of that). A tap dismisses it sooner.
+const SPLASH_MS = 2500;
 const splash = document.getElementById('splash');
 if (splash) {
   const shown = getComputedStyle(splash).display !== 'none';
-  const wait = shown ? Math.max(0, 900 - performance.now()) : 0;
-  setTimeout(() => {
+  let gone = false;
+  const hide = () => {
+    if (gone) return;
+    gone = true;
     splash.classList.add('splash-out');
     setTimeout(() => splash.remove(), shown ? 400 : 0);
-  }, wait);
+  };
+  if (shown) {
+    const since = performance.now() - (window.__splashShownAt ?? performance.now());
+    setTimeout(hide, Math.max(0, SPLASH_MS - since));
+    splash.addEventListener('pointerdown', hide);
+  } else hide();
 }
