@@ -517,6 +517,19 @@ log('delete → trash → restore');
 await page.locator('.trow', { hasText: 'Liste pour samedi' }).locator('.rowcheck').check();
 await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.rowcheck').check();
 await page.getByText('2 selected').waitFor();
+// The toolbar stays at the top while the list scrolls (short window so the page can scroll).
+{
+  const vp = page.viewportSize();
+  await page.setViewportSize({ width: vp.width, height: 360 });
+  await page.mouse.wheel(0, 3000);
+  await page.waitForTimeout(300);
+  await must((await page.evaluate(() => scrollY)) > 0, 'page scrolled');
+  await must(Math.abs(await page.locator('.list-head').evaluate((e) => e.getBoundingClientRect().top)) < 2, 'toolbar stays at the top');
+  await must(await page.getByRole('button', { name: 'Delete' }).first().isVisible(), 'actions still reachable after scrolling');
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.setViewportSize(vp);
+}
+log('selection toolbar stays at the top while scrolling');
 await shot('m13-bulk-select');
 await page.locator('.bulkbar').getByRole('button', { name: 'Delete' }).click();
 await page.locator('.bulkbar').waitFor({ state: 'detached' });
