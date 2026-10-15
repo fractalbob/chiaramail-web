@@ -670,6 +670,8 @@ await must((await page.evaluate(() => JSON.parse(localStorage.getItem('chiaramai
 await must((await page.locator('.folder', { hasText: /^Estate firms$/i }).count()) <= 1, 'no duplicate label');
 await shot('m16-label-as');
 await page.locator('.folder', { hasText: 'Inbox' }).first().click();
+// The row shows its labels as chips, as in Gmail.
+await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.lchip', { hasText: 'Estate firms' }).first().waitFor();
 log('Label as: search on top, list, Create new at the bottom (New label box with Nest under); existing names reused');
 log('toolbar: select ▾ menu, Label as, Move to, ⋮ Mark as important, Mark all as read, 1–N of total');
 

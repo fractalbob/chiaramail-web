@@ -206,6 +206,7 @@ export default function ThreadView() {
       </div>
       <h1 className="thread-subject">
         {subject}
+        {mail.userLabels.filter((l) => labels.has(l.id)).map((l) => <span key={l.id} className="lchip lchip-title">{l.name}</span>)}
         <button type="button" className={labels.has('IMPORTANT') ? 'imp imp-on' : 'imp'} aria-pressed={labels.has('IMPORTANT')}
           aria-label={labels.has('IMPORTANT') ? t('markNotImportant') : t('markImportant')} title={labels.has('IMPORTANT') ? t('importantTitle') : t('markImportant')}
           onClick={() => act(() => gmail.modifyThread(threadId, labels.has('IMPORTANT') ? [] : ['IMPORTANT'], labels.has('IMPORTANT') ? ['IMPORTANT'] : []), false)}>

@@ -81,8 +81,13 @@ export function MailProvider({ children }) {
       fetchCounts().then((c) => { if (live) setUnread(c); }).catch(onErr);
     }).catch(onErr);
     rescue();
-    const t = setInterval(() => { refreshCounts(); rescue(); }, 60_000);
-    return () => { live = false; clearInterval(t); };
+    const reloadLabels = () => gmail.listLabels().then((l) => { if (live) setLabels(l); }).catch(() => {});
+    const t = setInterval(() => { refreshCounts(); rescue(); reloadLabels(); }, 60_000);
+    // Labels created or renamed in Gmail show up when the window comes back into focus.
+    const onFocus = () => { if (document.visibilityState === 'visible') reloadLabels(); };
+    document.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('focus', onFocus);
+    return () => { live = false; clearInterval(t); document.removeEventListener('visibilitychange', onFocus); window.removeEventListener('focus', onFocus); };
   }, [status, refreshCounts, rescue]);
 
   const value = useMemo(() => ({

@@ -144,6 +144,8 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .row-people { color: var(--slate); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-subject { font-family: var(--serif); font-size: 1.0625rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-fresh .row-subject { font-weight: 600; }
+.lchip { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 9%, transparent); color: var(--ink); font: 400 0.75rem/1.5 var(--sans); vertical-align: 2px; white-space: nowrap; }
+.lchip-title { font-size: 0.8125rem; margin-left: 10px; vertical-align: 4px; }
 .row-meta { color: var(--slate); font-size: 0.875rem; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--lumen); box-shadow: 0 0 0 1px color-mix(in srgb, var(--lumen-ink) 40%, transparent); }
 .empty { padding: 48px 8px; display: grid; gap: 16px; justify-items: start; color: var(--slate); }

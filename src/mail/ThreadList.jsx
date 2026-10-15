@@ -28,6 +28,8 @@ export default function ThreadList() {
   const key = `${folder}|${q}|${pages[pages.length - 1]}`;
   const { handle } = mail;
   const viewLabel = q ? null : labelIdFor(folder); // the label every row in this view carries
+  // User labels shown as chips on each row, as in Gmail.
+  const labelNames = Object.fromEntries(mail.userLabels.map((l) => [l.id, l.name]));
 
   const fetchPage = useCallback(async () => {
     const pageToken = pages[pages.length - 1] || undefined;
@@ -397,6 +399,9 @@ export default function ThreadList() {
                 <span className="row-subject">
                   {r.live && <span className="live" title={t('liveTitle')}>{t('live')}</span>}
                   {marks.verdicts[r.id] === 'spoof' && <span className="spoof-tag">{t('spoofTag')}</span>}
+                  {r.labelIds.filter((id) => id !== viewLabel && labelNames[id]).map((id) => (
+                    <span key={id} className="lchip">{labelNames[id]}</span>
+                  ))}
                   <span className={marks.verdicts[r.id] === 'ok' ? 'subj subj-verified' : marks.verdicts[r.id] === 'spoof' ? 'subj subj-spoof' : 'subj'}
                     title={marks.verdicts[r.id] === 'ok' ? t('verifiedTitle') : marks.verdicts[r.id] === 'spoof' ? t('spoofTitle') : undefined}>
                     {r.subject || t('noSubject')}
