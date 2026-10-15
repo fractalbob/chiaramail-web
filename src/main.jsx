@@ -21,7 +21,7 @@ createRoot(document.getElementById('root')).render(
 // The start screen (index.html, installed app only) stays long enough for the name and the
 // tagline to be read, counted from when it actually appeared (not from launch: the phone's own
 // icon-only splash uses up part of that). A tap dismisses it sooner.
-const SPLASH_MS = 2500;
+const SPLASH_MS = 3500;
 const splash = document.getElementById('splash');
 if (splash) {
   const shown = getComputedStyle(splash).display !== 'none';
