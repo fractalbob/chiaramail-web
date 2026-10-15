@@ -11,7 +11,8 @@ import { fmtSize } from '../lib.js';
 import { useIsEcsUser } from './ecsCheck.js';
 import { markSpamHandled } from './prefs.js';
 import Icon from './icons.jsx';
-import { IconButton, Menu, MenuItem, MenuSep } from './Menu.jsx';
+import { IconButton, Menu, MenuItem } from './Menu.jsx';
+import LabelPicker from './LabelPicker.jsx';
 
 
 function Attachments({ message }) {
@@ -194,19 +195,12 @@ export default function ThreadView() {
         </IconButton>
         {!labels.has('TRASH') && !labels.has('SPAM') && (
           <Menu align="right" label={t('labelAs')} button={<Icon name="label" />}>
-            {mail.userLabels.map((l) => (
-              <MenuItem key={l.id} checked={labels.has(l.id)}
-                onClick={() => act(() => gmail.modifyThread(threadId, labels.has(l.id) ? [] : [l.id], labels.has(l.id) ? [l.id] : []), false)}>{l.name}</MenuItem>
-            ))}
-            {mail.userLabels.length > 0 && <MenuSep />}
-            <MenuItem onClick={() => {
-              const name = (window.prompt(t('newLabelPrompt')) || '').trim();
-              if (!name) return;
-              act(async () => {
+            <LabelPicker state={(id) => labels.has(id)}
+              onToggle={(l) => act(() => gmail.modifyThread(threadId, labels.has(l.id) ? [] : [l.id], labels.has(l.id) ? [l.id] : []), false)}
+              onNew={(name) => act(async () => {
                 const l = mail.userLabels.find((x) => x.name.toLowerCase() === name.toLowerCase()) || await mail.createLabel(name);
                 await gmail.modifyThread(threadId, [l.id], []);
-              }, false);
-            }}>{t('newLabel')}</MenuItem>
+              }, false)} />
           </Menu>
         )}
       </div>

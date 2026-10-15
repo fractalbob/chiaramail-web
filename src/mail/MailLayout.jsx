@@ -10,6 +10,7 @@ import ThreadList from './ThreadList.jsx';
 import DraftList from './DraftList.jsx';
 import ThreadView from './ThreadView.jsx';
 import Composer from './Composer.jsx';
+import { NewLabelDialogHost } from './LabelPicker.jsx';
 
 function SearchBox() {
   const { t } = useI18n();
@@ -205,6 +206,7 @@ export default function MailLayout() {
           <Route path="*" element={<Navigate to="/mail/inbox" replace />} />
         </Routes>
       </section>
+      <NewLabelDialogHost />
     </div>
   );
 }

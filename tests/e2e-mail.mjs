@@ -623,30 +623,54 @@ if (await page.locator('.trow-unread').count()) {
   await must(!(await page.locator('.trow-unread').count()), 'mark all as read');
 }
 await shot('m15-toolbar');
-// "New label…": create a label from ChiaraMail and apply it in one go.
+// "Label as:" works like Gmail's: search box on top, list, "Create new" at the bottom.
 await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.rowcheck').check();
 await page.locator('.bulkbar').getByRole('button', { name: 'Label as' }).click();
-page.removeAllListeners('dialog');
-page.once('dialog', (d) => d.accept('Estate firms'));
-await page.getByRole('menuitem', { name: 'New label…' }).click();
+await page.getByText('Label as:').waitFor();
+const lsearch = page.getByRole('searchbox', { name: 'Search labels' });
+await must(await lsearch.evaluate((e) => e === document.activeElement), 'search box focused');
+await lsearch.fill('jul');
+await must((await page.locator('.lp-list [role="menuitemcheckbox"]').count()) === 1, 'search narrows the list');
+await page.getByRole('menuitemcheckbox', { name: 'Fractals/Julia sets' }).waitFor();
+await lsearch.fill('Estate firms');
+await page.getByRole('menuitem', { name: '“Estate firms” (create new)' }).click();
 await page.locator('.folder', { hasText: 'Estate firms' }).waitFor();
-page.on('dialog', (d) => d.accept());
 await page.locator('.working').waitFor({ state: 'detached' });
 await page.locator('.folder', { hasText: 'Estate firms' }).click();
 await page.locator('.trow', { hasText: 'Ordinary note' }).waitFor();
-// From an open message: typing an existing name reuses that label instead of making a second one.
+// "Create new" opens the New label box, with "Nest label under".
+await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.rowcheck').check();
+await page.locator('.bulkbar').getByRole('button', { name: 'Label as' }).click();
+await page.getByRole('menuitem', { name: 'Create new' }).click();
+const dlg = page.getByRole('dialog', { name: 'New label' });
+await dlg.waitFor();
+await must(!(await dlg.getByRole('button', { name: 'Create' }).isEnabled()), 'Create disabled until a name is typed');
+await dlg.getByLabel('Please enter a new label name:').fill('Barr & Douds');
+await dlg.getByLabel('Nest label under:', { exact: true }).first().check();
+await dlg.getByRole('combobox').selectOption('Estate firms');
+await dlg.getByRole('button', { name: 'Create' }).click();
+await dlg.waitFor({ state: 'detached' });
+await page.locator('.working').waitFor({ state: 'detached' });
+await must((await page.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem('chiaramail.mock.gmail'))))).includes('Estate firms/Barr & Douds'), 'nested label created');
+// From an open message: an existing name (any capitals) is reused, not duplicated; Escape cancels the box.
 await page.locator('.trow-link', { hasText: 'Ordinary note' }).click();
 await page.locator('.thread-subject').waitFor();
 await page.getByRole('button', { name: 'Label as' }).click();
-await must(await page.getByRole('menuitemcheckbox', { name: 'Estate firms' }).isVisible(), 'new label listed when reading');
-page.removeAllListeners('dialog');
-page.once('dialog', (d) => d.accept('estate FIRMS'));
-await page.getByRole('menuitem', { name: 'New label…' }).click();
+await page.getByRole('menuitemcheckbox', { name: 'Estate firms', exact: true }).waitFor();
+await page.getByRole('menuitem', { name: 'Create new' }).click();
+await dlg.waitFor();
+await page.keyboard.press('Escape');
+await dlg.waitFor({ state: 'detached' });
+await page.getByRole('button', { name: 'Label as' }).click();
+await page.getByRole('menuitem', { name: 'Create new' }).click();
+await dlg.getByLabel('Please enter a new label name:').fill('estate FIRMS');
+await dlg.getByRole('button', { name: 'Create' }).click();
 await page.waitForTimeout(500);
-page.on('dialog', (d) => d.accept());
-await must((await page.locator('.folder', { hasText: /^Estate firms/i }).count()) === 1, 'no duplicate label');
-await page.locator('.folder', { hasText: 'Inbox' }).click();
-log('New label… creates a Gmail label and applies it; an existing name is reused');
+await must((await page.evaluate(() => JSON.parse(localStorage.getItem('chiaramail.mock.gmail')).boxes)).toString() !== '', 'state ok');
+await must((await page.locator('.folder', { hasText: /^Estate firms$/i }).count()) <= 1, 'no duplicate label');
+await shot('m16-label-as');
+await page.locator('.folder', { hasText: 'Inbox' }).first().click();
+log('Label as: search on top, list, Create new at the bottom (New label box with Nest under); existing names reused');
 log('toolbar: select ▾ menu, Label as, Move to, ⋮ Mark as important, Mark all as read, 1–N of total');
 
 // ---- Verified ECS messages are rescued from Spam; forgeries and reported ones stay

@@ -9,6 +9,7 @@ import { useEcsMarks } from './ecsCheck.js';
 import { markSpamHandled } from './prefs.js';
 import Icon from './icons.jsx';
 import { ContextMenu, IconButton, Menu, MenuItem, MenuSep, SubMenu } from './Menu.jsx';
+import LabelPicker from './LabelPicker.jsx';
 
 const PAGE = 25;
 const phone = () => window.matchMedia('(max-width: 600px)').matches;
@@ -133,10 +134,8 @@ export default function ThreadList() {
       load(true);
     } finally { setBusyBulk(false); }
   };
-  // "New label…": name it, create it in Gmail (or reuse one of that name), then apply it.
-  const newLabel = async (ids) => {
-    const name = (window.prompt(t('newLabelPrompt')) || '').trim();
-    if (!name) return;
+  // A new label from "Label as": create it in Gmail (or reuse one of that name), then apply it.
+  const newLabel = async (name, ids) => {
     try {
       const l = mail.userLabels.find((x) => x.name.toLowerCase() === name.toLowerCase()) || await mail.createLabel(name);
       labelBulk([l.id], [], ids);
@@ -240,12 +239,8 @@ export default function ThreadList() {
           </SubMenu>
         )}
         <SubMenu label={t('labelAs')} icon={<Icon name="label" size={18} />}>
-          {mail.userLabels.map((l) => (
-            <MenuItem key={l.id} checked={lstate(l.id)} onClick={() => (lstate(l.id) === true ? labelBulk([], [l.id], ids) : labelBulk([l.id], [], ids))}>{l.name}</MenuItem>
-          ))}
-          {!mail.userLabels.length && <p className="menu-note">{t('noLabels')}</p>}
-          <MenuSep />
-          <MenuItem onClick={() => newLabel(ids)}>{t('newLabel')}</MenuItem>
+          <LabelPicker state={lstate} onNew={(name) => newLabel(name, ids)}
+            onToggle={(l) => (lstate(l.id) === true ? labelBulk([], [l.id], ids) : labelBulk([l.id], [], ids))} />
         </SubMenu>
         {one && (
           <>
@@ -307,13 +302,8 @@ export default function ThreadList() {
                 </Menu>
               )}
               <Menu align="right" className="desk-only" label={t('labelAs')} button={<Icon name="label" />}>
-                {mail.userLabels.map((l) => {
-                  const st = labelState(l.id);
-                  return <MenuItem key={l.id} checked={st} onClick={() => (st === true ? labelBulk([], [l.id]) : labelBulk([l.id], []))}>{l.name}</MenuItem>;
-                })}
-                {!mail.userLabels.length && <p className="menu-note">{t('noLabels')}</p>}
-                <MenuSep />
-                <MenuItem onClick={() => newLabel()}>{t('newLabel')}</MenuItem>
+                <LabelPicker state={labelState} onNew={(name) => newLabel(name)}
+                  onToggle={(l) => (labelState(l.id) === true ? labelBulk([], [l.id]) : labelBulk([l.id], []))} />
               </Menu>
               <Menu align="right" label={t('moreActions')} button={<Icon name="more" />}>
                 <div className="phone-only">
@@ -325,13 +315,8 @@ export default function ThreadList() {
                     </SubMenu>
                   )}
                   <SubMenu label={t('labelAs')}>
-                    {mail.userLabels.map((l) => {
-                      const st = labelState(l.id);
-                      return <MenuItem key={l.id} checked={st} onClick={() => (st === true ? labelBulk([], [l.id]) : labelBulk([l.id], []))}>{l.name}</MenuItem>;
-                    })}
-                    {!mail.userLabels.length && <p className="menu-note">{t('noLabels')}</p>}
-                    <MenuSep />
-                    <MenuItem onClick={() => newLabel()}>{t('newLabel')}</MenuItem>
+                    <LabelPicker state={labelState} onNew={(name) => newLabel(name)}
+                      onToggle={(l) => (labelState(l.id) === true ? labelBulk([], [l.id]) : labelBulk([l.id], []))} />
                   </SubMenu>
                   {inFolder('spam')
                     ? <MenuItem onClick={() => labelBulk(['INBOX'], ['SPAM'])}>{t('notSpam')}</MenuItem>
