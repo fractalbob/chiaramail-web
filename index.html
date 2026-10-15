@@ -26,14 +26,14 @@
       #splash .splash-name { font: 600 2.25rem/1 'Literata Variable', Georgia, 'Times New Roman', serif; color: #14313b; letter-spacing: -0.01em; }
       #splash .splash-name span { font-weight: 400; color: #587079; }
       #splash .splash-name sup { font-size: 0.4em; font-weight: 400; color: #587079; margin-left: 1px; }
-      #splash .splash-tag { font: 1rem/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; color: #587079; margin-top: -6px; }
+      #splash .splash-tag { font: 1rem/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; color: #587079; margin-top: -6px; text-align: center; max-width: 320px; padding: 0 16px; }
     </style>
   </head>
   <body>
     <div id="splash" aria-hidden="true">
       <img src="/icon-512.png" alt="" />
       <div class="splash-name">Chiara<span>Mail</span><sup>™</sup></div>
-      <div class="splash-tag">Email you can change after sending</div>
+      <div class="splash-tag">Own the email you send. Indefinitely.</div>
     </div>
     <script>
       // Same language choice as the app: the one picked in ChiaraMail, else the phone's.
@@ -41,7 +41,7 @@
         var l = null;
         try { l = localStorage.getItem('chiaramail.lang'); } catch (e) { /* ignore */ }
         if (!l) l = ((navigator.languages || [navigator.language || 'en'])[0] || 'en').slice(0, 2);
-        if (l === 'fr') document.querySelector('#splash .splash-tag').textContent = 'L’e-mail que l’on peut modifier après l’envoi';
+        if (l === 'fr') document.querySelector('#splash .splash-tag').textContent = 'Restez maître des e-mails que vous envoyez. Indéfiniment.';
       })();
     </script>
     <div id="root"></div>
