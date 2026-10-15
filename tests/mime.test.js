@@ -150,3 +150,15 @@ test('bouncedAddresses reads failed recipients from bounce reports', async () =>
   // An ordinary message: nothing
   assert.deepEqual(bouncedAddresses({ payload: { mimeType: 'text/plain', headers: [], body: { data: b64('Hello') } } }), []);
 });
+
+// ---- search queries (src/gmail/query.js) ----
+import { widenQuery } from '../src/gmail/query.js';
+test('widenQuery: underscore words also match the spaced phrase, like Gmail on the web', () => {
+  assert.equal(widenQuery('sean_welch'), '{sean_welch "sean welch"}');
+  assert.equal(widenQuery('lucky sean_welch film'), 'lucky {sean_welch "sean welch"} film');
+  assert.equal(widenQuery('a_b_c'), '{a_b_c "a b c"}');
+  // left alone: operators, addresses, phrases, exclusions, plain words, lone underscores
+  for (const q of ['from:sean_welch', 'sean_welch@example.com', '"sean_welch"', '-sean_welch', 'sean welch', '_x', 'x_', '', undefined]) {
+    assert.equal(widenQuery(q), q);
+  }
+});

@@ -3,6 +3,7 @@
 // stored on any server except the content of ChiaraMail's own ECS messages.
 import * as backend from '@backend';
 import { busy } from '../busy.js';
+import { widenQuery } from './query.js';
 
 export const mode = 'gmail';
 const SCOPES = 'openid email profile https://www.googleapis.com/auth/gmail.modify';
@@ -161,7 +162,7 @@ export async function listLabels() { return (await call('/labels')).labels || []
 export const getLabel = (id) => call(`/labels/${encodeURIComponent(id)}`);
 
 export async function listThreads({ labelId, q, pageToken, max = 25 }) {
-  const r = await call('/threads', { query: { labelIds: labelId, q, pageToken, maxResults: max } });
+  const r = await call('/threads', { query: { labelIds: labelId, q: widenQuery(q), pageToken, maxResults: max } });
   return { ids: (r.threads || []).map((t) => t.id), nextPageToken: r.nextPageToken || null, estimate: r.resultSizeEstimate || 0 };
 }
 
