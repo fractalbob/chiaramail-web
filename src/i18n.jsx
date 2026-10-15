@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useState, useCallback } from 'react';
 
 const en = {
-  tagline: 'Email you can still change after you send it.',
+  tagline: 'Own the email you send. Indefinitely.',
   intro: 'Write your message here and send your recipients a link to it. You can correct, update or withdraw it at any time, and the link always shows the current version. Only the people you sent it to can read it.',
   how1: 'Write the message in ChiaraMail.',
   how2: 'Send the link from your own email account.',
@@ -118,8 +118,9 @@ const en = {
   privacy: 'Privacy',
   terms: 'Terms',
   testModeMail: 'Test mode: Gmail and ChiaraMail are simulated in this browser. No real email is sent.',
-  mailTagline: 'Your Gmail, with messages you can change after sending.',
-  appIntro: 'ChiaraMail™ is a mail app for your Gmail account. Read, write, search and organise your mail as usual. Send an ECS message (Envelope-Content Splitting) and only its envelope travels by email: the text and attachments stay with ChiaraMail, where only its recipients can read them, and you can correct, update or withdraw it after it’s sent. Recipients who use ChiaraMail see the current version right in their inbox.',
+  mailEyebrow: 'ChiaraMail™ for Gmail',
+  mailTagline: 'Own the email you send. Indefinitely.',
+  appIntro: 'ChiaraMail™ is a mail app for your Gmail account. Read, write, search and organise your mail as usual. Send an ECS message (Envelope-Content Splitting) and it stays yours after it’s sent: only its envelope travels by email, while the text and attachments stay with ChiaraMail, where only its recipients can read them. You can correct, update or withdraw it at any time, decide whether it may be forwarded, see who has read it, and keep a record of every change. Recipients who use ChiaraMail see the current version right in their inbox.',
   mailPoint1: 'Your mail stays in Gmail. It goes straight from Google to your browser and is never copied to any ChiaraMail server — nobody at ChiaraMail can see it.',
   mailPoint2: 'ECS messages are encrypted in the sender’s browser. Only their recipients can read them — not Google’s mail servers on the way, and not ChiaraMail.',
   mailPoint3: 'People without ChiaraMail get a link to the current version.',
@@ -277,7 +278,7 @@ const en = {
 };
 
 const fr = {
-  tagline: 'Des e-mails que vous pouvez encore modifier après les avoir envoyés.',
+  tagline: 'Restez maître des e-mails que vous envoyez. Indéfiniment.',
   intro: 'Rédigez votre message ici et envoyez à vos destinataires un lien vers celui-ci. Vous pouvez le corriger, le mettre à jour ou le retirer à tout moment, et le lien affiche toujours la version actuelle. Seules les personnes à qui vous l’avez envoyé peuvent le lire.',
   how1: 'Rédigez le message dans ChiaraMail.',
   how2: 'Envoyez le lien depuis votre propre messagerie.',
@@ -394,8 +395,9 @@ const fr = {
   privacy: 'Confidentialité',
   terms: 'Conditions',
   testModeMail: 'Mode test : Gmail et ChiaraMail sont simulés dans ce navigateur. Aucun e-mail réel n’est envoyé.',
-  mailTagline: 'Votre Gmail, avec des messages que vous pouvez changer après l’envoi.',
-  appIntro: 'ChiaraMail™ est une messagerie pour votre compte Gmail. Lisez, écrivez, cherchez et classez vos e-mails comme d’habitude. Envoyez un message ECS (séparation enveloppe-contenu) et seule son enveloppe voyage par e-mail : le texte et les pièces jointes restent chez ChiaraMail, où seuls ses destinataires peuvent les lire, et vous pourrez le corriger, le mettre à jour ou le retirer après l’envoi. Les destinataires qui utilisent ChiaraMail voient la version actuelle directement dans leur boîte de réception.',
+  mailEyebrow: 'ChiaraMail™ pour Gmail',
+  mailTagline: 'Restez maître des e-mails que vous envoyez. Indéfiniment.',
+  appIntro: 'ChiaraMail™ est une messagerie pour votre compte Gmail. Lisez, écrivez, cherchez et classez vos e-mails comme d’habitude. Envoyez un message ECS (séparation enveloppe-contenu) et il reste à vous après l’envoi : seule son enveloppe voyage par e-mail, tandis que le texte et les pièces jointes restent chez ChiaraMail, où seuls ses destinataires peuvent les lire. Vous pouvez à tout moment le corriger, le mettre à jour ou le retirer, décider s’il peut être transféré, voir qui l’a lu et garder une trace de chaque modification. Les destinataires qui utilisent ChiaraMail voient la version actuelle directement dans leur boîte de réception.',
   mailPoint1: 'Vos e-mails restent dans Gmail. Ils vont directement de Google à votre navigateur et ne sont jamais copiés sur un serveur de ChiaraMail : personne chez ChiaraMail ne peut les voir.',
   mailPoint2: 'Les messages ECS sont chiffrés dans le navigateur de l’expéditeur. Seuls leurs destinataires peuvent les lire : ni les serveurs de messagerie en chemin, ni ChiaraMail.',
   mailPoint3: 'Les personnes sans ChiaraMail reçoivent un lien vers la version actuelle.',

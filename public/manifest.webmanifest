@@ -1,7 +1,7 @@
 {
   "name": "ChiaraMail",
   "short_name": "ChiaraMail",
-  "description": "Mail for Gmail with ECS messages: change them after sending.",
+  "description": "For Gmail: own the email you send, indefinitely. Correct or withdraw it after sending, control forwarding, keep a record of every change.",
   "id": "/",
   "start_url": "/",
   "scope": "/",

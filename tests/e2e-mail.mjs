@@ -73,7 +73,7 @@ const keyFor = (ptr) => page.evaluate((p) => {
 await page.goto(BASE + '/');
 await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
 await page.goto(BASE + '/');
-await page.getByRole('heading', { name: /change after sending/ }).waitFor();
+await page.getByRole('heading', { name: /Own the email you send/ }).waitFor();
 await shot('m01-landing'); log('landing');
 
 // ---- Alice's inbox

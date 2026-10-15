@@ -2,6 +2,8 @@
 
 Live at **https://app.chiaramail.com** (also served at chiaramail-mail.web.app).
 
+*Own the email you send. Indefinitely.*
+
 A mail app for your Gmail account that brings back ChiaraMail 5.1's core idea:
 **ECS messages** (Envelope-Content Splitting). Only the envelope (sender,
 recipients, subject) travels by email; the text and attachments are stored

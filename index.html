@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="ChiaraMail: email you can still change after you send it." />
+    <meta name="description" content="ChiaraMail™ for Gmail: own the email you send, indefinitely. Correct or withdraw a message after sending, decide whether it can be forwarded, and keep a record of every change." />
     <meta name="referrer" content="no-referrer" />
     <link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -26,6 +26,7 @@
       #splash .splash-name { font: 600 2.25rem/1 'Literata Variable', Georgia, 'Times New Roman', serif; color: #14313b; letter-spacing: -0.01em; }
       #splash .splash-name span { font-weight: 400; color: #587079; }
       #splash .splash-name sup { font-size: 0.4em; font-weight: 400; color: #587079; margin-left: 1px; }
+      #splash .splash-for { font: 600 0.8125rem/1 system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: #587079; margin-top: -8px; }
       #splash .splash-tag { font: 1rem/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; color: #587079; margin-top: -6px; text-align: center; max-width: 320px; padding: 0 16px; }
     </style>
   </head>
@@ -33,6 +34,7 @@
     <div id="splash" aria-hidden="true">
       <img src="/icon-512.png" alt="" />
       <div class="splash-name">Chiara<span>Mail</span><sup>™</sup></div>
+      <div class="splash-for">for Gmail</div>
       <div class="splash-tag">Own the email you send. Indefinitely.</div>
     </div>
     <script>
@@ -41,7 +43,10 @@
         var l = null;
         try { l = localStorage.getItem('chiaramail.lang'); } catch (e) { /* ignore */ }
         if (!l) l = ((navigator.languages || [navigator.language || 'en'])[0] || 'en').slice(0, 2);
-        if (l === 'fr') document.querySelector('#splash .splash-tag').textContent = 'Restez maître des e-mails que vous envoyez. Indéfiniment.';
+        if (l === 'fr') {
+          document.querySelector('#splash .splash-tag').textContent = 'Restez maître des e-mails que vous envoyez. Indéfiniment.';
+          document.querySelector('#splash .splash-for').textContent = 'pour Gmail';
+        }
       })();
     </script>
     <div id="root"></div>

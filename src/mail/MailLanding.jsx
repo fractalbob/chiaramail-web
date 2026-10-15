@@ -15,6 +15,7 @@ export default function MailLanding() {
   return (
     <div className="landing">
       <section className="landing-copy">
+        <p className="eyebrow">{t('mailEyebrow')}</p>
         <h1 className="hero">{t('mailTagline')}</h1>
         <p className="lede">{t('appIntro')}</p>
         <ul className="points">
