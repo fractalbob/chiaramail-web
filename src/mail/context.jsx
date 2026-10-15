@@ -105,6 +105,12 @@ export function MailProvider({ children }) {
       } finally { setBusy(false); }
     },
     disconnect: async () => { await gmail.disconnect(); setAccount(null); setLabels([]); },
+    // Creates a label in Gmail (or finds the one with that name) and adds it to the lists.
+    createLabel: async (name) => {
+      const l = await gmail.createLabel(name);
+      setLabels((prev) => (prev.some((x) => x.id === l.id) ? prev : [...prev, { ...l, type: l.type || 'user' }]));
+      return l;
+    },
     // Call with any error from a Gmail call; returns true if it was handled.
     handle: (e) => { if (e?.code === 'reconnect') { setExpired(true); return true; } return false; },
   }), [status, account, labels, unread, busy, error, grantFor, refreshCounts]);

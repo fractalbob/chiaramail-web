@@ -133,6 +133,17 @@ export default function ThreadList() {
       load(true);
     } finally { setBusyBulk(false); }
   };
+  // "New label…": name it, create it in Gmail (or reuse one of that name), then apply it.
+  const newLabel = async (ids) => {
+    const name = (window.prompt(t('newLabelPrompt')) || '').trim();
+    if (!name) return;
+    try {
+      const l = mail.userLabels.find((x) => x.name.toLowerCase() === name.toLowerCase()) || await mail.createLabel(name);
+      labelBulk([l.id], [], ids);
+    } catch (e) {
+      if (!handle(e)) setState((s) => ({ ...s, error: e.message }));
+    }
+  };
   const labelBulk = (add, remove, ids) => {
     if (add.includes('SPAM')) markSpamHandled(ids || [...selected]); // reported: never pulled back out of Spam
     return bulk((id) => gmail.modifyThread(id, add, remove), add, remove, ids);
@@ -233,6 +244,8 @@ export default function ThreadList() {
             <MenuItem key={l.id} checked={lstate(l.id)} onClick={() => (lstate(l.id) === true ? labelBulk([], [l.id], ids) : labelBulk([l.id], [], ids))}>{l.name}</MenuItem>
           ))}
           {!mail.userLabels.length && <p className="menu-note">{t('noLabels')}</p>}
+          <MenuSep />
+          <MenuItem onClick={() => newLabel(ids)}>{t('newLabel')}</MenuItem>
         </SubMenu>
         {one && (
           <>
@@ -299,6 +312,8 @@ export default function ThreadList() {
                   return <MenuItem key={l.id} checked={st} onClick={() => (st === true ? labelBulk([], [l.id]) : labelBulk([l.id], []))}>{l.name}</MenuItem>;
                 })}
                 {!mail.userLabels.length && <p className="menu-note">{t('noLabels')}</p>}
+                <MenuSep />
+                <MenuItem onClick={() => newLabel()}>{t('newLabel')}</MenuItem>
               </Menu>
               <Menu align="right" label={t('moreActions')} button={<Icon name="more" />}>
                 <div className="phone-only">
@@ -315,6 +330,8 @@ export default function ThreadList() {
                       return <MenuItem key={l.id} checked={st} onClick={() => (st === true ? labelBulk([], [l.id]) : labelBulk([l.id], []))}>{l.name}</MenuItem>;
                     })}
                     {!mail.userLabels.length && <p className="menu-note">{t('noLabels')}</p>}
+                    <MenuSep />
+                    <MenuItem onClick={() => newLabel()}>{t('newLabel')}</MenuItem>
                   </SubMenu>
                   {inFolder('spam')
                     ? <MenuItem onClick={() => labelBulk(['INBOX'], ['SPAM'])}>{t('notSpam')}</MenuItem>

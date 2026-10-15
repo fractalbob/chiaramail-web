@@ -152,6 +152,15 @@ function matches(m, needle) {
     return text(m).toLowerCase().includes(term.replace(/"/g, '').toLowerCase());
   });
 }
+export async function createLabel(name) {
+  const s = load(); const b = mine(s);
+  const found = b.labels.find((l) => l.name.toLowerCase() === name.toLowerCase());
+  if (found) return found;
+  const n = b.labels.reduce((m, l) => Math.max(m, Number(l.id.split('_')[1]) || 0), 0) + 1;
+  const label = { id: `Label_${n}`, name, type: 'user' };
+  b.labels.push(label); save(s);
+  return label;
+}
 export async function getLabel(id) {
   const s = load();
   const b = mine(s);

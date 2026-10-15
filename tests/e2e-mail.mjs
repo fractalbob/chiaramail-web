@@ -623,6 +623,30 @@ if (await page.locator('.trow-unread').count()) {
   await must(!(await page.locator('.trow-unread').count()), 'mark all as read');
 }
 await shot('m15-toolbar');
+// "New label…": create a label from ChiaraMail and apply it in one go.
+await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.rowcheck').check();
+await page.locator('.bulkbar').getByRole('button', { name: 'Label as' }).click();
+page.removeAllListeners('dialog');
+page.once('dialog', (d) => d.accept('Estate firms'));
+await page.getByRole('menuitem', { name: 'New label…' }).click();
+await page.locator('.folder', { hasText: 'Estate firms' }).waitFor();
+page.on('dialog', (d) => d.accept());
+await page.locator('.working').waitFor({ state: 'detached' });
+await page.locator('.folder', { hasText: 'Estate firms' }).click();
+await page.locator('.trow', { hasText: 'Ordinary note' }).waitFor();
+// From an open message: typing an existing name reuses that label instead of making a second one.
+await page.locator('.trow-link', { hasText: 'Ordinary note' }).click();
+await page.locator('.thread-subject').waitFor();
+await page.getByRole('button', { name: 'Label as' }).click();
+await must(await page.getByRole('menuitemcheckbox', { name: 'Estate firms' }).isVisible(), 'new label listed when reading');
+page.removeAllListeners('dialog');
+page.once('dialog', (d) => d.accept('estate FIRMS'));
+await page.getByRole('menuitem', { name: 'New label…' }).click();
+await page.waitForTimeout(500);
+page.on('dialog', (d) => d.accept());
+await must((await page.locator('.folder', { hasText: /^Estate firms/i }).count()) === 1, 'no duplicate label');
+await page.locator('.folder', { hasText: 'Inbox' }).click();
+log('New label… creates a Gmail label and applies it; an existing name is reused');
 log('toolbar: select ▾ menu, Label as, Move to, ⋮ Mark as important, Mark all as read, 1–N of total');
 
 // ---- Verified ECS messages are rescued from Spam; forgeries and reported ones stay

@@ -160,6 +160,17 @@ async function mapLimit(items, limit, fn) {
 export const getProfile = () => call('/profile');
 export async function listLabels() { return (await call('/labels')).labels || []; }
 export const getLabel = (id) => call(`/labels/${encodeURIComponent(id)}`);
+/** A new user label, shown in Gmail's label list. If one with this name already exists, that one. */
+export async function createLabel(name) {
+  try {
+    return await call('/labels', { method: 'POST', body: { name, labelListVisibility: 'labelShow', messageListVisibility: 'show' } });
+  } catch (e) {
+    if (e.status !== 409) throw e;
+    const found = (await listLabels()).find((l) => l.name.toLowerCase() === name.toLowerCase());
+    if (!found) throw e;
+    return found;
+  }
+}
 
 export async function listThreads({ labelId, q, pageToken, max = 25 }) {
   const r = await call('/threads', { query: { labelIds: labelId, q: widenQuery(q), pageToken, maxResults: max } });

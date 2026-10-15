@@ -11,7 +11,7 @@ import { fmtSize } from '../lib.js';
 import { useIsEcsUser } from './ecsCheck.js';
 import { markSpamHandled } from './prefs.js';
 import Icon from './icons.jsx';
-import { IconButton, Menu, MenuItem } from './Menu.jsx';
+import { IconButton, Menu, MenuItem, MenuSep } from './Menu.jsx';
 
 
 function Attachments({ message }) {
@@ -192,12 +192,21 @@ export default function ThreadView() {
           onClick={() => act(() => gmail.modifyThread(threadId, labels.has('STARRED') ? [] : ['STARRED'], labels.has('STARRED') ? ['STARRED'] : []), false)}>
           <Icon name="star" />
         </IconButton>
-        {!labels.has('TRASH') && !labels.has('SPAM') && mail.userLabels.length > 0 && (
+        {!labels.has('TRASH') && !labels.has('SPAM') && (
           <Menu align="right" label={t('labelAs')} button={<Icon name="label" />}>
             {mail.userLabels.map((l) => (
               <MenuItem key={l.id} checked={labels.has(l.id)}
                 onClick={() => act(() => gmail.modifyThread(threadId, labels.has(l.id) ? [] : [l.id], labels.has(l.id) ? [l.id] : []), false)}>{l.name}</MenuItem>
             ))}
+            {mail.userLabels.length > 0 && <MenuSep />}
+            <MenuItem onClick={() => {
+              const name = (window.prompt(t('newLabelPrompt')) || '').trim();
+              if (!name) return;
+              act(async () => {
+                const l = mail.userLabels.find((x) => x.name.toLowerCase() === name.toLowerCase()) || await mail.createLabel(name);
+                await gmail.modifyThread(threadId, [l.id], []);
+              }, false);
+            }}>{t('newLabel')}</MenuItem>
           </Menu>
         )}
       </div>
