@@ -186,6 +186,39 @@ await page.reload();
 await page.locator('.thread-subject').waitFor();
 await must(!(await page.locator('.mcard-draft').count()), 'reply draft discarded');
 log('reply drafts appear in the conversation, resume and discard');
+
+// Signature: set once, then added to new messages and replies (above the quote), as in Gmail.
+await page.getByRole('button', { name: 'Signature' }).click();
+await page.getByRole('dialog', { name: 'Signature' }).waitFor();
+await page.locator('#sig-body').click();
+await page.locator('#sig-body').pressSequentially('Robert Uomini');
+await page.locator('#sig-body').press('Enter');
+await page.locator('#sig-body').pressSequentially('+33 7 67 17 54 89');
+await shot('m04e-signature');
+await page.getByRole('button', { name: 'Save' }).click();
+await page.getByRole('dialog', { name: 'Signature' }).waitFor({ state: 'detached' });
+await page.getByRole('link', { name: 'Reply', exact: true }).last().click();
+await waitValue(page.getByLabel('Message', { exact: true }), (v) => /^\s*--\s*\nRobert Uomini\n\+33 7 67 17 54 89\n[\s\S]*wrote:/.test(v), 'reply: signature above the quoted message');
+await page.getByRole('button', { name: 'Discard' }).click();
+await page.locator('.thread-subject').waitFor();
+await page.goto(BASE + '/compose');
+await waitValue(page.getByLabel('Message', { exact: true }), (v) => /--\s*\nRobert Uomini\n\+33 7 67 17 54 89\s*$/.test(v), 'new message: signature added');
+await page.getByRole('button', { name: 'Discard' }).click();
+await page.locator('.folder', { hasText: 'Inbox' }).waitFor();
+// Removing it: new messages start empty again.
+await page.getByRole('button', { name: 'Signature' }).click();
+await page.locator('#sig-body').click();
+await page.keyboard.press('Control+A');
+await page.keyboard.press('Delete');
+await page.getByRole('button', { name: 'Save' }).click();
+await page.goto(BASE + '/compose');
+await page.getByLabel('Subject', { exact: true }).waitFor();
+await page.waitForTimeout(400);
+await must((await page.getByLabel('Message', { exact: true }).innerText()).trim() === '', 'no signature once removed');
+await page.getByRole('button', { name: 'Discard' }).click();
+log('signature: set in a dialog, added to new messages and above the quote in replies, removable');
+await page.locator('.folder', { hasText: 'Inbox' }).click();
+await openRow('Paul Martin');
 await page.getByRole('link', { name: 'Back' }).click();
 
 // ---- Alice sends an ECS message with an attachment

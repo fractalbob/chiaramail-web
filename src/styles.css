@@ -339,6 +339,12 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .search-col .search { max-width: none; }
 .setting { display: inline-flex; gap: 6px; align-items: center; align-self: flex-start; margin-left: 14px; font: 0.875rem/1.3 var(--sans); color: var(--slate); cursor: pointer; }
 .setting input { margin: 0; accent-color: var(--ink); }
+.settings-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+.setting-link { background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 2px; }
+.setting-link:hover { color: var(--ink); }
+.setting-link:disabled { opacity: .5; cursor: default; }
+.dlg-wide { width: min(620px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
+.dlg-note { margin: 0; font-size: 0.875rem; color: var(--slate); }
 .mail-main { grid-area: main; min-width: 0; }
 
 .list-head { display: flex; justify-content: space-between; align-items: center; gap: 4px 12px; flex-wrap: wrap; border-bottom: 1px solid var(--rule); padding: 2px 0 4px; min-height: 48px; }

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, Link, Navigate, Route, Routes, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useMail } from './context.jsx';
 import { useAuth } from '../auth.jsx';
@@ -11,6 +11,8 @@ import DraftList from './DraftList.jsx';
 import ThreadView from './ThreadView.jsx';
 import Composer from './Composer.jsx';
 import { NewLabelDialogHost } from './LabelPicker.jsx';
+import RichEditor from './RichEditor.jsx';
+import { useSignature, saveSignature } from './signature.js';
 
 function SearchBox() {
   const { t } = useI18n();
@@ -75,6 +77,49 @@ function ImagesSetting() {
       <input type="checkbox" checked={on} onChange={(e) => setAlwaysImages(e.target.checked)} />
       <span>{t('alwaysShowImages')}</span>
     </label>
+  );
+}
+
+// "Signature": the text added to new messages, replies and forwards, edited in a small dialog.
+function SignatureSetting() {
+  const { t } = useI18n();
+  const { user } = useAuth();
+  const sig = useSignature(user?.uid);
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    if (!open) return undefined;
+    const esc = (e) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); } };
+    document.addEventListener('keydown', esc, true);
+    return () => document.removeEventListener('keydown', esc, true);
+  }, [open]);
+  const start = () => { setDraft(sig.html); setErr(''); setOpen(true); };
+  const save = async (e) => {
+    e.preventDefault();
+    setSaving(true); setErr('');
+    try { await saveSignature(draft); setOpen(false); } catch (x) { setErr(x.message || String(x)); }
+    setSaving(false);
+  };
+  return (
+    <>
+      <button type="button" className="setting setting-link" onClick={start} disabled={!sig.loaded}>{t('signature')}</button>
+      {open && (
+        <div className="dlg-back" onPointerDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
+          <form className="dlg dlg-wide" role="dialog" aria-modal="true" aria-labelledby="sig-title" onSubmit={save}>
+            <h2 id="sig-title" className="dlg-title">{t('signature')}</h2>
+            <RichEditor id="sig-body" label={t('signatureLabel')} labelClass="dlg-label" value={draft} onChange={setDraft} minRows={5} />
+            <p className="dlg-note">{t('signatureNote')}</p>
+            {err && <p className="error" role="alert">{err}</p>}
+            <div className="dlg-actions">
+              <button type="button" className="btn btn-quiet" onClick={() => setOpen(false)}>{t('cancel')}</button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>{t('save')}</button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -193,7 +238,10 @@ export default function MailLayout() {
         <div className="search-col">
           <SearchBox key={loc.search} />
           <AccountLine />
-          <ImagesSetting />
+          <div className="settings-row">
+            <ImagesSetting />
+            <SignatureSetting />
+          </div>
         </div>
         <button type="button" className="btn btn-quiet signout" onClick={mail.disconnect}>{t('signOut')}</button>
       </div>

@@ -98,6 +98,11 @@ const filesTotal = (atts) => (atts || []).reduce((n, a) => n + (a.size || 0), 0)
 export class QuotaError extends Error {
   constructor(used, need) { super('quota'); this.code = 'quota'; this.used = used; this.need = need; this.quota = quota(); }
 }
+export async function getPrefs(uid) { return later((load().prefs || {})[uid] || null); }
+export async function savePrefs(uid, prefs) {
+  if (uid !== currentUser()?.uid) throw denied();
+  const db = load(); db.prefs = { ...(db.prefs || {}), [uid]: { ...((db.prefs || {})[uid] || {}), ...prefs } }; save(db);
+}
 export async function getUsage(uid) { return { used: (load().usage || {})[uid] || 0, quota: quota() }; }
 export async function createMessage(user, { recipients, subject, body, allowForward = false, attachments = [], enc = 0 }) {
   await later();

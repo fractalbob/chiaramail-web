@@ -158,6 +158,12 @@ async function mapLimit(items, limit, fn) {
 }
 
 export const getProfile = () => call('/profile');
+// The signature set in Gmail's settings for the main address ('' if none).
+export async function getGmailSignature() {
+  const r = await call('/settings/sendAs');
+  const a = (r.sendAs || []).find((x) => x.isDefault) || (r.sendAs || []).find((x) => x.isPrimary);
+  return a?.signature || '';
+}
 export async function listLabels() { return (await call('/labels')).labels || []; }
 export const getLabel = (id) => call(`/labels/${encodeURIComponent(id)}`);
 /** A new user label, shown in Gmail's label list. If one with this name already exists, that one. */

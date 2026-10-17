@@ -137,6 +137,13 @@ export async function getUsage(uid) {
   const s = await getDoc(usageRef(uid)).catch(() => null);
   return { used: s?.exists() ? s.data().bytes || 0 : 0, quota: QUOTA };
 }
+// prefs/{uid}: the user's own settings (their email signature), shared by all their devices.
+const prefsRef = (uid) => doc(db, 'prefs', uid);
+export async function getPrefs(uid) {
+  const s = await getDoc(prefsRef(uid));
+  return s.exists() ? s.data() : null;
+}
+export const savePrefs = (uid, prefs) => busy(() => setDoc(prefsRef(uid), { ...prefs, updatedAt: serverTimestamp() }, { merge: true }));
 // Thrown when a message's files would go over the allowance.
 export class QuotaError extends Error {
   constructor(used, need) { super('quota'); this.code = 'quota'; this.used = used; this.need = need; this.quota = QUOTA; }

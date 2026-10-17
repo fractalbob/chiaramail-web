@@ -15,6 +15,7 @@ import RecipientField from './RecipientField.jsx';
 import RichEditor, { focusStart } from './RichEditor.jsx';
 import { bodyHtml, textToRich, fromEmailHtml, storeRich, richToText, richIsEmpty, emailHtml } from '../richtext.js';
 import { cachedContacts, refreshContacts, rememberRecipients } from './contacts.js';
+import { useSignature, signatureBlock } from './signature.js';
 
 const MAX_TOTAL = 24 * 1024 * 1024; // what Gmail lets an ordinary email (or a draft) carry
 const MAX_ECS_FILE = backend.MAX_FILE; // ECS attachments skip the email: per-file limit (see storage.rules)
@@ -76,6 +77,16 @@ export default function Composer() {
   const [error, setError] = useState('');
   const bodyRef = useRef(null);
   const [contacts, setContacts] = useState(() => cachedContacts(me));
+  const sig = useSignature(user?.uid);
+  const sigBlock = signatureBlock(sig.html);
+
+  // A new message starts with the signature below an empty line, as in Gmail
+  // (set once, while rendering, as soon as the signature is known).
+  const [sigAdded, setSigAdded] = useState(false);
+  if (!sigAdded && sig.loaded && mode === 'new' && !draftParam) {
+    setSigAdded(true);
+    if (sigBlock && !body) setBody(`<div><br></div>${sigBlock}`);
+  }
 
   // Load suggestions from Gmail in the background (cached for a few hours).
   useEffect(() => {
@@ -86,7 +97,7 @@ export default function Composer() {
 
   // Prefill replies and forwards from the original message.
   useEffect(() => {
-    if (!threadParam || !msgParam || draftParam) return;
+    if (!threadParam || !msgParam || draftParam || !sig.loaded) return;
     let live = true;
     gmail.getThread(threadParam).then(async (th) => {
       if (mode === 'forwardAttach') {
@@ -122,7 +133,7 @@ export default function Composer() {
       const sender = m.replyTo[0] || m.from;
       if (mode === 'forward') {
         setSubject(forwardSubject(m.subject));
-        setBody(textToRich(`\n\n${t('fwdHeader')}\n${t('from')}: ${m.from ? fmtAddr(m.from) : ''}\n${t('date')}: ${formatDate(m.date)}\n${t('subject')}: ${m.subject}\n${t('to')}: ${m.to.map(fmtAddr).join(', ')}\n`) + origHtml);
+        setBody(`<div><br></div>${sigBlock}<div><br></div>` + textToRich(`${t('fwdHeader')}\n${t('from')}: ${m.from ? fmtAddr(m.from) : ''}\n${t('date')}: ${formatDate(m.date)}\n${t('subject')}: ${m.subject}\n${t('to')}: ${m.to.map(fmtAddr).join(', ')}\n`) + origHtml);
         const stored = info && !info.withdrawn && !info.locked ? (info.attachments || []) : [];
         setFiles([
           ...m.attachments.map((a) => ({ name: a.filename, type: a.mimeType, size: a.size, fwd: { messageId: m.id, attachmentId: a.attachmentId, data: a.data } })),
@@ -141,13 +152,14 @@ export default function Composer() {
         if (ccList.length) { setCc(dedupe(ccList)); setShowCc(true); }
         setThread({ threadId: m.threadId, inReplyTo: m.messageId, references: `${m.references} ${m.messageId}`.trim() });
         setSubject(replySubject(m.subject));
-        const intro = note === 'updated' ? `${t('updateNoteBody')}\n` : '\n';
-        setBody(`${textToRich(`${intro}\n${t('wroteOn', { date: formatDate(m.date), name: displayName(m.from) })}`)}<blockquote>${origHtml}</blockquote>`);
+        // Your text, then the signature, then the quoted message (Gmail's default order).
+        const top = note === 'updated' ? textToRich(t('updateNoteBody')) : '<div><br></div>';
+        setBody(`${top}${sigBlock}<div><br></div>${textToRich(t('wroteOn', { date: formatDate(m.date), name: displayName(m.from) }))}<blockquote>${origHtml}</blockquote>`);
       }
       setTimeout(() => focusStart(bodyRef.current), 0);
     }).catch((e) => { if (!mail.handle(e)) setError(e.message); });
     return () => { live = false; };
-  }, [threadParam, msgParam, mode, note]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [threadParam, msgParam, mode, note, sig.loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resume a draft: recipients, text, settings, attachments and reply threading.
   useEffect(() => {
@@ -223,7 +235,7 @@ export default function Composer() {
     return chainRef.current;
   };
 
-  const ready = draftLoaded && !(threadParam && msgParam && !draftParam && !orig);
+  const ready = draftLoaded && (!!draftParam || sig.loaded) && !(threadParam && msgParam && !draftParam && !orig);
   useEffect(() => {
     if (!ready || doneRef.current) return;
     if (baselineRef.current === null) { baselineRef.current = snapshot; lastSavedRef.current = draftParam ? snapshot : null; return; }

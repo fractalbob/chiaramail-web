@@ -116,6 +116,7 @@ function seed(s, b, addr) {
 
 // ---- reading ---------------------------------------------------------------------
 const SYSTEM = ['INBOX', 'STARRED', 'SENT', 'SPAM', 'TRASH', 'UNREAD', 'IMPORTANT', 'DRAFT', 'CATEGORY_PERSONAL', 'CATEGORY_SOCIAL', 'CATEGORY_UPDATES', 'CATEGORY_FORUMS', 'CATEGORY_PROMOTIONS'];
+export async function getGmailSignature() { return ''; }
 export async function listLabels() {
   const s = load();
   return [...SYSTEM.map((id) => ({ id, name: id, type: 'system' })), ...mine(s).labels];

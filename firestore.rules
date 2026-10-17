@@ -151,6 +151,16 @@ service cloud.firestore {
     // A sender's attachment total. They can read it; raising it is always
     // allowed (it only limits them), lowering it only together with withdrawing
     // or deleting one of their counted messages, by exactly its files' sizes.
+    // A user's own settings: only their email signature, readable and writable by them alone.
+    match /prefs/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['signature', 'updatedAt'])
+        && request.resource.data.signature is string
+        && request.resource.data.signature.size() <= 10000
+        && request.resource.data.updatedAt == request.time;
+    }
+
     match /usage/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
       allow create, update: if signedIn() && request.auth.uid == uid
