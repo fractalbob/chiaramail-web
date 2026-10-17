@@ -179,6 +179,7 @@ export function parseMessage(msg) {
     key: (h[CONTENT_KEY.toLowerCase()] || '').trim() || null,
     inReplyTo: h['in-reply-to'] || '',
     headers: h,
+    rawHeaders: payload.headers || [],
     text: '',
     html: '',
     attachments: [],
@@ -307,4 +308,25 @@ export function bouncedAddresses(msg) {
     for (const m of all.matchAll(/(?:wasn['’]t delivered to|couldn['’]t be delivered to|delivery to the following recipients? failed(?: permanently)?:?|could not be delivered to|undeliverable to|failed recipient:?)\s*<?([^\s<>"']+@[^\s<>"']+)/gi)) add(m[1]);
   }
   return [...found];
+}
+
+// ---- "Show details": how a message reached the mailbox, as Gmail reports it -------------
+// mailedBy: the domain of the envelope sender (SPF's smtp.mailfrom, or Return-Path).
+// signedBy: the domains whose DKIM signature checked out.
+// tls: whether the hop into Google's servers was encrypted ("with ESMTPS"); null if unknown
+// (e.g. a message sent from this account, which never came in from outside).
+export function deliveryInfo(rawHeaders = []) {
+  const all = (n) => rawHeaders.filter((x) => x.name.toLowerCase() === n).map((x) => x.value || '');
+  const auth = all('authentication-results').find((v) => /mx\.google\.com/i.test(v)) || all('authentication-results')[0] || '';
+  const domainOf = (addr) => (addr.match(/@([^\s>;]+)/) || [])[1]?.toLowerCase() || '';
+  let mailedBy = domainOf((auth.match(/smtp\.mailfrom=([^\s;]+)/i) || [])[1] || '');
+  if (!mailedBy) mailedBy = domainOf(all('return-path')[0] || '');
+  const signedBy = [];
+  for (const m of auth.matchAll(/dkim=pass\b[^;]*?header\.(?:i|d)=@?([^\s;]+)/gi)) {
+    const d = m[1].replace(/^@/, '').toLowerCase();
+    if (!signedBy.includes(d)) signedBy.push(d);
+  }
+  const hop = all('received').find((v) => /by mx\.google\.com/i.test(v));
+  const tls = hop ? /\bwith ESMTPS\b/i.test(hop) || /\bversion=TLS/i.test(hop) : null;
+  return { mailedBy, signedBy, tls };
 }

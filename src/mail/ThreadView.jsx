@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import * as gmail from '@gmail';
-import { parseMessage, b64urlToBytes, displayName } from '../gmail/mime.js';
+import { parseMessage, b64urlToBytes, displayName, deliveryInfo } from '../gmail/mime.js';
+
+const fmtAddr = (a) => (a.name ? `${a.name} <${a.email}>` : a.email);
+import PersonHover from './PersonCard.jsx';
 import { useMail } from './context.jsx';
 import { useI18n } from '../i18n.jsx';
 import HtmlBody from './HtmlBody.jsx';
@@ -41,6 +44,43 @@ function Attachments({ message }) {
   );
 }
 
+// Gmail's "Show details" (▾ beside the recipients): who sent it, to whom, when, and how it
+// reached the mailbox (mailed-by, signed-by, encryption).
+function MessageDetails({ m, onClose }) {
+  const { t, formatDate } = useI18n();
+  const ref = useRef(null);
+  useEffect(() => {
+    const out = (e) => { if (ref.current && !ref.current.contains(e.target) && !e.target.closest?.('.mdetails-btn')) onClose(); };
+    const esc = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('pointerdown', out);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('pointerdown', out); document.removeEventListener('keydown', esc); };
+  }, [onClose]);
+  const d = deliveryInfo(m.rawHeaders);
+  const list = (l) => l.map(fmtAddr).join(', ');
+  const rows = [
+    ['dFrom', m.from ? fmtAddr(m.from) : ''],
+    ['dReplyTo', list(m.replyTo)],
+    ['dTo', list(m.to)],
+    ['dCc', list(m.cc)],
+    ['dBcc', list(m.bcc)],
+    ['dDate', m.date ? formatDate(m.date) : ''],
+    ['dSubject', m.subject],
+    ['dMailedBy', d.mailedBy],
+    ['dSignedBy', d.signedBy.join(', ')],
+    ['dSecurity', d.tls == null ? '' : t(d.tls ? 'tlsYes' : 'tlsNo')],
+  ].filter(([, v]) => v);
+  return (
+    <div className="mdetails" ref={ref} role="dialog" aria-label={t('showDetails')}>
+      <table>
+        <tbody>
+          {rows.map(([k, v]) => <tr key={k}><th scope="row">{t(k)}:</th><td>{v}</td></tr>)}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function DraftCard({ m }) {
   const { t, formatMail } = useI18n();
   const nav = useNavigate();
@@ -74,7 +114,12 @@ function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
   const replyBase = `/compose?thread=${threadId}&msg=${m.id}`;
   const fromEmail = (m.from?.email || '').toLowerCase();
   const ecsSender = useIsEcsUser(fromEmail === me ? '' : fromEmail) && !live?.spoof;
-  const fromName = <span className={ecsSender ? 'ecs-user' : undefined} title={ecsSender ? t('ecsUserTitle') : undefined}>{displayName(m.from)}</span>;
+  const [details, setDetails] = useState(false);
+  const fromName = (
+    <PersonHover name={displayName(m.from)} email={m.from?.email}>
+      <span className={ecsSender ? 'ecs-user' : undefined} title={ecsSender ? t('ecsUserTitle') : undefined}>{displayName(m.from)}</span>
+    </PersonHover>
+  );
   if (!expanded) {
     return (
       <li className="mcard mcard-collapsed">
@@ -105,11 +150,16 @@ function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
             </Menu>
           </span>
         </div>
-        <p className="mto">
-          {t('to')}: {people(m.to) || '—'}
-          {m.cc.length > 0 && <> · {t('cc')}: {people(m.cc)}</>}
-          {m.bcc.length > 0 && <> · {t('bcc')}: {people(m.bcc)}</>}
-        </p>
+        <div className="mto">
+          <span>
+            {t('to')}: {people(m.to) || '—'}
+            {m.cc.length > 0 && <> · {t('cc')}: {people(m.cc)}</>}
+            {m.bcc.length > 0 && <> · {t('bcc')}: {people(m.bcc)}</>}
+          </span>
+          <button type="button" className="mdetails-btn" aria-expanded={details} aria-label={t('showDetails')} title={t('showDetails')}
+            onClick={() => setDetails((v) => !v)}><Icon name="drop" size={20} /></button>
+          {details && <MessageDetails m={m} onClose={() => setDetails(false)} />}
+        </div>
       </header>
       <div className="mbody">
         {m.pointer

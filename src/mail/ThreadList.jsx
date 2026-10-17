@@ -10,12 +10,11 @@ import { markSpamHandled } from './prefs.js';
 import Icon from './icons.jsx';
 import { ContextMenu, IconButton, Menu, MenuItem, MenuSep, SubMenu } from './Menu.jsx';
 import LabelPicker from './LabelPicker.jsx';
+import { hue } from './avatar.js';
+import PersonHover from './PersonCard.jsx';
 
 const PAGE = 25;
 const phone = () => window.matchMedia('(max-width: 600px)').matches;
-// Gmail-style letter avatar: the first letter of the name, on a colour picked from the address.
-const HUES = [4, 28, 45, 95, 145, 175, 200, 225, 260, 290, 320, 345];
-const hue = (str) => HUES[[...(str || '?')].reduce((h, c) => (h * 31 + c.codePointAt(0)) >>> 0, 7) % HUES.length];
 
 // A row's label chips, as in Gmail: at most two (one on a phone), then "+N" for the rest,
 // so labels never push the subject out of sight. The full list is in the tooltip.
@@ -403,9 +402,13 @@ export default function ThreadList() {
                   {r.people.length ? r.people.map((p, i) => (
                     <span key={p.email + i}>
                       {i > 0 && ', '}
-                      {marks.users.has(p.email) && marks.verdicts[r.id] !== 'spoof'
-                        ? <span className="ecs-user" title={t('ecsUserTitle')}>{p.label}</span>
-                        : (p.label === 'me' ? t('me') : p.label)}
+                      {p.label === 'me' ? t('me') : (
+                        <PersonHover name={p.label} email={p.email}>
+                          {marks.users.has(p.email) && marks.verdicts[r.id] !== 'spoof'
+                            ? <span className="ecs-user" title={t('ecsUserTitle')}>{p.label}</span>
+                            : p.label}
+                        </PersonHover>
+                      )}
                     </span>
                   )) : t('noSender')}
                   {r.count > 1 && <span className="tcount"> {r.count}</span>}

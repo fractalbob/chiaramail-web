@@ -99,6 +99,11 @@ function seed(s, b, addr) {
     subject: 'Print sizes for the exhibition',
     text: 'Hi Bob,\n\nCould you send the final print sizes for the three Julia set pieces?\n\nPaul',
     labels: ['INBOX', 'Label_2', 'IMPORTANT'], minutesAgo: 2000,
+    extraHeaders: [
+      { name: 'Received', value: 'from mail.atelier.example (mail.atelier.example. [203.0.113.7]) by mx.google.com with ESMTPS id x12si; Thu, 15 Oct 2026 20:35:01 -0700 (PDT)' },
+      { name: 'Authentication-Results', value: 'mx.google.com; dkim=pass header.i=@atelier.example header.s=s1 header.b=abc; spf=pass (google.com: domain of bounce@mail.atelier.example designates 203.0.113.7 as permitted sender) smtp.mailfrom=bounce@mail.atelier.example; dmarc=pass (p=NONE) header.from=atelier.example' },
+      { name: 'Return-Path', value: '<bounce@mail.atelier.example>' },
+    ],
   });
   const d = msgJson(s, b, {
     from: `Me <${addr}>`, to: 'Paul Martin <paul@atelier.example>',

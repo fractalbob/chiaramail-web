@@ -405,7 +405,24 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .maddr { font-weight: 400; color: var(--slate); font-size: 0.875rem; }
 .msnip { flex: 1; min-width: 0; color: var(--slate); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mdate { margin-left: auto; color: var(--slate); font-size: 0.875rem; white-space: nowrap; }
-.mto { color: var(--slate); font-size: 0.875rem; margin: 4px 0 0; overflow-wrap: anywhere; }
+.mto { position: relative; display: flex; align-items: flex-start; gap: 2px; color: var(--slate); font-size: 0.875rem; margin: 4px 0 0; overflow-wrap: anywhere; }
+.mdetails-btn { flex: none; display: inline-grid; place-items: center; width: 24px; height: 20px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--slate); cursor: pointer; }
+.mdetails-btn:hover, .mdetails-btn[aria-expanded="true"] { background: color-mix(in srgb, var(--ink) 9%, transparent); color: var(--ink); }
+.mdetails { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; max-width: min(560px, calc(100vw - 32px)); padding: 12px 16px; border-radius: 8px; background: var(--paper); color: var(--ink); box-shadow: 0 4px 18px rgba(0, 0, 0, .22); border: 1px solid var(--rule); }
+.mdetails table { border-collapse: collapse; font-size: 0.8125rem; }
+.mdetails th { text-align: right; font-weight: 400; color: var(--slate); padding: 2px 10px 2px 0; vertical-align: top; white-space: nowrap; }
+.mdetails td { padding: 2px 0; overflow-wrap: anywhere; }
+/* Contact card shown when resting the mouse on a name. */
+.pcard { position: fixed; z-index: 300; background: var(--paper); color: var(--ink); border: 1px solid var(--rule); border-radius: 12px; box-shadow: 0 6px 24px rgba(0, 0, 0, .25); padding: 16px; display: grid; gap: 12px; font-family: var(--sans); }
+.pcard-top { display: flex; gap: 14px; align-items: center; min-width: 0; }
+.pcard-avatar { flex: none; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 1.5rem; font-weight: 500; color: #fff; background: hsl(var(--av) 45% 45%); }
+.pcard-who { min-width: 0; }
+.pcard-who p { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcard-name { font-size: 1.0625rem; font-weight: 600; }
+.pcard-mail { font-size: 0.875rem; color: var(--slate); }
+.pcard-ecs { font-size: 0.8125rem; color: var(--slate); }
+.pcard-actions { display: flex; align-items: center; gap: 4px; border-top: 1px solid var(--rule); padding-top: 8px; }
+.pcard-copied { font-size: 0.8125rem; color: var(--slate); margin-left: 6px; }
 .mbody { margin-top: 16px; }
 .mactions { margin-top: 18px; }
 .mhead-row { display: flex; align-items: flex-start; gap: 4px; }

@@ -218,7 +218,35 @@ await must((await page.getByLabel('Message', { exact: true }).innerText()).trim(
 await page.getByRole('button', { name: 'Discard' }).click();
 log('signature: set in a dialog, added to new messages and above the quote in replies, removable');
 await page.locator('.folder', { hasText: 'Inbox' }).click();
+// Gmail's contact card: resting the mouse on a sender's name in the list.
+await page.locator('.trow', { hasText: 'Print sizes' }).locator('.row-people').getByText('Paul Martin').hover();
+const pcard = page.locator('.pcard');
+await pcard.waitFor();
+await must((await pcard.innerText()).includes('paul@atelier.example'), 'list: contact card shows the address');
+await shot('m04f-contact-card');
+await page.mouse.move(5, 5);
+await pcard.waitFor({ state: 'detached' });
 await openRow('Paul Martin');
+// ...and on the sender of an open message; its Send email button starts a message to them.
+await page.locator('.mcard .mfrom').getByText('Paul Martin', { exact: true }).first().hover();
+await pcard.waitFor();
+await must(await pcard.getByRole('button', { name: 'Send email' }).isVisible(), 'card has Send email');
+await must(await pcard.getByRole('button', { name: 'Copy email address' }).isVisible(), 'card has Copy email address');
+await page.mouse.move(5, 5);
+await pcard.waitFor({ state: 'detached' });
+// Gmail's "Show details" ▾ beside the recipients.
+const firstCard = page.locator('.mcard', { hasText: 'Could you send the final print sizes' });
+if (await firstCard.locator('.mcard-collapsed').count() || await firstCard.evaluate((e) => e.classList.contains('mcard-collapsed'))) await firstCard.locator('.mcard-toggle').click();
+await page.locator('.mcard:not(.mcard-collapsed)').filter({ hasText: 'paul@atelier.example' }).first().getByRole('button', { name: 'Show details' }).click();
+const det = page.getByRole('dialog', { name: 'Show details' });
+await det.waitFor();
+const dt = await det.innerText();
+await must(/from:\s*Paul Martin <paul@atelier\.example>/.test(dt) && /mailed-by:\s*mail\.atelier\.example/.test(dt)
+  && /signed-by:\s*atelier\.example/.test(dt) && /security:\s*Standard encryption \(TLS\)/.test(dt) && /subject:\s*Print sizes/.test(dt), `details popover (got ${JSON.stringify(dt)})`);
+await shot('m04g-message-details');
+await page.keyboard.press('Escape');
+await det.waitFor({ state: 'detached' });
+log('contact card on hover (list and message) and Gmail-style Show details with mailed-by, signed-by, security');
 await page.getByRole('link', { name: 'Back' }).click();
 
 // ---- Alice sends an ECS message with an attachment
