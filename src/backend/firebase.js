@@ -99,8 +99,28 @@ export async function completeEmailLink(emailIfAsked) {
   return { needsEmail: false };
 }
 
-export function signOut() {
-  return fbSignOut(auth);
+// Signing out leaves nothing personal in this browser: ECS keys, the contact
+// book, the last account's address, the signature copy and Gmail housekeeping
+// lists are all removed. Only plain display settings stay (language, folded
+// folders, the remote-images choice, and the flag that makes the next sign-in
+// show Google's account chooser).
+const KEEP_ON_SIGN_OUT = new Set([
+  'chiaramail.lang', 'chiaramail.folded', 'chiaramail.alwaysImages', 'chiaramail.chooseAccount',
+]);
+function clearBrowserStorage() {
+  for (const store of [globalThis.localStorage, globalThis.sessionStorage]) {
+    try {
+      const keys = [];
+      for (let i = 0; i < store.length; i += 1) keys.push(store.key(i));
+      keys.filter((k) => k && k.startsWith('chiaramail.') && !KEEP_ON_SIGN_OUT.has(k))
+        .forEach((k) => store.removeItem(k));
+    } catch { /* storage unavailable (private mode) */ }
+  }
+}
+
+export async function signOut() {
+  await fbSignOut(auth);
+  clearBrowserStorage();
 }
 
 // ---- messages -----------------------------------------------------------
