@@ -146,6 +146,13 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .row-fresh .row-subject { font-weight: 600; }
 .lchip { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 9%, transparent); color: var(--ink); font: 400 0.75rem/1.5 var(--sans); vertical-align: 2px; white-space: nowrap; }
 .lchip-title { font-size: 0.8125rem; margin-left: 10px; vertical-align: 4px; }
+.trow .lchip { max-width: 11em; overflow: hidden; text-overflow: ellipsis; vertical-align: -3px; }
+.lchip-more-1 { display: none; }
+@media (max-width: 600px) {
+  .trow .lchip { max-width: 8.5em; }
+  .lchip-2, .lchip-more-2 { display: none; }
+  .lchip-more-1 { display: inline-block; }
+}
 .row-meta { color: var(--slate); font-size: 0.875rem; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--lumen); box-shadow: 0 0 0 1px color-mix(in srgb, var(--lumen-ink) 40%, transparent); }
 .empty { padding: 48px 8px; display: grid; gap: 16px; justify-items: start; color: var(--slate); }
@@ -278,7 +285,8 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 }
 .mail-bar { grid-area: bar; display: flex; align-items: center; gap: 12px; padding: 0 0 16px; }
 .mail-bar .signout { margin-left: auto; align-self: flex-start; margin-top: 4px; }
-.mail-bar .menu-btn { align-self: flex-start; margin-top: 4px; }
+.mail-bar .menu-btn { align-self: flex-start; margin-top: 2px; padding: 8px; border-radius: 50%; line-height: 0; color: var(--ink); }
+.mail-bar .menu-btn:hover { text-decoration: none; background: color-mix(in srgb, var(--ink) 8%, transparent); }
 .search { flex: 1; max-width: 560px; position: relative; }
 .search input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
 .search-clear {

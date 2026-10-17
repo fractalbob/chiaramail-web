@@ -187,7 +187,9 @@ export default function MailLayout() {
   return (
     <div className={open ? 'mail mail-menu-open' : 'mail'}>
       <div className="mail-bar">
-        <button type="button" className="btn btn-quiet menu-btn" aria-expanded={open} onClick={() => setOpen(!open)}>{t('menu')}</button>
+        <button type="button" className="btn btn-quiet menu-btn" aria-expanded={open} aria-label={t('menu')} title={t('menu')} onClick={() => setOpen(!open)}>
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" fill="currentColor" /></svg>
+        </button>
         <div className="search-col">
           <SearchBox key={loc.search} />
           <AccountLine />

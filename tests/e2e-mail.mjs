@@ -913,6 +913,17 @@ await mp.evaluate(() => sessionStorage.setItem('chiaramail.mock.gmailSession', '
 await mp.goto(BASE + '/mail/inbox');
 await mp.locator('.trow').first().waitFor();
 await mp.screenshot({ path: `${SHOTS}/m10-mobile-inbox.png`, fullPage: true });
+{
+  // Several labels on one row: one chip and "+N" on a phone, and the subject stays in view.
+  const row = mp.locator('.trow', { hasText: 'Ordinary note' });
+  const chips = await row.locator('.lchip').evaluateAll((cs) => cs.filter((c) => getComputedStyle(c).display !== 'none').map((c) => c.textContent));
+  const subj = await row.locator('.subj').boundingBox();
+  const rowBox = await row.boundingBox();
+  await must(chips.length === 2 && /^\+\d+$/.test(chips[1]), `phone shows one label chip and +N (got ${JSON.stringify(chips)})`);
+  await must(subj && subj.x + 40 < rowBox.x + rowBox.width, 'phone: subject visible next to the label chips');
+  await must(await mp.getByRole('button', { name: 'Menu' }).locator('svg').count() === 1, 'phone: Menu is a ☰ icon');
+  log('phone: label chips capped, subject in view, ☰ menu');
+}
 await mp.getByRole('button', { name: 'Menu' }).click();
 await mp.screenshot({ path: `${SHOTS}/m11-mobile-menu.png` });
 await mp.getByRole('button', { name: 'Menu' }).click();

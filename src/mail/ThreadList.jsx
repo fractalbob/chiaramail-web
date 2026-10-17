@@ -17,6 +17,21 @@ const phone = () => window.matchMedia('(max-width: 600px)').matches;
 const HUES = [4, 28, 45, 95, 145, 175, 200, 225, 260, 290, 320, 345];
 const hue = (str) => HUES[[...(str || '?')].reduce((h, c) => (h * 31 + c.codePointAt(0)) >>> 0, 7) % HUES.length];
 
+// A row's label chips, as in Gmail: at most two (one on a phone), then "+N" for the rest,
+// so labels never push the subject out of sight. The full list is in the tooltip.
+function LabelChips({ ids, names }) {
+  if (!ids.length) return null;
+  const all = ids.map((id) => names[id]);
+  const more = (n) => (all.length > n ? <span className={`lchip lchip-more lchip-more-${n}`} title={all.join(', ')}>+{all.length - n}</span> : null);
+  return (
+    <>
+      {all.slice(0, 2).map((name, i) => <span key={ids[i]} className={i ? 'lchip lchip-2' : 'lchip'} title={name}>{name}</span>)}
+      {more(2)}
+      {more(1)}
+    </>
+  );
+}
+
 export default function ThreadList() {
   const { folder } = useParams();
   const [params] = useSearchParams();
@@ -399,9 +414,7 @@ export default function ThreadList() {
                 <span className="row-subject">
                   {r.live && <span className="live" title={t('liveTitle')}>{t('live')}</span>}
                   {marks.verdicts[r.id] === 'spoof' && <span className="spoof-tag">{t('spoofTag')}</span>}
-                  {r.labelIds.filter((id) => id !== viewLabel && labelNames[id]).map((id) => (
-                    <span key={id} className="lchip">{labelNames[id]}</span>
-                  ))}
+                  <LabelChips ids={r.labelIds.filter((id) => id !== viewLabel && labelNames[id])} names={labelNames} />
                   <span className={marks.verdicts[r.id] === 'ok' ? 'subj subj-verified' : marks.verdicts[r.id] === 'spoof' ? 'subj subj-spoof' : 'subj'}
                     title={marks.verdicts[r.id] === 'ok' ? t('verifiedTitle') : marks.verdicts[r.id] === 'spoof' ? t('spoofTitle') : undefined}>
                     {r.subject || t('noSubject')}
