@@ -322,9 +322,9 @@ The walkthrough covers:
 - `public/privacy.html` and `public/terms.html` are the privacy policy and
   terms (English and French), linked from Google's consent screen.
 - `firestore.rules` controls who may read and change ECS messages and the
-  directory. It also keeps the old Android app's `users` rule.
+  directory. The old Android app's `users` collection is closed to everyone.
 - `storage.rules` controls who may fetch an ECS message's attachments,
-  following the message in Firestore. It also keeps the old `content/` rule.
+  following the message in Firestore. The old `content/` folder is closed to everyone.
 
 ## Not yet included
 

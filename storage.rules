@@ -9,11 +9,11 @@ service firebase.storage {
   match /b/{bucket}/o {
 
     // ---- Old ChiaraMail (2020): its content/ folder. -------------------------
-    // Kept as it was (any signed-in user may read and write), but limited to
-    // content/ — the old rule matched every path, which would have let any
-    // signed-in user read ECS attachments too.
+    // The old app has been shut down, so content/ is closed to everyone.
+    // (It used to let any signed-in user read and write it.) The files stay
+    // in the bucket; only the console and admin tools can reach them.
     match /content/{allPaths=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
 
     // ---- ChiaraMail web: ECS attachments. ----------------------------------

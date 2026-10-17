@@ -125,13 +125,11 @@ service cloud.firestore {
     }
 
     // ---- Old ChiaraMail (Android app, 2020): device registrations. ----------
-    // Kept exactly as it was in project chiaramail-15119 so the old app keeps
-    // working. NOTE: this lets anyone read or write users/ — see README.
+    // The Android app has been shut down, so users/ is closed to everyone.
+    // (It used to be open to anyone, signed in or not.) The data stays in
+    // the database; only the console and admin tools can reach it.
     match /users/{docId} {
-			allow read,write: if true;
-//      allow write: if request.resource.data.DeviceID == docId;
-//      allow create: if request.resource.data.DeviceID == docId;
- //   	allow update: if resource.data.DeviceID == docId;
+      allow read, write: if false;
     }
 
     // ---- ChiaraMail web ------------------------------------------------------

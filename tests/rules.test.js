@@ -156,10 +156,12 @@ test('read receipts: recipient writes own, sender reads all', async () => {
   await assertSucceeds(getDoc(doc(ctx(BOB), 'messages/m1/reads/bob@example.com')));
 });
 
-test('old ChiaraMail users/ collection keeps its original open rules', async () => {
+test('old ChiaraMail users/ collection is closed to everyone', async () => {
   const anon = env.unauthenticatedContext().firestore();
-  await assertSucceeds(setDoc(doc(anon, 'users/device1'), { 'Device ID': 'abc' }));
-  await assertSucceeds(getDoc(doc(anon, 'users/device1')));
+  await assertFails(setDoc(doc(anon, 'users/device1'), { 'Device ID': 'abc' }));
+  await assertFails(getDoc(doc(anon, 'users/device1')));
+  await assertFails(setDoc(doc(ctx(ALICE), 'users/device1'), { 'Device ID': 'abc' }));
+  await assertFails(getDoc(doc(ctx(ALICE), 'users/device1')));
 });
 
 test('forwarding permission: set at sending, switched by the sender only', async () => {
@@ -301,9 +303,9 @@ test('ECS directory: list yourself only; look up one address; never browse', asy
   await assertFails(updateDoc(doc(ctx(EVE), 'ecsUsers/alice@example.com'), { since: serverTimestamp() }));
 });
 
-test('old content/ folder keeps its rule; it opens nothing else', async () => {
-  await assertSucceeds(store(EVE).ref('content/x').put(bytes));
-  await assertSucceeds(store(EVE).ref('content/x').getMetadata());
+test('old content/ folder is closed; it opens nothing else', async () => {
+  await assertFails(store(EVE).ref('content/x').put(bytes));
+  await assertFails(store(EVE).ref('content/x').getMetadata());
   await assertFails(env.unauthenticatedContext().storage().ref('content/x').getMetadata());
   await assertFails(store(EVE).ref('other/x').put(bytes));
   await seedWithFile();
