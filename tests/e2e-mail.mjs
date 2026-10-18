@@ -998,6 +998,16 @@ await mp.screenshot({ path: `${SHOTS}/m10-mobile-inbox.png`, fullPage: true });
   await must(subj && subj.x + 40 < rowBox.x + rowBox.width, 'phone: subject visible next to the label chips');
   await must(await mp.getByRole('button', { name: 'Menu' }).locator('svg').count() === 1, 'phone: Menu is a ☰ icon');
   log('phone: label chips capped, subject in view, ☰ menu');
+  // With nothing selected, the list toolbar still stays at the top while the list scrolls.
+  await mp.setViewportSize({ width: 390, height: 480 });
+  await mp.evaluate(() => scrollTo(0, 2000));
+  await mp.waitForTimeout(300);
+  await must((await mp.evaluate(() => scrollY)) > 0, 'phone list scrolled');
+  await must(Math.abs(await mp.locator('.list-head').evaluate((e) => e.getBoundingClientRect().top)) < 2, 'phone: list toolbar stays at the top with nothing selected');
+  await mp.screenshot({ path: `${SHOTS}/m10b-mobile-sticky.png` });
+  await mp.evaluate(() => scrollTo(0, 0));
+  await mp.setViewportSize({ width: 390, height: 844 });
+  log('phone: list toolbar stays at the top with nothing selected');
 }
 await mp.getByRole('button', { name: 'Menu' }).click();
 await mp.screenshot({ path: `${SHOTS}/m11-mobile-menu.png` });
@@ -1028,6 +1038,18 @@ await mp.locator('.trow-link', { hasText: 'Liste pour samedi' }).tap();
 await mp.getByText('2 selected').waitFor();
 await mp.locator('.trow', { hasText: 'Print sizes' }).locator('.avatar').tap();
 await mp.getByText('3 selected').waitFor();
+{
+  // Phone: the selection bar stays at the top while the list scrolls (short screen).
+  const vp = mp.viewportSize();
+  await mp.setViewportSize({ width: vp.width, height: 420 });
+  await mp.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+  await mp.waitForTimeout(300);
+  const info = await mp.evaluate(() => ({ y: scrollY, top: document.querySelector('.list-head').getBoundingClientRect().top, cls: document.querySelector('.list-head').className, pos: getComputedStyle(document.querySelector('.list-head')).position }));
+  await must(info.y > 0 && Math.abs(info.top) < 2, `phone: selection bar stays at the top while scrolling (got ${JSON.stringify(info)})`);
+  await mp.evaluate(() => scrollTo(0, 0));
+  await mp.setViewportSize(vp);
+  log('phone: selection bar stays at the top while scrolling');
+}
 await mp.locator('.bulkbar').getByRole('button', { name: 'More' }).tap();
 await mp.getByRole('menuitem', { name: 'Label as' }).waitFor();
 await mp.screenshot({ path: `${SHOTS}/m16-mobile-select.png` });
