@@ -227,7 +227,7 @@ export default function ThreadView() {
 
   return (
     <article className="thread">
-      <div className="toolbar" role="toolbar" aria-label={t('threadActions')}>
+      <div className="toolbar thread-toolbar" role="toolbar" aria-label={t('threadActions')}>
         <Link to={back} className="ibtn" aria-label={t('backToList')} title={t('backToList')}><Icon name="back" /></Link>
         {labels.has('INBOX') && <IconButton label={t('archive')} onClick={() => act(() => gmail.modifyThread(threadId, [], ['INBOX']))}><Icon name="archive" /></IconButton>}
         {!labels.has('INBOX') && !labels.has('TRASH') && !labels.has('SPAM') && <IconButton label={t('moveToInbox')} onClick={() => act(() => gmail.modifyThread(threadId, ['INBOX'], []), false)}><Icon name="inbox" /></IconButton>}

@@ -247,6 +247,20 @@ await shot('m04g-message-details');
 await page.keyboard.press('Escape');
 await det.waitFor({ state: 'detached' });
 log('contact card on hover (list and message) and Gmail-style Show details with mailed-by, signed-by, security');
+// An open message's toolbar stays at the top while the message scrolls (short window).
+{
+  const vp = page.viewportSize();
+  await page.setViewportSize({ width: vp.width, height: 360 });
+  await page.mouse.move(700, 300);
+  await page.mouse.wheel(0, 3000);
+  await page.waitForTimeout(300);
+  await must((await page.evaluate(() => scrollY)) > 0, 'message page scrolled');
+  await must(Math.abs(await page.locator('.thread-toolbar').evaluate((e) => e.getBoundingClientRect().top)) < 2, 'message toolbar stays at the top');
+  await must(await page.locator('.thread-toolbar').getByRole('button', { name: 'Archive' }).isVisible(), 'Archive still reachable after scrolling');
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.setViewportSize(vp);
+  log('open message: toolbar stays at the top while scrolling');
+}
 await page.getByRole('link', { name: 'Back' }).click();
 
 // ---- Alice sends an ECS message with an attachment

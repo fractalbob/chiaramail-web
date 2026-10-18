@@ -387,6 +387,8 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .savestate { color: var(--slate); font-size: 0.875rem; margin-left: auto; }
 
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding-bottom: 6px; border-bottom: 1px solid var(--rule); }
+/* An open message's toolbar (Back, Archive, Report spam, Delete…) stays at the top while the message scrolls. */
+.thread-toolbar { position: sticky; top: 0; z-index: 25; background: var(--sky); padding-top: 6px; }
 .toolbar-reply { display: inline-flex; gap: 2px; margin-left: auto; }
 .ibtn.star-on { color: #d9a400; }
 .star-btn.star-on { color: #b88a00; border-color: #d9a400; }
