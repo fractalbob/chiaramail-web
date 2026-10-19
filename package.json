@@ -14,7 +14,8 @@
     "dev:mock": "vite --mode mock",
     "build:mock": "vite build --mode mock",
     "test:unit": "node --test tests/mime.test.js",
-    "test:e2e": "npm run build:mock && echo \"Run: npx vite preview, then BASE=http://localhost:4173 node tests/e2e-mail.mjs shots\""
+    "test:e2e": "npm run build:mock && echo \"Run: npx vite preview, then BASE=http://localhost:4173 node tests/e2e-mail.mjs shots\"",
+    "build:desktop": "vite build --mode desktop --outDir desktop/renderer --emptyOutDir"
   },
   "dependencies": {
     "@fontsource-variable/literata": "^5.3.0",

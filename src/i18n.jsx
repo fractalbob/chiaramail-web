@@ -1,4 +1,5 @@
 import { createContext, useContext, useMemo, useState, useCallback } from 'react';
+import { desktopText } from './i18n-desktop.js';
 
 const en = {
   tagline: 'Own the email you send. Indefinitely.',
@@ -590,6 +591,8 @@ const fr = {
   discard: 'Annuler',
 };
 
+// The desktop app (any provider over IMAP/SMTP) has its own wording where Gmail is mentioned.
+if (import.meta.env.MODE === 'desktop') { Object.assign(en, desktopText.en); Object.assign(fr, desktopText.fr); }
 const dicts = { en, fr };
 const pickInitial = () => {
   try {

@@ -3,8 +3,14 @@ import * as gmail from '@gmail';
 import { useMail } from './context.jsx';
 import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
+import DesktopSignIn from './DesktopSignIn.jsx';
 
 export default function MailLanding() {
+  if (gmail.mode === 'desktop') return <DesktopSignIn />;
+  return <GmailLanding />;
+}
+
+function GmailLanding() {
   const { t } = useI18n();
   const { user } = useAuth();
   const mail = useMail();

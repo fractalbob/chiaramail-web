@@ -13,7 +13,7 @@
 // flags is kept on this computer (in dataDir) to build conversations quickly.
 import { ImapFlow } from 'imapflow';
 import nodemailer from 'nodemailer';
-import addressparser from 'nodemailer/lib/addressparser/index.js';
+import addressparser from 'nodemailer/lib/addressparser';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { join } from 'node:path';

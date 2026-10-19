@@ -697,3 +697,21 @@ html.busy body::before {
 
 .notice-line { margin: 8px 0; padding: 8px 12px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--lumen) 25%, var(--paper)); font-size: 0.9375rem; }
 .linklike { background: none; border: 0; padding: 0 4px; cursor: pointer; color: var(--slate); font-size: 1rem; }
+
+/* desktop app sign-in (any provider) */
+.dsignin input[type="password"], .dsignin select {
+  width: 100%; padding: 10px 12px; border-radius: var(--radius-s);
+  border: 1px solid var(--rule); background: var(--paper); color: var(--ink);
+  font: 1rem/1.4 var(--sans);
+}
+.dsignin input[readonly] { background: var(--sky); color: var(--slate); }
+.dsignin .btn-primary { margin-top: 10px; justify-self: start; }
+.dsrv-toggle { justify-self: start; margin-top: 4px; }
+.dsrv-all { display: grid; gap: 8px; }
+.dsrv { border: 1px solid var(--rule); border-radius: var(--radius-s); padding: 8px 12px 12px; margin: 0; display: grid; gap: 6px; }
+.dsrv legend { font: 600 0.875rem/1.2 var(--sans); color: var(--ink); padding: 0 4px; }
+.dsrv-row { display: grid; grid-template-columns: 6rem 1fr; gap: 10px; }
+.dsrv-row span { display: grid; gap: 6px; }
+.dsignout { margin-top: 12px; }
+.ecs-soon { padding: 10px 12px; border-left: 3px solid var(--rule); background: var(--sky); border-radius: var(--radius-s); }
+.signin .help + .dsignin { margin-top: 16px; }

@@ -38,6 +38,7 @@ export function MailProvider({ children }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [grantFor, setGrantFor] = useState(null); // account signed in without Gmail access
+  const [failure, setFailure] = useState(null); // desktop app: why the last sign-in failed (code, settings…)
 
   let status = 'checking';
   if (user !== undefined) {
@@ -101,15 +102,16 @@ export function MailProvider({ children }) {
     grantFor,
     refreshCounts,
     connect: async (arg) => {
-      setBusy(true); setError(''); setGrantFor(null);
+      setBusy(true); setError(''); setGrantFor(null); setFailure(null);
       try { const email = await gmail.connect(arg); setAccount(email); setExpired(false); } catch (e) {
+        if (gmail.mode === 'desktop') { setFailure(e); return; }
         const quiet = ['popup_closed', 'popup_failed_to_open', 'access_denied'];
         if (e.code === 'scope-denied') { setError(e.email ? 'scopeDeniedFor' : 'scopeDenied'); setGrantFor(e.email || ''); }
         else if (e.code === 'popup_failed_to_open') setError('popupBlocked');
         else if (!quiet.includes(e.code)) setError(e.message);
       } finally { setBusy(false); }
     },
-    disconnect: async () => { await gmail.disconnect(); setAccount(null); setLabels([]); },
+    disconnect: async () => { await gmail.disconnect(); setAccount(null); setLabels([]); setFailure(null); setExpired(false); },
     // Creates a label in Gmail (or finds the one with that name) and adds it to the lists.
     createLabel: async (name) => {
       const l = await gmail.createLabel(name);
@@ -118,7 +120,8 @@ export function MailProvider({ children }) {
     },
     // Call with any error from a Gmail call; returns true if it was handled.
     handle: (e) => { if (e?.code === 'reconnect') { setExpired(true); return true; } return false; },
-  }), [status, account, labels, unread, busy, error, grantFor, refreshCounts]);
+    failure,
+  }), [status, account, labels, unread, busy, error, grantFor, failure, refreshCounts]);
 
   return <MailCtx.Provider value={value}>{children}</MailCtx.Provider>;
 }

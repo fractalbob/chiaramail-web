@@ -4,3 +4,4 @@ dist
 .firebase
 *-debug.log
 shots/
+desktop/renderer

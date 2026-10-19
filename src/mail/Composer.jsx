@@ -58,7 +58,7 @@ export default function Composer() {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState(''); // HTML from the editor (see richtext.js)
   const [files, setFiles] = useState([]); // { name, type, size, file? , fwd? }
-  const [changeable, setChangeable] = useState(mode === 'new' && !note);
+  const [changeable, setChangeable] = useState(mode === 'new' && !note && backend.ecsReady);
   const [allowFwd, setAllowFwd] = useState(false);
   const [forwardBlocked, setForwardBlocked] = useState(false);
   const [orig, setOrig] = useState(null);
@@ -378,13 +378,14 @@ export default function Composer() {
         <RichEditor id="body" label={t('message')} value={body} onChange={setBody} editorRef={bodyRef} />
       </div>
 
-      <label className={changeable ? 'livetoggle livetoggle-on' : 'livetoggle'}>
+      {!backend.ecsReady && <p className="help ecs-soon">{t('ecsSoon')}</p>}
+      {backend.ecsReady && <label className={changeable ? 'livetoggle livetoggle-on' : 'livetoggle'}>
         <input type="checkbox" checked={changeable} onChange={(e) => setChangeable(e.target.checked)} />
         <span>
           <strong>{t('changeableLabel')}</strong>
           <span className="help">{t('changeableHelp')}</span>
         </span>
-      </label>
+      </label>}
       {changeable && (
         <label className="subtoggle">
           <input type="checkbox" checked={allowFwd} onChange={(e) => setAllowFwd(e.target.checked)} />
