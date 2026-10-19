@@ -4,6 +4,7 @@
 //   magenta sender  — someone who uses ECS
 import { useEffect, useState } from 'react';
 import * as backend from '@backend';
+import { useAuth } from '../auth.jsx';
 
 // 'ok' | 'spoof' | null (can't tell: not readable by you, or not ECS)
 export async function verdictFor(items) {
@@ -16,7 +17,9 @@ export async function verdictFor(items) {
 // For a page of the thread list: who uses ECS, and each thread's verdict.
 export function useEcsMarks(rows, me) {
   const [marks, setMarks] = useState({ key: null, users: new Set(), verdicts: {} });
-  const key = rows ? rows.map((r) => r.id).join(',') : null;
+  const { user } = useAuth();
+  // Checked again when the session changes (desktop: once the ECS server sign-in completes).
+  const key = rows ? `${user?.uid || ''}|${rows.map((r) => r.id).join(',')}` : null;
   useEffect(() => {
     if (!rows) return;
     let live = true;
@@ -34,12 +37,13 @@ export function useEcsMarks(rows, me) {
 
 export function useIsEcsUser(email) {
   const [state, setState] = useState({ email: null, yes: false });
+  const { user } = useAuth();
   const e = (email || '').toLowerCase();
   useEffect(() => {
     if (!e) return;
     let live = true;
     backend.isEcsUser(e).then((yes) => { if (live) setState({ email: e, yes }); });
     return () => { live = false; };
-  }, [e]);
+  }, [e, user?.uid]);
   return state.email === e && state.yes;
 }

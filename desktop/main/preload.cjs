@@ -11,4 +11,10 @@ contextBridge.exposeInMainWorld('chiaramailDesktop', {
   connect: (cfg) => ipcRenderer.invoke('account:connect', cfg),
   signOut: () => ipcRenderer.invoke('account:signOut'),
   call: (method, args) => ipcRenderer.invoke('mail', method, args),
+  ecs: {
+    ...ipcRenderer.sendSync('ecs:config'),
+    session: (email) => ipcRenderer.invoke('ecs:session', email),
+    signIn: (email, lang) => ipcRenderer.invoke('ecs:signIn', email, lang),
+    call: (method, path, opts) => ipcRenderer.invoke('ecs:call', method, path, opts),
+  },
 });

@@ -1,0 +1,19 @@
+{
+  "name": "chiaramail-ecs-server",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ChiaraMail's European ECS server: the content of ECS messages, stored in the EU",
+  "type": "module",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "nodemailer": "^10.1.7",
+    "pg": "^8.23.1"
+  }
+}

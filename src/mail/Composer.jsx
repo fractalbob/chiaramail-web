@@ -80,6 +80,15 @@ export default function Composer() {
   const sig = useSignature(user?.uid);
   const sigBlock = signatureBlock(sig.html);
 
+  // Desktop app: ECS becomes available once its server sign-in completes; a new
+  // message opened before that switches to ECS then (the option wasn't shown yet).
+  const [ecsSeen, setEcsSeen] = useState(backend.ecsReady);
+  const [ecsAuto, setEcsAuto] = useState(false); // switched on that way (not by the writer)
+  if (!ecsSeen && backend.ecsReady) {
+    setEcsSeen(true);
+    if (mode === 'new' && !note) { setChangeable(true); setEcsAuto(true); }
+  }
+
   // A new message starts with the signature below an empty line, as in Gmail
   // (set once, while rendering, as soon as the signature is known).
   const [sigAdded, setSigAdded] = useState(false);
@@ -239,10 +248,15 @@ export default function Composer() {
   useEffect(() => {
     if (!ready || doneRef.current) return;
     if (baselineRef.current === null) { baselineRef.current = snapshot; lastSavedRef.current = draftParam ? snapshot : null; return; }
+    // ECS switched on by itself is not an edit: with nothing else written, no draft is kept.
+    if (ecsAuto && !draftIdRef.current && JSON.stringify({ ...JSON.parse(snapshot), changeable: false }) === baselineRef.current) {
+      baselineRef.current = snapshot;
+      return;
+    }
     if (snapshot === lastSavedRef.current || (snapshot === baselineRef.current && !draftIdRef.current)) return;
     const timer = setTimeout(saveDraft, AUTOSAVE_MS);
     return () => clearTimeout(timer);
-  }, [snapshot, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [snapshot, ready, ecsAuto]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mountedRef = useRef(true);
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
@@ -378,7 +392,7 @@ export default function Composer() {
         <RichEditor id="body" label={t('message')} value={body} onChange={setBody} editorRef={bodyRef} />
       </div>
 
-      {!backend.ecsReady && <p className="help ecs-soon">{t('ecsSoon')}</p>}
+      {!backend.ecsReady && <p className="help ecs-soon">{t(backend.ecsPending ? 'ecsConnecting' : 'ecsSoon')}</p>}
       {backend.ecsReady && <label className={changeable ? 'livetoggle livetoggle-on' : 'livetoggle'}>
         <input type="checkbox" checked={changeable} onChange={(e) => setChangeable(e.target.checked)} />
         <span>

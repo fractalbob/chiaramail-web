@@ -31,13 +31,18 @@ iCloud need an *app password* (created in the account's security settings).
 - `main/mail/detect.js`: finds a provider's servers from the address.
 - `../src/gmail/desktop.js`, `../src/backend/desktop.js`: the screens' side.
 
-Changeable (ECS) messages are switched off until the European ECS server exists.
+Changeable (ECS) messages go through ChiaraMail's European ECS server
+(`../server/`), set in `package.json` → `chiaramail.ecsUrl`. The app signs in
+to it by itself: the server emails a code, the app finds it in the inbox,
+enters it and deletes that email. With no server set, ECS stays off.
+`main/ecs.js` holds that connection; `../src/backend/desktop.js` is the screens' side.
 
 ## Tests
 
 ```
 cd desktop && npm test                                   # mail layer, against a real Dovecot server
 cd .. && npm run build:desktop && xvfb-run -a node desktop/test/app.e2e.mjs   # the whole app
+xvfb-run -a node desktop/test/ecs.e2e.mjs   # ECS between two users, through the server
 ```
 
-The tests need `dovecot` installed (they start their own private copy).
+The tests need `dovecot` and PostgreSQL installed (they start their own private copies).

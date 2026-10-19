@@ -19,7 +19,8 @@ export const isEmail = (s) => EMAIL.test(s.trim());
 
 // Links always point at the public address (e.g. https://app.chiaramail.com), even
 // when the app is opened on its .web.app address. Falls back to the current site.
-const PUBLIC_ORIGIN = import.meta.env.VITE_PUBLIC_ORIGIN || window.location.origin;
+// The desktop app links to the reader page of its European ECS server.
+const PUBLIC_ORIGIN = window.chiaramailDesktop?.ecs?.readerOrigin || import.meta.env.VITE_PUBLIC_ORIGIN || window.location.origin;
 export const messageUrl = (id) => new URL(`/m/${id}`, PUBLIC_ORIGIN).toString();
 export const homeUrl = () => new URL('/', PUBLIC_ORIGIN).toString();
 

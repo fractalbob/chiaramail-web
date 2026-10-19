@@ -4,7 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default [
-  { ignores: ['dist', 'desktop/node_modules', 'desktop/renderer'] },
+  { ignores: ['dist', 'desktop/node_modules', 'desktop/renderer', 'server/node_modules', 'server/files'] },
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {
@@ -22,7 +22,7 @@ export default [
   },
   // The desktop app's main process runs in Node, not the browser.
   {
-    files: ['desktop/**/*.js'],
+    files: ['desktop/**/*.js', 'server/**/*.js'],
     languageOptions: { globals: globals.node },
     rules: { 'preserve-caught-error': 'off' },
   },

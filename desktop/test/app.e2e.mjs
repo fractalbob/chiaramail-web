@@ -88,7 +88,7 @@ try {
   // Reply from the desktop app: it reaches Paul's server copy in Sent, threaded.
   await page.getByRole('link', { name: 'Reply', exact: true }).first().click();
   await page.locator('.compose').waitFor();
-  await must(page.getByText(/Changeable ECS messages will be available here/).count(), 'ECS shown as coming soon');
+  await must(page.getByText(/Changeable ECS messages aren’t available at the moment/).count(), 'ECS shown as coming soon');
   await page.getByLabel('Message', { exact: true }).click();
   await page.keyboard.press('Control+Home');
   await page.keyboard.type('Merci Paul, le 50×70 me convient.');

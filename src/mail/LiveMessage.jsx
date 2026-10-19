@@ -30,7 +30,7 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
   const key = message.key;
   useEffect(() => watchEcs(pointer, key,
     (d) => setLoaded(d ? { id: pointer, status: 'ok', data: d } : { id: pointer, status: 'missing' }),
-    (e) => setLoaded({ id: pointer, status: e.code === 'permission-denied' ? 'denied' : 'error', error: e.message })), [pointer, key]);
+    (e) => setLoaded({ id: pointer, status: e.code === 'permission-denied' ? 'denied' : 'error', error: e.message })), [pointer, key, user?.uid]); // again once signed in (desktop: the ECS server)
 
   const state = loaded.id === pointer ? loaded : { status: 'loading' };
   const d = state.data;

@@ -17,5 +17,9 @@
   "devDependencies": {
     "electron": "^44.9.0",
     "smtp-server": "^3.20.2"
+  },
+  "chiaramail": {
+    "ecsUrl": "",
+    "readerOrigin": ""
   }
 }

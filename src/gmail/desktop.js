@@ -17,7 +17,7 @@ const call = (method, ...args) => busy(async () => unwrap(await bridge.call(meth
 /** The account saved on this computer, if any (signed in again silently). */
 export function restore() {
   if (!account) return null;
-  backend.signInWithGoogleAccessToken(account.email); // the local session follows the mail account
+  backend.signInWithGoogleAccessToken(account.email, account.name); // the session follows the mail account
   return account.email;
 }
 export const lastAccount = () => account?.email || '';
@@ -29,7 +29,7 @@ export const detect = async (email) => unwrap(await bridge.detect(email));
 /** { email, password, name?, user?, imap?, smtp? } — checks the servers, then saves. */
 export async function connect(cfg) {
   account = unwrap(await bridge.connect(cfg));
-  await backend.signInWithGoogleAccessToken(account.email);
+  await backend.signInWithGoogleAccessToken(account.email, account.name);
   return account.email;
 }
 
