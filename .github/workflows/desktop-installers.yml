@@ -1,0 +1,68 @@
+# Builds the ChiaraMail desktop installers (Windows, Mac, Linux) on GitHub's
+# machines. Start it by hand: GitHub → Actions → "Desktop installers" → Run
+# workflow, giving the address of the ECS server the app should use. The
+# installers appear at the bottom of the run's page, under "Artifacts".
+name: Desktop installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      ecs_url:
+        description: "ECS server address (e.g. https://ecs.chiaramail.fr); empty = ECS off"
+        required: false
+        default: ""
+      reader_origin:
+        description: "Reader page address for recipients without the app (empty = same as the ECS server)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: --win
+            files: desktop/dist/*.exe
+          - os: macos-latest
+            target: --mac
+            files: desktop/dist/*.dmg
+          - os: ubuntu-latest
+            target: --linux
+            files: desktop/dist/*.AppImage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build the screens
+        run: |
+          npm ci
+          npm run build:desktop
+      - name: Point the app at the ECS server
+        working-directory: desktop
+        shell: bash
+        env:
+          ECS_URL: ${{ inputs.ecs_url }}
+          READER_ORIGIN: ${{ inputs.reader_origin }}
+        run: |
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json'));p.chiaramail={ecsUrl:process.env.ECS_URL||'',readerOrigin:process.env.READER_ORIGIN||''};fs.writeFileSync('package.json',JSON.stringify(p,null,2));"
+          grep -A3 '"chiaramail"' package.json
+      - name: Make the installer
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          npm ci
+          npx electron-builder ${{ matrix.target }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChiaraMail-${{ runner.os }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+          retention-days: 30

@@ -20,6 +20,18 @@ automatically for well-known providers and for domains that publish their
 settings; otherwise open **Server settings** and type them in. Gmail, Yahoo and
 iCloud need an *app password* (created in the account's security settings).
 
+## Installers
+
+Built on GitHub: **Actions → Desktop installers → Run workflow**, giving the ECS
+server's address. About ten minutes later the run's page lists, under
+**Artifacts**, `ChiaraMail-Windows` (.exe), `ChiaraMail-macOS` (.dmg, Apple
+silicon and Intel) and `ChiaraMail-Linux` (.AppImage). Locally: `npm run dist`
+builds the one for this computer's system.
+
+They aren't signed yet (a Microsoft code-signing certificate and an Apple
+developer account are needed for that), so Windows and macOS warn the first
+time; `INSTALLER-fr.md` tells testers how to go past the warning.
+
 ## How it fits together
 
 - `main/main.js`: the app window; serves `renderer/` as `app://chiaramail/`.

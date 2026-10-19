@@ -31,8 +31,9 @@ await srv.deliver('bob@example.fr', mail('Julia Köhler <julia@example.de>', 'Co
 let app; let page;
 const launch = async () => {
   app = await electron.launch({
-    executablePath: ELECTRON,
-    args: ['--no-sandbox', DESKTOP],
+    // CHIARAMAIL_APP: test an installed/packaged app instead of the source.
+    executablePath: process.env.CHIARAMAIL_APP || ELECTRON,
+    args: process.env.CHIARAMAIL_APP ? ['--no-sandbox'] : ['--no-sandbox', DESKTOP],
     env: { ...process.env, CHIARAMAIL_USERDATA: userData, LANG: 'en_GB.UTF-8' },
   });
   page = await app.firstWindow();

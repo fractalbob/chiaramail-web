@@ -7,7 +7,8 @@
   "main": "main/main.js",
   "scripts": {
     "test": "node --test test/*.test.js",
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "electron-builder --publish never"
   },
   "dependencies": {
     "imapflow": "^1.7.8",
@@ -16,10 +17,84 @@
   },
   "devDependencies": {
     "electron": "^44.9.0",
+    "electron-builder": "^26.15.3",
     "smtp-server": "^3.20.2"
   },
   "chiaramail": {
     "ecsUrl": "",
     "readerOrigin": ""
-  }
+  },
+  "productName": "ChiaraMail",
+  "author": {
+    "name": "The Fractal Images Company"
+  },
+  "homepage": "https://app.chiaramail.com",
+  "build": {
+    "appId": "com.thefractalimagescompany.chiaramail",
+    "productName": "ChiaraMail",
+    "copyright": "© The Fractal Images Company",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main/**",
+      "renderer/**",
+      "package.json",
+      "!**/*.map"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "ChiaraMail-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "ChiaraMail"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "identity": "-",
+      "artifactName": "ChiaraMail-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Network;Email",
+      "artifactName": "ChiaraMail-${version}-${arch}.${ext}",
+      "syncDesktopName": true,
+      "executableName": "chiaramail"
+    },
+    "publish": null
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fractalbob/chiaramail-web.git"
+  },
+  "desktopName": "chiaramail.desktop"
 }

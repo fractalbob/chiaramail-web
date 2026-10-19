@@ -47,8 +47,9 @@ async function open(name) {
   if (app) await app.close();
   who = name;
   app = await electron.launch({
-    executablePath: ELECTRON,
-    args: ['--no-sandbox', DESKTOP],
+    // CHIARAMAIL_APP: test an installed/packaged app instead of the source.
+    executablePath: process.env.CHIARAMAIL_APP || ELECTRON,
+    args: process.env.CHIARAMAIL_APP ? ['--no-sandbox'] : ['--no-sandbox', DESKTOP],
     env: { ...process.env, CHIARAMAIL_USERDATA: dataDirs[name], CHIARAMAIL_ECS_URL: ECS_URL, CHIARAMAIL_READER_ORIGIN: 'https://lire.chiaramail.test', CHIARAMAIL_DOWNLOADS: downloads, LANG: 'en_GB.UTF-8' },
   });
   page = await app.firstWindow();
