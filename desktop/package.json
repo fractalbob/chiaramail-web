@@ -1,0 +1,20 @@
+{
+  "name": "chiaramail-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ChiaraMail desktop: any mail provider over IMAP/SMTP; ECS content on European servers",
+  "type": "module",
+  "main": "main/main.js",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "imapflow": "^1.7.8",
+    "libmime": "^5.4.3",
+    "mailparser": "^3.9.47",
+    "nodemailer": "^7.0.13"
+  },
+  "devDependencies": {
+    "smtp-server": "^3.20.2"
+  }
+}
