@@ -49,6 +49,8 @@ export function restore() {
   return null;
 }
 
+// Only the desktop app saves an account on the computer (see desktop.js).
+export const savedAccount = () => null;
 export const lastAccount = () => { try { return localStorage.getItem(HINT_KEY) || ''; } catch { return ''; } };
 
 const flag = (k) => { try { return localStorage.getItem(k) === '1'; } catch { return false; } };

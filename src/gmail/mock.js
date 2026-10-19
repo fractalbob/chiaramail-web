@@ -27,6 +27,8 @@ export function restore() {
   try { me = sessionStorage.getItem(SESSION); } catch { me = null; }
   return me;
 }
+// Only the desktop app saves an account on the computer (see desktop.js).
+export const savedAccount = () => null;
 export const lastAccount = () => '';
 
 export async function connect(email) {
