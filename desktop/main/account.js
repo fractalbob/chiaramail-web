@@ -93,6 +93,8 @@ export class AccountManager {
     email = String(email || '').trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw fail('badEmail');
     if (!password) throw fail('needPassword');
+    // App passwords (Google, Yahoo) are shown as "abcd efgh ijkl mnop": the servers want them without the spaces.
+    if (/^[a-z]{4}( [a-z]{4}){3}$/i.test(password.trim())) password = password.replace(/ /g, '');
     let found = null;
     if (!imap || !smtp) {
       found = await detect(email);

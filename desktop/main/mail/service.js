@@ -37,6 +37,7 @@ const notFound = (what) => Object.assign(new Error(`${what} not found`), { statu
 const b64url = (buf) => Buffer.from(buf).toString('base64url');
 const streamToBuffer = async (s) => { const c = []; for await (const x of s) c.push(x); return Buffer.concat(c); };
 const byDate = (a, b) => (a.meta.date - b.meta.date) || ((a.meta.hdate || 0) - (b.meta.hdate || 0));
+const INITIAL = 300; // newest messages read from a folder the first time it's opened
 const chunks = (a, n) => Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, i * n + n));
 
 export class MailService {
@@ -45,7 +46,8 @@ export class MailService {
    * imap/smtp: { host, port, secure }; auth: { user, pass } (shared by both unless smtpAuth).
    * dataDir: where the index is kept. saveSent: append sent mail to Sent (most IMAP providers don't do it themselves).
    */
-  constructor({ email, name = '', imap, smtp, auth, smtpAuth, dataDir, saveSent = true, logger = false }) {
+  constructor({ email, name = '', imap, smtp, auth, smtpAuth, dataDir, saveSent = true, logger = false, initial = INITIAL }) {
+    this.initial = initial;
     this.email = email.toLowerCase();
     this.name = name;
     this.opts = { imap, smtp, auth, smtpAuth: smtpAuth || auth, logger };
@@ -85,6 +87,8 @@ export class MailService {
   }
 
   async close() {
+    clearTimeout(this.warming);
+    this.warming = null;
     await this.flush();
     try { await this.client?.logout(); } catch { /* already closed */ }
     this.client = null;
@@ -107,7 +111,8 @@ export class MailService {
     for (const f of list) {
       const flags = new Set([...(f.flags || [])].map(String));
       if (flags.has('\\Noselect') || flags.has('\\NonExistent')) continue;
-      if (f.specialUse === '\\All' || f.specialUse === '\\Flagged' || f.specialUse === '\\Important') continue; // Gmail-style virtual folders
+      // Gmail's virtual folders (All Mail, Starred, Important) repeat messages kept elsewhere.
+      if (['\\All', '\\Flagged', '\\Important'].some((x) => f.specialUse === x || flags.has(x))) continue;
       let role = f.path.toUpperCase() === 'INBOX' ? 'INBOX' : SPECIAL[f.specialUse] || null;
       if (!role) {
         const leaf = f.path.split(f.delimiter || '/').pop();
@@ -187,43 +192,117 @@ export class MailService {
     };
   }
 
-  /** Brings the index up to date with the server: new, removed and re-flagged messages. */
+  /**
+   * Brings the index up to date. A folder seen for the first time gets its
+   * newest INITIAL messages only (older ones come as the person pages back:
+   * backfill); after that, only what changed is asked for: new messages, removed
+   * ones, and changed flags (with CONDSTORE, only those that changed).
+   * paths: these folders, now. Otherwise the folders already in use plus the
+   * Inbox, Sent and Drafts, each at most every 10 seconds (force: now).
+   */
   async sync({ force = false, paths } = {}) {
-    if (!force && !paths && Date.now() - this.lastSync < 10_000) return;
     if (!this.folders.length) await this.loadFolders();
-    const c = await this.conn();
-    for (const f of this.folders) {
-      if (paths && !paths.includes(f.path)) continue;
-      let st;
-      try { st = await c.status(f.path, { uidNext: true, uidValidity: true, messages: true }); } catch { continue; }
-      let fx = this.idx.folders[f.path];
-      if (!fx || String(fx.uidValidity) !== String(st.uidValidity)) {
-        fx = { uidValidity: String(st.uidValidity), uidNext: 0, msgs: {} };
-        this.idx.folders[f.path] = fx;
-      }
-      if (!st.messages) { fx.msgs = {}; fx.uidNext = Number(st.uidNext || 0); continue; }
-      await this.inBox(f.path, async (cc) => {
-        const uids = (await cc.search({ all: true }, { uid: true })) || [];
-        const now = new Set(uids.map(String));
-        for (const u of Object.keys(fx.msgs)) if (!now.has(u)) delete fx.msgs[u];
-        const fresh = uids.filter((u) => !fx.msgs[u]).sort((a, b) => b - a); // newest first
-        for (const part of chunks(fresh, 400)) {
-          for await (const m of cc.fetch(part, { uid: true, flags: true, internalDate: true, size: true, headers: META }, { uid: true })) {
-            fx.msgs[m.uid] = this.metaOf(m);
-          }
-        }
-        if (uids.length) {
-          for await (const m of cc.fetch('1:*', { uid: true, flags: true })) {
-            if (fx.msgs[m.uid]) fx.msgs[m.uid].flags = [...(m.flags || [])];
-          }
-        }
-        fx.uidNext = Number(st.uidNext || 0);
-      });
+    const core = ['INBOX', 'SENT', 'DRAFT'].map((r) => this.pathOf(r)).filter(Boolean);
+    const list = paths || [...new Set([...core, ...Object.keys(this.idx.folders).filter((p) => this.idx.folders[p].ready)])];
+    for (const path of list) {
+      if (!this.folders.some((f) => f.path === path)) continue;
+      const fx = this.idx.folders[path];
+      if (!paths && !force && fx?.ready && Date.now() - (fx.at || 0) < 10_000) continue;
+      try { await this.syncFolder(path); } catch (e) { if (e.code === 'reconnect' || !this.client?.usable) throw e; }
     }
     // Forget folders that no longer exist.
     for (const p of Object.keys(this.idx.folders)) if (!this.folders.some((f) => f.path === p)) delete this.idx.folders[p];
-    if (!paths) this.lastSync = Date.now();
     this.saveSoon();
+  }
+
+  async fetchMeta(c, fx, uids) {
+    for (const part of chunks([...uids].sort((a, b) => b - a), 200)) {
+      for await (const m of c.fetch(part, { uid: true, flags: true, internalDate: true, size: true, headers: META }, { uid: true })) {
+        fx.msgs[m.uid] = { ...this.metaOf(m), ...(fx.msgs[m.uid]?.snip !== undefined ? { snip: fx.msgs[m.uid].snip } : {}) };
+      }
+    }
+  }
+
+  async syncFolder(path) {
+    const c = await this.conn();
+    const condstore = c.capabilities?.has?.('CONDSTORE');
+    // With the folder open on this connection, the server's figures only move on after a NOOP.
+    if (c.mailbox?.path === path) await c.noop().catch(() => {});
+    const st = await c.status(path, { uidNext: true, uidValidity: true, messages: true, ...(condstore ? { highestModseq: true } : {}) });
+    let fx = this.idx.folders[path];
+    if (!fx || String(fx.uidValidity) !== String(st.uidValidity)) {
+      fx = { uidValidity: String(st.uidValidity), uidNext: 0, msgs: {} };
+      this.idx.folders[path] = fx;
+    }
+    const finish = () => Object.assign(fx, {
+      uidNext: Number(st.uidNext || 0), count: st.messages, modseq: st.highestModseq ? String(st.highestModseq) : null, at: Date.now(), ready: true,
+    });
+    if (!st.messages) { fx.msgs = {}; fx.complete = true; fx.lowest = 0; finish(); return; }
+    await this.inBox(path, async (cc) => {
+      if (!fx.ready) {
+        const uids = ((await cc.search({ all: true }, { uid: true })) || []).sort((a, b) => a - b);
+        const take = uids.slice(-this.initial);
+        await this.fetchMeta(cc, fx, take);
+        fx.lowest = take[0] || 0;
+        fx.complete = take.length === uids.length;
+        finish();
+        return;
+      }
+      const unchanged = Number(st.uidNext) === fx.uidNext && st.messages === fx.count;
+      // New messages.
+      if (Number(st.uidNext) > fx.uidNext) {
+        const fresh = ((await cc.search({ uid: `${fx.uidNext || 1}:*` }, { uid: true })) || []).filter((u) => u >= fx.uidNext && !fx.msgs[u]);
+        await this.fetchMeta(cc, fx, fresh);
+      }
+      // Removed messages (only when the count says something went).
+      if (!unchanged) {
+        const from = fx.complete ? 1 : fx.lowest || 1;
+        const here = new Set(((await cc.search({ uid: `${from}:*` }, { uid: true })) || []).map(String));
+        for (const u of Object.keys(fx.msgs)) if (Number(u) >= from && !here.has(u)) delete fx.msgs[u];
+      }
+      // Changed flags (read, starred…).
+      const flagsOf = (m) => { if (fx.msgs[m.uid]) fx.msgs[m.uid].flags = [...(m.flags || [])]; };
+      if (condstore && fx.modseq && st.highestModseq) {
+        if (String(st.highestModseq) !== fx.modseq) {
+          try {
+            for await (const m of cc.fetch('1:*', { uid: true, flags: true }, { uid: true, changedSince: BigInt(fx.modseq) })) flagsOf(m);
+          } catch { fx.modseq = null; }
+        }
+      } else {
+        const from = fx.complete ? 1 : fx.lowest || 1;
+        for await (const m of cc.fetch(`${from}:*`, { uid: true, flags: true }, { uid: true })) flagsOf(m);
+      }
+    });
+    finish();
+  }
+
+  /** Fetches up to n older messages of a folder. Returns how many came. */
+  async backfill(path, n) {
+    const fx = this.idx.folders[path];
+    if (!fx?.ready || fx.complete || !fx.lowest) return 0;
+    let got = 0;
+    await this.inBox(path, async (cc) => {
+      const older = fx.lowest > 1 ? ((await cc.search({ uid: `1:${fx.lowest - 1}` }, { uid: true })) || []).sort((a, b) => a - b) : [];
+      const take = older.slice(-n);
+      await this.fetchMeta(cc, fx, take);
+      if (take.length) fx.lowest = take[0];
+      fx.complete = take.length === older.length;
+      got = take.length;
+    });
+    this.saveSoon();
+    return got;
+  }
+
+  /** In the background, one folder at a time: the others get their newest messages too. */
+  warmUp() {
+    if (this.warming) return;
+    this.warming = setTimeout(async () => {
+      this.warming = null;
+      const next = this.folders.find((f) => !this.idx.folders[f.path]?.ready);
+      if (!next || !this.client?.usable) return;
+      try { await this.syncFolder(next.path); this.saveSoon(); } catch { /* try again later */ }
+      this.warmUp();
+    }, 1500);
   }
 
   // ---- the Gmail-shaped view ---------------------------------------------------
@@ -303,7 +382,7 @@ export class MailService {
   getGmailSignature() { return ''; }
 
   async listLabels() {
-    if (!this.folders.length) await this.loadFolders();
+    await this.loadFolders(); // folders added or renamed elsewhere show up
     const sys = ['INBOX', 'STARRED', 'IMPORTANT', 'UNREAD', ...this.folders.filter((f) => !['INBOX', 'USER', 'ARCHIVE'].includes(f.role)).map((f) => f.role)];
     return [
       ...[...new Set(sys)].map((id) => ({ id, name: id, type: 'system' })),
@@ -326,7 +405,14 @@ export class MailService {
   }
 
   async getLabel(id) {
-    await this.sync();
+    const path = ['STARRED', 'IMPORTANT', 'UNREAD'].includes(id) || !id ? null : this.pathOfLabel(id);
+    if (path && !(this.idx.folders[path]?.ready && this.idx.folders[path].complete)) {
+      // A folder not read in full: its counts come straight from the server.
+      const c = await this.conn();
+      const st = await c.status(path, { messages: true, unseen: true });
+      return { id, threadsTotal: st.messages, threadsUnread: id === 'SENT' || id === 'DRAFT' ? 0 : st.unseen, messagesTotal: st.messages };
+    }
+    await this.sync(path ? { paths: [path] } : {});
     const { threads, entries } = this.view();
     const inLabel = [...threads.values()].filter((t) => MailService.visible(t.msgs, id));
     return {
@@ -348,6 +434,7 @@ export class MailService {
     else if (labelId && this.pathOfLabel(labelId)) paths = [this.pathOfLabel(labelId)];
     else if (pq.inFolder === 'anywhere') paths = this.folders.map((f) => f.path);
     else paths = this.folders.filter((f) => f.role !== 'TRASH' && f.role !== 'SPAM').map((f) => f.path);
+    await this.sync({ paths: paths.filter((p) => !this.idx.folders[p]?.ready) });
     const hits = new Set();
     for (const path of paths) {
       if (!this.idx.folders[path] || !Object.keys(this.idx.folders[path].msgs).length) continue;
@@ -365,21 +452,48 @@ export class MailService {
           const r = new Set((await c.search(t.criteria, { uid: true })) || []);
           set = new Set([...set].filter((u) => !r.has(u)));
         }
-        for (const u of set) hits.add(`${path}#${u}`);
+        // Matches older than what has been read so far: read them now (the newest 300).
+        const fx = this.idx.folders[path];
+        const missing = [...set].filter((u) => !fx.msgs[u]).sort((a, b) => b - a).slice(0, 300);
+        if (missing.length) await this.fetchMeta(c, fx, missing);
+        for (const u of set) if (fx.msgs[u]) hits.add(`${path}#${u}`);
       });
     }
     return hits;
   }
 
   async listThreads({ labelId, q, pageToken, max = 25 } = {}) {
+    const own = ['STARRED', 'IMPORTANT', 'UNREAD'].includes(labelId) || !labelId ? null : this.pathOfLabel(labelId);
+    if (own && !this.folders.some((f) => f.path === own)) await this.loadFolders(); // created elsewhere since
+    if (own && !this.idx.folders[own]?.ready) await this.sync({ paths: [own] });
     await this.sync();
     const hits = q ? await this.searchServer(q, labelId) : null;
-    const { threads } = this.view();
-    let list = [...threads.values()].filter((t) => MailService.visible(t.msgs, labelId));
-    if (hits) list = list.filter((t) => t.msgs.some((m) => m.locs.some((l) => hits.has(`${l.path}#${l.uid}`))));
-    list.sort((a, b) => byDate({ meta: b.latest }, { meta: a.latest }));
     const start = Number(pageToken || 0);
-    return { ids: list.slice(start, start + max).map((t) => t.id), nextPageToken: start + max < list.length ? String(start + max) : null, estimate: list.length };
+    const relevant = () => (own ? [own].filter((p) => this.idx.folders[p]) : Object.keys(this.idx.folders).filter((p) => this.idx.folders[p].ready));
+    const build = () => {
+      const { threads } = this.view();
+      let l = [...threads.values()].filter((t) => MailService.visible(t.msgs, labelId));
+      if (hits) l = l.filter((t) => t.msgs.some((m) => m.locs.some((x) => hits.has(`${x.path}#${x.uid}`))));
+      return l.sort((a, b) => byDate({ meta: b.latest }, { meta: a.latest }));
+    };
+    let list = build();
+    // Paging past what has been read: read older messages first.
+    for (let round = 0; !hits && round < 4 && list.length < start + max; round += 1) {
+      const todo = relevant().filter((p) => this.idx.folders[p] && !this.idx.folders[p].complete);
+      if (!todo.length) break;
+      let got = 0;
+      for (const p of todo) got += await this.backfill(p, Math.max(100, start + max - list.length + 50));
+      if (!got) break;
+      list = build();
+    }
+    const more = relevant().some((p) => !this.idx.folders[p]?.complete);
+    const total = own && !hits ? Math.max(list.length, this.idx.folders[own]?.count || 0) : list.length;
+    this.warmUp();
+    return {
+      ids: list.slice(start, start + max).map((t) => t.id),
+      nextPageToken: start + max < list.length || (more && !hits) ? String(start + max) : null,
+      estimate: total,
+    };
   }
 
   async ensureSnippet(e) {

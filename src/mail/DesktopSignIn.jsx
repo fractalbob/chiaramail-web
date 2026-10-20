@@ -110,7 +110,12 @@ export default function DesktopSignIn() {
               <input id="d-user" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} autoCapitalize="off" spellCheck="false" />
             </div>
           )}
-          {f && !mail.busy && <p className="error" role="alert">{failureText}</p>}
+          {f && !mail.busy && (
+            <div role="alert">
+              <p className="error">{failureText}</p>
+              {['auth', 'connect'].includes(f.code) && f.message && <p className="help dsrv-said">{t('dServerSaid', { msg: f.message })}</p>}
+            </div>
+          )}
           <button className="btn btn-primary" type="submit" disabled={mail.busy}>{mail.busy ? t('dConnecting') : t('dConnect')}</button>
         </form>
         {(reconnecting || user) && <button type="button" className="btn btn-quiet dsignout" onClick={mail.disconnect}>{t('otherAccount')}</button>}

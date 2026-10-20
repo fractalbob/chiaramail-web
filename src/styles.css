@@ -715,3 +715,4 @@ html.busy body::before {
 .dsignout { margin-top: 12px; }
 .ecs-soon { padding: 10px 12px; border-left: 3px solid var(--rule); background: var(--sky); border-radius: var(--radius-s); }
 .signin .help + .dsignin { margin-top: 16px; }
+.dsrv-said { word-break: break-word; font-family: ui-monospace, monospace; font-size: 0.8125rem; margin-top: 4px; }

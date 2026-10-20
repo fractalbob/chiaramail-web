@@ -198,3 +198,42 @@ test('the index survives a restart', async () => {
   assert.ok(Object.keys(bob.idx.folders).length > 0, 'index loaded from disk');
   assert.equal((await bob.listThreads({ labelId: 'INBOX' })).ids.length, 3);
 });
+
+test('big folders: newest first, older ones as you page back; counts from the server', async () => {
+  const box = await bob.createLabel('Archives 2020');
+  const path = bob.pathOfLabel(box.id);
+  const c = await bob.conn();
+  for (let i = 1; i <= 23; i += 1) {
+    await c.append(path, msg({ from: 'Old Friend <old@example.fr>', to: 'bob@example.fr', subject: `Vieux message ${i}`, body: `n° ${i}`, id: `old${i}@example.fr`, date: new Date(Date.UTC(2020, 0, i)).toUTCString() }), i % 2 ? ['\\Seen'] : []);
+  }
+  const own = (name, initial) => new MailService({ email: 'bob@example.fr', imap: srv.imap, smtp: srv.smtp, auth: { user: 'bob@example.fr', pass: USERS['bob@example.fr'] }, dataDir: join(dir, name), initial });
+  const small = own('small', 10);
+  await small.open();
+  const p1 = await small.listThreads({ labelId: box.id, max: 10 });
+  assert.equal(p1.ids.length, 10);
+  assert.equal(p1.estimate, 23);
+  assert.ok(p1.nextPageToken);
+  const [first] = await small.getThreadsMeta([p1.ids[0]]);
+  assert.equal(header(first.messages[0], 'subject'), 'Vieux message 23', 'newest first');
+  assert.equal(Object.keys(small.idx.folders[path].msgs).length, 10, 'only the newest were read');
+  const p2 = await small.listThreads({ labelId: box.id, max: 10, pageToken: p1.nextPageToken });
+  assert.equal(p2.ids.length, 10);
+  const p3 = await small.listThreads({ labelId: box.id, max: 10, pageToken: p2.nextPageToken });
+  assert.equal(p3.ids.length, 3);
+  assert.equal(p3.nextPageToken, null);
+  const [last] = await small.getThreadsMeta([p3.ids.at(-1)]);
+  assert.equal(header(last.messages[0], 'subject'), 'Vieux message 1');
+  const info = await small.getLabel(box.id);
+  assert.equal(info.messagesTotal, 23);
+  assert.equal(info.threadsUnread, 11);
+  // Search finds old messages that haven't been read yet.
+  const fresh = own('fresh', 5);
+  await fresh.open();
+  assert.equal((await fresh.listThreads({ labelId: box.id, q: 'subject:"Vieux message 2"' })).ids.length, 1 + 4, '2 and 20–23');
+  // A flag changed elsewhere is seen.
+  await bob.inBox(path, (cc) => cc.messageFlagsAdd('1:*', ['\\Flagged']));
+  await small.sync({ paths: [path] });
+  assert.equal((await small.listThreads({ labelId: 'STARRED', max: 50 })).ids.length, 23, 'flags changed elsewhere are seen');
+  await bob.inBox(path, (cc) => cc.messageFlagsRemove('1:*', ['\\Flagged']));
+  await small.close(); await fresh.close();
+});

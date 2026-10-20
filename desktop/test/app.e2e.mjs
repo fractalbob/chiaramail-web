@@ -68,7 +68,7 @@ try {
   await fillServers();
   await page.getByLabel('Password').fill('wrong');
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.getByRole('alert').filter({ hasText: /Incoming mail \(IMAP\): your provider refused/ }).waitFor({ timeout: 30_000 });
+  await page.getByRole('alert').filter({ hasText: /Incoming mail \(IMAP\): your provider refused/ }).first().waitFor({ timeout: 30_000 });
   await shot('d02-wrong-password');
   log('wrong password refused');
 
