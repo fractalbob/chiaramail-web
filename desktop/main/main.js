@@ -9,6 +9,20 @@ import { AccountManager } from './account.js';
 import { EcsClient } from './ecs.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
+// Diagnostics in the terminal: start with --log-mail (or CHIARAMAIL_DEBUG=1). Lists each
+// request from the screens with its duration, and the mail server's commands
+// (passwords masked; message contents are not shown).
+const DEBUG = process.argv.includes('--log-mail') || process.env.CHIARAMAIL_DEBUG === '1';
+const t0 = Date.now();
+const dlog = (...a) => { if (DEBUG) console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s]`, ...a); };
+const short = (s) => { const x = String(s); return x.length > 160 ? `${x.slice(0, 160)}…` : x; };
+const imapLogger = DEBUG ? {
+  trace() {},
+  debug: (o) => dlog(o.src === 'c' ? 'IMAP >' : o.src === 's' ? 'IMAP <' : 'IMAP', short(o.msg || '')),
+  info: (o) => dlog('IMAP', short(o.msg || '')),
+  warn: (o) => dlog('IMAP warn', short(o.msg || ''), o.err?.message || ''),
+  error: (o) => dlog('IMAP error', short(o.msg || ''), o.err?.message || ''),
+} : false;
 const RENDERER = process.env.CHIARAMAIL_RENDERER || join(here, '..', 'renderer');
 const ORIGIN = 'app://chiaramail';
 // The European ECS server: package.json "chiaramail.ecsUrl", or CHIARAMAIL_ECS_URL. Empty: ECS stays off.
@@ -109,10 +123,21 @@ function wireIpc() {
     if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('/auth/')) throw Object.assign(new Error('Bad call'), { code: 'bad-call' });
     return ecs.request(method, path, { json: opts?.json, bytes: opts?.bytes });
   }));
+  let seq = 0;
   ipcMain.handle('mail', (_e, method, args) => reply(async () => {
     if (!MAIL_METHODS.has(method)) throw Object.assign(new Error(`Unknown: ${method}`), { code: 'bad-call' });
-    const s = await accounts.mail();
-    return s[method](...(Array.isArray(args) ? args : []));
+    const n = ++seq; const t = Date.now();
+    const what = `#${n} ${method}${['listThreads', 'getLabel', 'recentAddresses'].includes(method) ? ` ${short(JSON.stringify(args))}` : ''}`;
+    dlog('→', what);
+    try {
+      const s = await accounts.mail();
+      const r = await s[method](...(Array.isArray(args) ? args : []));
+      dlog('←', what, `${Date.now() - t} ms`);
+      return r;
+    } catch (e) {
+      dlog('✗', what, `${Date.now() - t} ms`, e.message);
+      throw e;
+    }
   }));
 }
 
@@ -122,7 +147,8 @@ app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWind
 app.on('before-quit', () => { accounts?.close(); });
 
 app.whenReady().then(async () => {
-  accounts = new AccountManager({ dataDir: app.getPath('userData'), safeStorage });
+  accounts = new AccountManager({ dataDir: app.getPath('userData'), safeStorage, logger: imapLogger });
+  dlog('ChiaraMail', app.getVersion(), 'data in', app.getPath('userData'));
   await accounts.load();
   ecs = new EcsClient({ url: ECS_URL, readerOrigin: READER_ORIGIN, dataDir: app.getPath('userData'), safeStorage });
   await ecs.load();

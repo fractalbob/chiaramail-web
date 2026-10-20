@@ -128,6 +128,7 @@ namespace inbox {
   await new Promise((r) => smtp.listen(smtpPort, '127.0.0.1', r));
 
   return {
+    root,
     imap: { host: '127.0.0.1', port: imapPort, secure: false },
     smtp: { host: '127.0.0.1', port: smtpPort, secure: false },
     deliver,

@@ -30,7 +30,8 @@ function classify(e, where) {
 }
 
 export class AccountManager {
-  constructor({ dataDir, safeStorage }) {
+  constructor({ dataDir, safeStorage, logger = false }) {
+    this.logger = logger;
     this.dataDir = dataDir;
     this.file = join(dataDir, 'account.json');
     this.safe = safeStorage;
@@ -64,7 +65,7 @@ export class AccountManager {
     return new MailService({
       email: cfg.email, name: cfg.name || '',
       imap: imapOptions(cfg.imap), smtp: smtpOptions(cfg.smtp), auth,
-      dataDir: join(this.dataDir, 'mail'),
+      dataDir: join(this.dataDir, 'mail'), logger: this.logger,
     });
   }
 
