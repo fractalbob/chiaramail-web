@@ -7,7 +7,7 @@ import { readFile, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const CODE_WAIT_MS = 120_000;
-const POLL_MS = 2_000;
+const POLL_MS = 4_000;
 
 export class EcsClient {
   /** url: the server, e.g. https://ecs.example.eu ('' = no ECS server: ECS stays off). */
@@ -67,19 +67,40 @@ export class EcsClient {
     return { bytes: new Uint8Array(await r.arrayBuffer()) };
   }
 
-  /** Finds the code email for `ref` in the Inbox or Spam; returns the code, deleting the email. */
-  async findCode(mail, ref) {
-    for (const role of ['INBOX', 'SPAM']) {
+  /**
+   * Where the code email can land: the Inbox, Spam, and Sent (when the server
+   * sends the codes from this same address, Gmail files them under Sent only).
+   * Returns { path: next UID } for each, so only newer messages are looked at.
+   */
+  async marks(mail) {
+    const out = {};
+    for (const role of ['INBOX', 'SPAM', 'SENT']) {
       const path = mail.pathOf(role);
-      if (!path) continue;
+      if (!path || out[path]) continue;
+      out[path] = await mail.inBox(path, async (c) => c.mailbox?.uidNext || 1).catch(() => 1);
+    }
+    return out;
+  }
+
+  /**
+   * Finds the code email for `ref` among the messages that arrived since
+   * `marks` (a few envelopes, not a search of the whole mailbox, so the
+   * screens aren't held up); returns the code, deleting the email.
+   */
+  async findCode(mail, ref, marks) {
+    for (const [path, next] of Object.entries(marks)) {
       const code = await mail.inBox(path, async (c) => {
-        const uids = (await c.search({ subject: ref }, { uid: true })) || [];
-        for (const uid of uids) {
-          const m = await c.fetchOne(String(uid), { envelope: true }, { uid: true });
-          const found = m?.envelope?.subject?.match(/\b(\d{6})\b/);
-          if (found) { await c.messageDelete([uid], { uid: true }).catch(() => {}); return found[1]; }
+        await c.noop().catch(() => {}); // news of arrivals when this folder was already open
+        if (!c.mailbox?.exists) return null;
+        // (No other command may run while a fetch is being read: collect, then delete.)
+        let hit = null;
+        for await (const m of c.fetch(`${next}:*`, { envelope: true, uid: true }, { uid: true })) {
+          const s = m.envelope?.subject || '';
+          const found = m.uid >= next && s.includes(ref) && s.match(/\b(\d{6})\b/);
+          if (found && !hit) hit = { uid: m.uid, code: found[1] };
         }
-        return null;
+        if (hit) await c.messageDelete([hit.uid], { uid: true }).catch(() => {});
+        return hit?.code || null;
       }).catch(() => null);
       if (code) return code;
     }
@@ -91,11 +112,12 @@ export class EcsClient {
     if (this.signingIn) return this.signingIn;
     this.signingIn = (async () => {
       email = String(email).toLowerCase();
+      const marks = await this.marks(mail);
       const { json: start } = await this.request('POST', '/auth/start', { json: { email, lang }, auth: false });
       const end = Date.now() + CODE_WAIT_MS;
       let code = null;
       while (!code && Date.now() < end) {
-        code = await this.findCode(mail, start.ref);
+        code = await this.findCode(mail, start.ref, marks);
         if (!code) await new Promise((r) => setTimeout(r, POLL_MS));
       }
       if (!code) throw Object.assign(new Error('The sign-in code never arrived'), { code: 'no-code' });
