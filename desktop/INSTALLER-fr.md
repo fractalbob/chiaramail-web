@@ -5,6 +5,14 @@ version de test n'est pas encore signée auprès de Microsoft ni d'Apple : votre
 ordinateur affichera donc un avertissement la première fois. Il suffit de le
 passer une fois, comme indiqué ci-dessous.
 
+## Si le navigateur bloque le téléchargement
+
+Chrome peut afficher « Téléchargement dangereux bloqué », simplement parce que
+ce fichier est nouveau et peu téléchargé. Ouvrez **chrome://downloads** dans un
+nouvel onglet, repérez le fichier ChiaraMail, cliquez sur **⋮** (ou
+**Conserver**) puis sur **Télécharger le fichier dangereux** / **Conserver**, et
+confirmez. Edge propose de même **Conserver** dans le menu **…** du téléchargement.
+
 ## Windows
 
 1. Ouvrez le fichier **ChiaraMail-Setup-0.1.0.exe**.
