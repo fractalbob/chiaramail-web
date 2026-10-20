@@ -3,6 +3,7 @@
 // firestore.rules, so the screens behave as they will in production.
 export const mode = 'mock';
 export const ecsReady = true;
+export const ecsPending = false;
 
 const DB_KEY = 'chiaramail.mock.db';
 const USER_KEY = 'chiaramail.mock.user';

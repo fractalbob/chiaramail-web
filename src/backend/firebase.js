@@ -34,7 +34,8 @@ if (import.meta.env.VITE_USE_EMULATORS === '1') {
 
 const EMAIL_KEY = 'chiaramail.emailForSignIn';
 export const mode = 'firebase';
-export const ecsReady = true; // ECS messages can be sent (not yet in the desktop app)
+export const ecsReady = true; // ECS messages can be sent (the desktop app waits for its server sign-in)
+export const ecsPending = false;
 
 const toUser = (u) => u && {
   uid: u.uid,
