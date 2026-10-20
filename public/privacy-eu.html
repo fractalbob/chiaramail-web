@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ChiaraMail™ — Confidentialité (Europe)</title>
+<link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/legal.css">
+</head>
+<body><main>
+<a class="mark" href="/"><i></i>ChiaraMail</a>
+<nav><a href="#fr">Français</a> · <a href="#en">English</a></nav>
+
+<section id="fr">
+<h1>Politique de confidentialité — ChiaraMail Europe</h1>
+<p class="meta">En vigueur le 21 octobre 2026 · Robert Uomini (The Fractal Images Company), entrepreneur individuel, Lombers (Tarn), France · SIRET 107 281 867 00013</p>
+
+<p>Cette politique couvre l’application de bureau ChiaraMail (pour toute messagerie : Orange, Free, SFR, La Poste, OVHcloud, votre propre domaine…) et la page de lecture des messages ECS (<code>ecs.chiaramail.com</code>). Elle ne couvre pas la version web pour Gmail (app.chiaramail.com), qui a <a href="/privacy.html">sa propre politique</a>.</p>
+
+<h2>Le principe</h2>
+<p>Un message ECS (séparation enveloppe-contenu) est en deux parties. L’<strong>enveloppe</strong> (expéditeur, destinataires, un lien) part par e-mail, par la messagerie de l’expéditeur. Le <strong>contenu</strong> (objet, texte, pièces jointes) est chiffré sur l’ordinateur de l’expéditeur, puis conservé sur notre serveur en France, où seuls les destinataires peuvent le lire. L’expéditeur peut ensuite le corriger ou le retirer.</p>
+
+<h2>Votre messagerie (application de bureau)</h2>
+<ul>
+<li>L’application lit et envoie vos e-mails <strong>directement entre votre ordinateur et votre fournisseur de messagerie</strong>. Vos e-mails ne passent par aucun serveur ChiaraMail et n’y sont jamais copiés.</li>
+<li>Votre mot de passe de messagerie reste sur votre ordinateur, chiffré par le trousseau du système, et n’est envoyé qu’à votre fournisseur.</li>
+<li>Personne chez ChiaraMail ne lit vos e-mails.</li>
+</ul>
+
+<h2>Ce que conserve notre serveur</h2>
+<ul>
+<li><strong>Votre adresse e-mail</strong>, quand vous vous connectez au serveur ECS (l’application le fait d’elle-même ; la page de lecture vous demande un code).</li>
+<li><strong>Les messages ECS que vous envoyez :</strong> leur objet, leur texte, leurs pièces jointes et chaque version enregistrée, <strong>chiffrés sur votre ordinateur avant l’envoi</strong> ; en clair : votre adresse et votre nom, les adresses des destinataires, les dates, la taille des pièces jointes et l’autorisation ou non de transférer. La clé qui ouvre un message ne voyage que dans l’e-mail aux destinataires : <strong>nous ne pouvons pas lire le contenu</strong>.</li>
+<li><strong>Accusés de lecture :</strong> quand un destinataire ouvre un message ECS, l’heure et la version lue. L’expéditeur les voit, et le lecteur en est informé sur le message.</li>
+<li><strong>L’annuaire ECS :</strong> les adresses des utilisateurs de l’application, pour signaler qu’un message vient bien d’eux. Toute personne connectée au serveur peut vérifier si une adresse donnée y figure ; personne ne peut parcourir la liste.</li>
+<li><strong>Votre signature</strong> (si vous en enregistrez une dans l’application) et le total de vos pièces jointes (limite de 1 Go par expéditeur).</li>
+<li><strong>Connexion :</strong> le code à 6 chiffres (sous forme chiffrée, 15 minutes au plus), un journal des demandes de code (adresse et adresse IP, gardé 24 heures, contre les abus), et votre session (identifiant chiffré, date de dernière utilisation).</li>
+</ul>
+<p>Les e-mails ordinaires (non ECS) ne sont jamais conservés par ChiaraMail.</p>
+
+<h2>Qui traite ces données pour nous</h2>
+<ul>
+<li><strong>OVHcloud</strong> (OVH SAS, 2 rue Kellermann, 59100 Roubaix, France) héberge notre serveur et sa base de données, dans son centre de données de <strong>Strasbourg</strong>.</li>
+<li><strong>Brevo</strong> (Sendinblue SAS, Paris, France) envoie pour nous les e-mails contenant les codes de connexion. Il reçoit pour cela votre adresse et le code. Brevo indique héberger ses données dans l’Union européenne.</li>
+</ul>
+<p>Nous ne transférons pas vos données hors de l’Union européenne et ne les vendons à personne.</p>
+
+<h2>Bases légales</h2>
+<p>Nous traitons ces données pour fournir le service que vous utilisez (article 6.1.b du RGPD) et, pour le journal des demandes de code, dans notre intérêt légitime à prévenir les abus (article 6.1.f).</p>
+
+<h2>Durées de conservation</h2>
+<ul>
+<li><strong>Messages ECS :</strong> jusqu’à ce que l’expéditeur les retire (le texte et les pièces jointes sont effacés ; les versions précédentes restent chiffrées, visibles de l’expéditeur seul) ou les supprime (tout est effacé, accusés de lecture compris).</li>
+<li><strong>Sessions :</strong> effacées à la déconnexion, et caduques après 180 jours sans utilisation.</li>
+<li><strong>Codes de connexion :</strong> 15 minutes ; <strong>journal des demandes :</strong> 24 heures.</li>
+<li><strong>Adresse, annuaire, signature :</strong> tant que vous utilisez ChiaraMail. Pour les faire effacer avec tous vos messages ECS, écrivez à <a href="mailto:ruomini@gmail.com">ruomini@gmail.com</a> ; c’est fait sous 30 jours.</li>
+</ul>
+
+<h2>Sécurité</h2>
+<ul>
+<li>Toutes les connexions sont chiffrées (HTTPS/TLS).</li>
+<li>Le contenu des messages ECS est chiffré avec une clé AES-GCM de 256 bits propre à chaque message, avant d’arriver sur le serveur. Le serveur ne détient jamais cette clé.</li>
+<li>Le serveur vérifie à chaque demande que seuls l’expéditeur et les destinataires lisent un message, et que seul l’expéditeur le modifie, le retire ou le supprime.</li>
+</ul>
+
+<h2>Pas de pistage, pas de publicité</h2>
+<p>Ni publicité, ni outil de mesure d’audience, ni cookie de pistage. La page de lecture garde seulement votre session dans votre navigateur, pour ne pas vous redemander un code à chaque visite ; « Se déconnecter » l’efface.</p>
+
+<h2>Vos droits</h2>
+<p>Vous pouvez demander l’accès à vos données, leur rectification, leur effacement, leur portabilité, ou vous opposer à leur traitement ou le limiter : écrivez à <a href="mailto:ruomini@gmail.com">ruomini@gmail.com</a>. Vous pouvez aussi saisir la CNIL (<a href="https://www.cnil.fr">cnil.fr</a>).</p>
+
+<h2>Modifications</h2>
+<p>Si cette politique change, la nouvelle version sera publiée ici avec une nouvelle date.</p>
+</section>
+
+<section id="en" lang="en">
+<h1>Privacy policy — ChiaraMail Europe</h1>
+<p class="meta">Effective 21 October 2026 · Robert Uomini (The Fractal Images Company), sole proprietor, Lombers (Tarn), France · SIRET 107 281 867 00013</p>
+
+<p>This policy covers the ChiaraMail desktop app (for any mail provider: Orange, Free, SFR, La Poste, OVHcloud, your own domain…) and the page where ECS messages are read (<code>ecs.chiaramail.com</code>). It does not cover the web version for Gmail (app.chiaramail.com), which has <a href="/privacy.html">its own policy</a>.</p>
+
+<h2>The idea</h2>
+<p>An ECS message (Envelope-Content Splitting) has two parts. The <strong>envelope</strong> (sender, recipients, a link) goes by email, through the sender’s own mail provider. The <strong>content</strong> (subject, text, attachments) is encrypted on the sender’s computer, then kept on our server in France, where only the recipients can read it. The sender can then correct or withdraw it.</p>
+
+<h2>Your mailbox (desktop app)</h2>
+<ul>
+<li>The app reads and sends your mail <strong>directly between your computer and your mail provider</strong>. Your mail never passes through, or is copied to, any ChiaraMail server.</li>
+<li>Your mail password stays on your computer, encrypted by the system’s keychain, and is sent only to your provider.</li>
+<li>Nobody at ChiaraMail reads your mail.</li>
+</ul>
+
+<h2>What our server keeps</h2>
+<ul>
+<li><strong>Your email address</strong>, when you sign in to the ECS server (the app does this by itself; the reading page asks you for a code).</li>
+<li><strong>ECS messages you send:</strong> their subject, text, attachments and every saved edition, <strong>encrypted on your computer before they’re sent</strong>; unencrypted: your address and name, the recipients’ addresses, the dates, the attachment sizes and whether forwarding is allowed. The key that opens a message travels only in the email to the recipients: <strong>we cannot read the content</strong>.</li>
+<li><strong>Read receipts:</strong> when a recipient opens an ECS message, the time and which edition. The sender sees them, and readers are told so on the message.</li>
+<li><strong>The ECS directory:</strong> the addresses of app users, so mail from them can be shown as genuinely theirs. Anyone signed in to the server can check whether a given address is listed; nobody can browse the list.</li>
+<li><strong>Your signature</strong> (if you save one in the app) and your attachment total (1 GB limit per sender).</li>
+<li><strong>Sign-in:</strong> the 6-digit code (in hashed form, 15 minutes at most), a log of code requests (address and IP address, kept 24 hours, against abuse), and your session (a hashed identifier and when it was last used).</li>
+</ul>
+<p>Ordinary (non-ECS) mail is never kept by ChiaraMail.</p>
+
+<h2>Who processes this data for us</h2>
+<ul>
+<li><strong>OVHcloud</strong> (OVH SAS, 2 rue Kellermann, 59100 Roubaix, France) hosts our server and its database, in its <strong>Strasbourg</strong> data centre.</li>
+<li><strong>Brevo</strong> (Sendinblue SAS, Paris, France) sends the emails with the sign-in codes for us. For this it receives your address and the code. Brevo states that it hosts its data in the European Union.</li>
+</ul>
+<p>We do not transfer your data outside the European Union, and we sell it to no one.</p>
+
+<h2>Legal bases</h2>
+<p>We process this data to provide the service you use (GDPR Article 6(1)(b)) and, for the log of code requests, in our legitimate interest in preventing abuse (Article 6(1)(f)).</p>
+
+<h2>How long data is kept</h2>
+<ul>
+<li><strong>ECS messages:</strong> until the sender withdraws them (the text and attachments are erased; earlier editions stay, encrypted, visible to the sender only) or deletes them (everything is erased, read receipts included).</li>
+<li><strong>Sessions:</strong> erased when you sign out, and void after 180 days unused.</li>
+<li><strong>Sign-in codes:</strong> 15 minutes; <strong>request log:</strong> 24 hours.</li>
+<li><strong>Address, directory entry, signature:</strong> while you use ChiaraMail. To have them erased with all your ECS messages, write to <a href="mailto:ruomini@gmail.com">ruomini@gmail.com</a>; this is done within 30 days.</li>
+</ul>
+
+<h2>Security</h2>
+<ul>
+<li>Every connection is encrypted (HTTPS/TLS).</li>
+<li>The content of ECS messages is encrypted with a 256-bit AES-GCM key of its own for each message, before it reaches the server. The server never holds that key.</li>
+<li>On every request, the server checks that only the sender and the recipients read a message, and only the sender changes, withdraws or deletes it.</li>
+</ul>
+
+<h2>No tracking, no ads</h2>
+<p>No advertising, no analytics, no tracking cookies. The reading page keeps only your session in your browser, so you aren’t asked for a code on every visit; “Sign out” erases it.</p>
+
+<h2>Your rights</h2>
+<p>You may ask to access, correct, erase or receive your data, or object to or restrict its processing: write to <a href="mailto:ruomini@gmail.com">ruomini@gmail.com</a>. You may also complain to the CNIL (<a href="https://www.cnil.fr">cnil.fr</a>).</p>
+
+<h2>Changes</h2>
+<p>If this policy changes, the new version will be posted here with a new date.</p>
+</section>
+</main></body>
+</html>

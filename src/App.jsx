@@ -39,7 +39,8 @@ function Footer() {
       {gmail.mode === 'mock-gmail' && <p className="testmode">{t('testModeMail')}</p>}
       <p>
         ChiaraMail™ · The Fractal Images Company
-        <a className="footlink" href="/privacy.html">{t('privacy')}</a>
+        {/* The desktop app and the reader page use the European server: their own policy. */}
+        <a className="footlink" href={backend.mode === 'reader' || backend.mode === 'desktop' ? '/privacy-eu.html' : '/privacy.html'}>{t('privacy')}</a>
         <a className="footlink" href="/terms.html">{t('terms')}</a>
         <button type="button" className="linklike" onClick={toggle}>{t('language')}</button>
       </p>
