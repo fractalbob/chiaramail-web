@@ -58,7 +58,7 @@ export class MailService {
     this.dataDir = dataDir;
     this.client = null;
     this.folders = []; // [{ path, name, role, delimiter }]
-    this.idx = { version: 1, folders: {}, trashedFrom: {} };
+    this.idx = { version: 1, snipVersion: 2, folders: {}, trashedFrom: {} };
     this.lastSync = 0;
     this.saveTimer = null;
   }
@@ -89,6 +89,11 @@ export class MailService {
   async open() {
     await mkdir(this.dataDir, { recursive: true });
     try { const saved = JSON.parse(await readFile(this.file, 'utf8')); if (saved.version === 1) this.idx = saved; } catch { /* first run */ }
+    // Previews made by earlier versions are made again (HTML ones could show styling code).
+    if (this.idx.snipVersion !== 2) {
+      Object.values(this.idx.folders).forEach((fx) => Object.values(fx.msgs).forEach((m) => { delete m.snip; }));
+      this.idx.snipVersion = 2;
+    }
     await this.conn();
     await this.loadFolders();
     return this.email;
@@ -544,10 +549,12 @@ export class MailService {
             if (!pick) { byUid.get(m.uid).meta.snip = ''; continue; }
             want.set(m.uid, { part: pick.id, html: !plain, encoding: (pick.n.encoding || '').toLowerCase(), charset: pick.n.parameters?.charset || 'utf-8' });
           }
+          // HTML often starts with kilobytes of styling before any text: read more of it.
           const byPart = new Map();
-          for (const [uid, w] of want) (byPart.get(w.part) || byPart.set(w.part, []).get(w.part)).push(uid);
-          for (const [part, uids] of byPart) {
-            for await (const m of c.fetch(uids, { uid: true, bodyParts: [{ key: part, start: 0, maxLength: 2048 }] }, { uid: true })) {
+          for (const [uid, w] of want) { const k = `${w.part}|${w.html ? 16384 : 2048}`; (byPart.get(k) || byPart.set(k, []).get(k)).push(uid); }
+          for (const [k, uids] of byPart) {
+            const [part, len] = k.split('|');
+            for await (const m of c.fetch(uids, { uid: true, bodyParts: [{ key: part, start: 0, maxLength: Number(len) }] }, { uid: true })) {
               const w = want.get(m.uid);
               const raw = m.bodyParts && [...m.bodyParts.values()][0];
               byUid.get(m.uid).meta.snip = raw ? MailService.snippetOf(raw, w) : '';
@@ -565,8 +572,21 @@ export class MailService {
     else if (encoding === 'quoted-printable') buf = Buffer.from(libqp.decode(buf.toString('latin1')));
     let s;
     try { s = iconv.decode(buf, iconv.encodingExists(charset) ? charset : 'utf-8'); } catch { s = buf.toString('utf8'); }
-    if (html) s = s.replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]*>?/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"');
+    if (html) s = MailService.htmlText(s).replace(/<[^>]*>?/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"');
     return s.replace(/^>.*$/gm, ' ').replace(/\uFFFD/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  }
+
+  /** The readable text of (the start of) an HTML body: no head, styles, scripts, comments or tags. */
+  static htmlText(h) {
+    let s = h;
+    const body = s.search(/<body[\s>]/i);
+    if (body >= 0) s = s.slice(s.indexOf('>', body) + 1);
+    else if (/<head[\s>]/i.test(s)) s = /<\/head>/i.test(s) ? s.slice(s.search(/<\/head>/i)) : '';
+    return s
+      .replace(/<!--[\s\S]*?(-->|$)/g, ' ')
+      .replace(/<(style|script|title|xml)[\s\S]*?(<\/\1>|$)/gi, ' ')
+      .replace(/<[^>]*>?/g, ' ')
+      .replace(/&nbsp;|&#160;|&zwnj;|&#8204;|&#847;|&shy;/gi, ' ');
   }
 
   async ensureSnippet(e) { return this.ensureSnippets([e]); }
