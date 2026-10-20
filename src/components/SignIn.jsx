@@ -3,7 +3,70 @@ import * as backend from '@backend';
 import { useI18n } from '../i18n.jsx';
 import { isEmail } from '../lib.js';
 
+// The reader page: a 6-digit code emailed to the address (backend/reader.js).
+function CodeSignIn() {
+  const { t } = useI18n();
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(null); // { email, from }
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const fail = (e) => setError(e.code === 'bad-code' ? t('codeWrong') : e.code === 'rate-limit' ? t('codeTooMany') : t('errorGeneric', { msg: e.message }));
+
+  const ask = async (ev) => {
+    ev?.preventDefault();
+    const to = (sent?.email || email).trim();
+    if (!isEmail(to) || busy) return;
+    setError(''); setBusy(true);
+    try {
+      const r = await backend.sendCode(to);
+      setSent({ email: to, from: (r.from || '').replace(/^.*<(.+)>.*$/, '$1') || 'ChiaraMail' });
+      setCode('');
+    } catch (e) { fail(e); } finally { setBusy(false); }
+  };
+  const verify = async (ev) => {
+    ev.preventDefault();
+    if (code.replace(/\D/g, '').length !== 6 || busy) return;
+    setError(''); setBusy(true);
+    try { await backend.verifyCode(sent.email, code.replace(/\D/g, '')); } catch (e) { fail(e); setBusy(false); }
+  };
+
+  return (
+    <div className="signin">
+      <h2 className="signin-title">{t('signInTitle')}</h2>
+      {!sent ? (
+        <form onSubmit={ask} className="signin-form">
+          <p>{t('codeIntro')}</p>
+          <label htmlFor="signin-email">{t('yourEmail')}</label>
+          <input id="signin-email" type="email" autoComplete="email" required value={email}
+            onChange={(e) => setEmail(e.target.value)} />
+          <button type="submit" className="btn" disabled={busy || !isEmail(email)}>{busy ? t('codeSending') : t('codeSend')}</button>
+        </form>
+      ) : (
+        <form onSubmit={verify} className="signin-form">
+          <p role="status">{t('codeSent', { email: sent.email, from: sent.from })}</p>
+          <label htmlFor="signin-code">{t('codeLabel')}</label>
+          <input id="signin-code" inputMode="numeric" autoComplete="one-time-code" maxLength={7} required value={code}
+            onChange={(e) => setCode(e.target.value)} />
+          <button type="submit" className="btn btn-primary" disabled={busy || code.replace(/\D/g, '').length !== 6}>{t('codeVerify')}</button>
+          <p className="signin-more">
+            <button type="button" className="linklike" onClick={() => ask()} disabled={busy}>{t('codeAgain')}</button>
+            {' · '}
+            <button type="button" className="linklike" onClick={() => { setSent(null); setError(''); }}>{t('codeOther')}</button>
+          </p>
+        </form>
+      )}
+      {error && <p className="error" role="alert">{error}</p>}
+    </div>
+  );
+}
+
 export default function SignIn({ returnPath = '/' }) {
+  if (backend.mode === 'reader') return <CodeSignIn />;
+  return <WebSignIn returnPath={returnPath} />;
+}
+
+function WebSignIn({ returnPath }) {
   const { t } = useI18n();
   const [email, setEmail] = useState('');
   const [state, setState] = useState('idle'); // idle | sending | sent

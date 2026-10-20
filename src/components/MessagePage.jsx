@@ -72,7 +72,8 @@ export default function MessagePage() {
     );
   }
 
-  const back = <p className="back"><Link to={isSender || !m ? '/' : '/?tab=received'}>{t('back')}</Link></p>;
+  // The reader page has nowhere to go back to.
+  const back = backend.mode === 'reader' ? null : <p className="back"><Link to={isSender || !m ? '/' : '/?tab=received'}>{t('back')}</Link></p>;
 
   if (state.status === 'loading') return <p className="loading">{t('loading')}</p>;
   if (state.status === 'missing') return <>{back}<Notice><p>{t('notFound')}</p></Notice></>;
@@ -120,7 +121,9 @@ export default function MessagePage() {
             <aside className="invite" aria-labelledby="invite-title">
               <h2 id="invite-title" className="invite-title">{t('inviteTitle')}</h2>
               <p>{t('inviteBody')}</p>
-              <Link to="/" className="btn btn-primary">{t('inviteButton')}</Link>
+              {backend.mode === 'reader'
+                ? <a href="https://chiaramail.com" className="btn btn-primary" target="_blank" rel="noopener noreferrer">{t('inviteButton')}</a>
+                : <Link to="/" className="btn btn-primary">{t('inviteButton')}</Link>}
             </aside>
           )}
         </div>

@@ -6,3 +6,4 @@ dist
 shots/
 desktop/renderer
 server/files
+server/reader

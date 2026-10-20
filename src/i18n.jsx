@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState, useCallback } from 'react';
 import { desktopText } from './i18n-desktop.js';
+import { readerText } from './i18n-reader.js';
 
 const en = {
   tagline: 'Own the email you send. Indefinitely.',
@@ -593,6 +594,8 @@ const fr = {
 
 // The desktop app (any provider over IMAP/SMTP) has its own wording where Gmail is mentioned.
 if (import.meta.env.MODE === 'desktop') { Object.assign(en, desktopText.en); Object.assign(fr, desktopText.fr); }
+// The reader page (for recipients without the app) has its own sign-in by code.
+if (import.meta.env.MODE === 'reader') { Object.assign(en, readerText.en); Object.assign(fr, readerText.fr); }
 const dicts = { en, fr };
 const pickInitial = () => {
   try {

@@ -61,9 +61,10 @@ const total = (atts) => (atts || []).reduce((n, a) => n + (a.size || 0), 0);
 
 /**
  * db: openDb(); store: fileStore(); mailer: smtpMailer()/memoryMailer();
- * origins: the web origins allowed to call (the desktop app and the reader page).
+ * origins: the web origins allowed to call (the desktop app; the reader page is on this server itself);
+ * site: staticSite() for the reader page, served for the paths the API doesn't use.
  */
-export function createApp({ db, store, mailer, origins = [], secret = randomBytes(32).toString('hex'), trustProxy = false }) {
+export function createApp({ db, store, mailer, origins = [], secret = randomBytes(32).toString('hex'), trustProxy = false, site = null }) {
   const codeHash = (email, code) => sha(`${secret}:${email}:${code}`);
 
   const ipOf = (req) => (trustProxy && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket.remoteAddress || '';
@@ -364,6 +365,7 @@ export function createApp({ db, store, mailer, origins = [], secret = randomByte
         if (!res.headersSent) send(res, 200, r === undefined ? null : r);
         return;
       }
+      if (site && await site(req, res, path)) return;
       send(res, 404, { error: { message: 'Not found', code: 'not-found' } });
     } catch (e) {
       const status = e.status || 500;

@@ -1,0 +1,36 @@
+// Wording of the reader page (served by ChiaraMail's European ECS server, for
+// recipients who don't have the app), where it differs from the web app's.
+export const readerText = {
+  en: {
+    readerHomeLead: 'This is where ECS messages sent with ChiaraMail™ are read.',
+    readerHomeHelp: 'To read one, open the link in the email you received.',
+    codeIntro: 'We’ll email you a 6-digit code to check that this address is yours.',
+    codeSend: 'Email me a code',
+    codeSending: 'Sending…',
+    codeSent: 'We sent a code to {email}. It arrives from {from} within a minute; check your spam folder if you don’t see it.',
+    codeLabel: '6-digit code',
+    codeVerify: 'Sign in',
+    codeWrong: 'That code is wrong or has expired. Check it, or ask for a new one.',
+    codeAgain: 'Send a new code',
+    codeOther: 'Use another address',
+    codeTooMany: 'Too many codes asked for this address. Wait a while, then try again.',
+    inviteBody: 'ChiaraMail™ works with the email address you already have. Only the envelope of an ECS message travels by email; its text and attachments stay encrypted, stored in Europe, and the sender can correct, update or withdraw it after sending.',
+    inviteButton: 'About ChiaraMail',
+  },
+  fr: {
+    readerHomeLead: 'C’est ici que se lisent les messages ECS envoyés avec ChiaraMail™.',
+    readerHomeHelp: 'Pour en lire un, ouvrez le lien de l’e-mail que vous avez reçu.',
+    codeIntro: 'Nous allons vous envoyer par e-mail un code à 6 chiffres pour vérifier que cette adresse est bien la vôtre.',
+    codeSend: 'Recevoir un code',
+    codeSending: 'Envoi…',
+    codeSent: 'Nous avons envoyé un code à {email}. Il arrive de {from} d’ici une minute ; regardez dans vos indésirables si vous ne le voyez pas.',
+    codeLabel: 'Code à 6 chiffres',
+    codeVerify: 'Se connecter',
+    codeWrong: 'Ce code est faux ou a expiré. Vérifiez-le, ou demandez-en un nouveau.',
+    codeAgain: 'Recevoir un nouveau code',
+    codeOther: 'Utiliser une autre adresse',
+    codeTooMany: 'Trop de codes demandés pour cette adresse. Patientez un moment, puis réessayez.',
+    inviteBody: 'ChiaraMail™ fonctionne avec l’adresse e-mail que vous avez déjà. Seule l’enveloppe d’un message ECS voyage par e-mail ; son texte et ses pièces jointes restent chiffrés, conservés en Europe, et l’expéditeur peut le corriger, le mettre à jour ou le retirer après l’envoi.',
+    inviteButton: 'Découvrir ChiaraMail',
+  },
+};

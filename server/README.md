@@ -116,6 +116,21 @@ sudo certbot --nginx -d ecs.chiaramail.fr
 
 Check: `curl https://ecs.chiaramail.fr/health` answers `{"ok":true}`.
 
+### The reader page
+
+Recipients without the app open the link in the email (`https://<server>/m/<id>#k=…`)
+in their browser: they sign in with a 6-digit code emailed to them, and the
+message is decrypted in the browser with the key from the link (the part after
+`#`, which browsers never send to the server). The page is built at the top
+level and served by this server itself, from `server/reader`:
+
+```
+npm run build:reader          # on the developer's computer
+rsync -a --exclude node_modules server ubuntu@<server>:   # then, on the server:
+sudo rsync -a --delete --exclude node_modules ~/server/ /srv/chiaramail/app/server/ && sudo chown -R chiaramail /srv/chiaramail/app
+sudo systemctl restart chiaramail-ecs
+```
+
 ### 5. Point the desktop app at it
 
 In `desktop/package.json`: `"chiaramail": { "ecsUrl": "https://ecs.chiaramail.fr", ... }`,

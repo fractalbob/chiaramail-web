@@ -9,6 +9,7 @@ import MailLayout from './mail/MailLayout.jsx';
 import EmailLinkFinisher from './components/EmailLinkFinisher.jsx';
 import Compose from './components/Compose.jsx';
 import MessagePage from './components/MessagePage.jsx';
+import ReaderHome from './components/ReaderHome.jsx';
 
 function Header() {
   const { user } = useAuth();
@@ -59,6 +60,15 @@ function Routed() {
   const { t } = useI18n();
   if (backend.isPendingEmailLink()) return <EmailLinkFinisher />;
   if (user === undefined) return <p className="loading">{t('loading')}</p>;
+  // The reader page (ecs server, for recipients without the app): ECS messages only.
+  if (backend.mode === 'reader') {
+    return (
+      <Routes>
+        <Route path="/m/:id" element={<MessagePage />} />
+        <Route path="/*" element={<ReaderHome />} />
+      </Routes>
+    );
+  }
   return (
     <Routes>
       {/* The web page an ECS message links to, for readers without ChiaraMail. */}
