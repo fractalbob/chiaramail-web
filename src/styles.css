@@ -352,7 +352,7 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .list-head { position: sticky; top: 0; z-index: 25; background: var(--sky); }
 .list-title { font: 500 1rem/1.2 var(--sans); margin: 0 8px 0 0; color: var(--slate); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40ch; }
 .pager { display: flex; align-items: center; gap: 0; margin-left: auto; min-width: 0; }
-.range { color: var(--slate); font-size: 0.8125rem; white-space: nowrap; margin-right: 6px; font-variant-numeric: tabular-nums; }
+.range { color: var(--slate); font-size: 0.8125rem; white-space: nowrap; margin-right: 6px; }
 .trow { display: flex; align-items: center; border-bottom: 1px solid var(--rule); }
 .trow-unread { background: var(--paper); }
 .trow-link {
