@@ -20,6 +20,8 @@ import { join } from 'node:path';
 import { parseHeaders, headerValue, msgIds } from './headers.js';
 import { toPayload, leaves, isTextBody } from './payload.js';
 import { parseQuery } from './query.js';
+import libqp from 'libqp';
+import iconv from 'iconv-lite';
 
 const sha = (s) => createHash('sha1').update(String(s)).digest('hex').slice(0, 16);
 const META = ['from', 'to', 'cc', 'bcc', 'reply-to', 'subject', 'date', 'message-id', 'in-reply-to', 'references', 'x-chiaramail-content-pointer', 'content-type'];
@@ -64,11 +66,17 @@ export class MailService {
   // ---- connection ------------------------------------------------------------
   async conn() {
     if (this.client?.usable) return this.client;
-    const c = new ImapFlow({ ...this.opts.imap, auth: this.opts.auth, logger: this.opts.logger, emitLogs: false });
-    c.on('error', () => {}); // a dropped connection is reopened on the next call
-    await c.connect();
-    this.client = c;
-    return c;
+    // One connection, even when several requests ask for it at the same moment.
+    if (!this.connecting) {
+      this.connecting = (async () => {
+        const c = new ImapFlow({ ...this.opts.imap, auth: this.opts.auth, logger: this.opts.logger, emitLogs: false });
+        c.on('error', () => {}); // a dropped connection is reopened on the next call
+        await c.connect();
+        this.client = c;
+        return c;
+      })().finally(() => { this.connecting = null; });
+    }
+    return this.connecting;
   }
 
   async inBox(path, fn) {
@@ -202,17 +210,26 @@ export class MailService {
    */
   async sync({ force = false, paths } = {}) {
     if (!this.folders.length) await this.loadFolders();
-    const core = ['INBOX', 'SENT', 'DRAFT'].map((r) => this.pathOf(r)).filter(Boolean);
-    const list = paths || [...new Set([...core, ...Object.keys(this.idx.folders).filter((p) => this.idx.folders[p].ready)])];
+    const list = paths || this.corePaths();
     for (const path of list) {
       if (!this.folders.some((f) => f.path === path)) continue;
       const fx = this.idx.folders[path];
       if (!paths && !force && fx?.ready && Date.now() - (fx.at || 0) < 10_000) continue;
-      try { await this.syncFolder(path); } catch (e) { if (e.code === 'reconnect' || !this.client?.usable) throw e; }
+      try { await this.syncOnce(path); } catch (e) { if (e.code === 'reconnect' || !this.client?.usable) throw e; }
     }
     // Forget folders that no longer exist.
     for (const p of Object.keys(this.idx.folders)) if (!this.folders.some((f) => f.path === p)) delete this.idx.folders[p];
     this.saveSoon();
+  }
+
+  /** The folders kept up to date all the time (others: when they're opened). */
+  corePaths() { return ['INBOX', 'SENT', 'DRAFT'].map((r) => this.pathOf(r)).filter(Boolean); }
+
+  /** A folder already being checked isn't checked a second time in parallel. */
+  syncOnce(path) {
+    this.syncing = this.syncing || new Map();
+    if (!this.syncing.has(path)) this.syncing.set(path, this.syncFolder(path).finally(() => this.syncing.delete(path)));
+    return this.syncing.get(path);
   }
 
   async fetchMeta(c, fx, uids) {
@@ -293,16 +310,17 @@ export class MailService {
     return got;
   }
 
-  /** In the background, one folder at a time: the others get their newest messages too. */
+  /** In the background, when nothing else is going on: Spam, Trash and Archive get their newest messages. */
   warmUp() {
     if (this.warming) return;
     this.warming = setTimeout(async () => {
       this.warming = null;
-      const next = this.folders.find((f) => !this.idx.folders[f.path]?.ready);
+      const next = ['SPAM', 'TRASH', 'ARCHIVE'].map((r) => this.pathOf(r)).find((p) => p && !this.idx.folders[p]?.ready);
       if (!next || !this.client?.usable) return;
-      try { await this.syncFolder(next.path); this.saveSoon(); } catch { /* try again later */ }
+      if (this.syncing?.size) { this.warmUp(); return; } // busy: later
+      try { await this.syncOnce(next); this.saveSoon(); } catch { /* try again later */ }
       this.warmUp();
-    }, 1500);
+    }, 3000);
   }
 
   // ---- the Gmail-shaped view ---------------------------------------------------
@@ -432,8 +450,13 @@ export class MailService {
     if (role) paths = [this.pathOf(role)].filter(Boolean);
     else if (pq.label) paths = this.folders.filter((f) => f.name.toLowerCase() === pq.label.toLowerCase()).map((f) => f.path);
     else if (labelId && this.pathOfLabel(labelId)) paths = [this.pathOfLabel(labelId)];
-    else if (pq.inFolder === 'anywhere') paths = this.folders.map((f) => f.path);
-    else paths = this.folders.filter((f) => f.role !== 'TRASH' && f.role !== 'SPAM').map((f) => f.path);
+    // Otherwise: the folders kept up to date and those already opened (an account
+    // can have hundreds of folders; searching them all would take minutes).
+    else {
+      const opened = this.folders.filter((f) => this.idx.folders[f.path]?.ready).map((f) => f.path);
+      paths = [...new Set([...this.corePaths(), ...opened])];
+      if (pq.inFolder !== 'anywhere') paths = paths.filter((p) => !['TRASH', 'SPAM'].includes(this.roleOf(p)));
+    }
     await this.sync({ paths: paths.filter((p) => !this.idx.folders[p]?.ready) });
     const hits = new Set();
     for (const path of paths) {
@@ -465,11 +488,11 @@ export class MailService {
   async listThreads({ labelId, q, pageToken, max = 25 } = {}) {
     const own = ['STARRED', 'IMPORTANT', 'UNREAD'].includes(labelId) || !labelId ? null : this.pathOfLabel(labelId);
     if (own && !this.folders.some((f) => f.path === own)) await this.loadFolders(); // created elsewhere since
-    if (own && !this.idx.folders[own]?.ready) await this.sync({ paths: [own] });
+    if (own && (!this.idx.folders[own]?.ready || Date.now() - (this.idx.folders[own].at || 0) > 10_000)) await this.sync({ paths: [own] });
     await this.sync();
     const hits = q ? await this.searchServer(q, labelId) : null;
     const start = Number(pageToken || 0);
-    const relevant = () => (own ? [own].filter((p) => this.idx.folders[p]) : Object.keys(this.idx.folders).filter((p) => this.idx.folders[p].ready));
+    const relevant = () => (own ? [own] : this.corePaths()).filter((p) => this.idx.folders[p]?.ready);
     const build = () => {
       const { threads } = this.view();
       let l = [...threads.values()].filter((t) => MailService.visible(t.msgs, labelId));
@@ -496,40 +519,66 @@ export class MailService {
     };
   }
 
-  async ensureSnippet(e) {
-    if (e.meta.snip !== undefined) return;
-    try {
-      e.meta.snip = await this.inBox(e.primary.path, async (c) => {
-        const m = await c.fetchOne(String(e.primary.uid), { bodyStructure: true }, { uid: true });
-        if (!m?.bodyStructure) return '';
-        let plain = null; let html = null;
-        leaves(m.bodyStructure, (n, id) => {
-          if (!isTextBody(n)) return;
-          if (/plain/i.test(n.type) && !plain) plain = id;
-          if (/html/i.test(n.type) && !html) html = id;
+  /**
+   * The first words of each message, for the lists. Fetched together, a few
+   * exchanges per folder rather than two per message: the structures of all the
+   * messages, then the first 2 KB of their text parts.
+   */
+  async ensureSnippets(entries) {
+    const todo = entries.filter((e) => e.meta.snip === undefined);
+    const byPath = new Map();
+    todo.forEach((e) => (byPath.get(e.primary.path) || byPath.set(e.primary.path, []).get(e.primary.path)).push(e));
+    for (const [path, list] of byPath) {
+      try {
+        await this.inBox(path, async (c) => {
+          const byUid = new Map(list.map((e) => [e.primary.uid, e]));
+          const want = new Map(); // uid -> { part, html, encoding, charset }
+          for await (const m of c.fetch([...byUid.keys()], { uid: true, bodyStructure: true }, { uid: true })) {
+            let plain = null; let html = null;
+            leaves(m.bodyStructure || {}, (n, id) => {
+              if (!isTextBody(n)) return;
+              if (/plain/i.test(n.type) && !plain) plain = { id, n };
+              if (/html/i.test(n.type) && !html) html = { id, n };
+            });
+            const pick = plain || html;
+            if (!pick) { byUid.get(m.uid).meta.snip = ''; continue; }
+            want.set(m.uid, { part: pick.id, html: !plain, encoding: (pick.n.encoding || '').toLowerCase(), charset: pick.n.parameters?.charset || 'utf-8' });
+          }
+          const byPart = new Map();
+          for (const [uid, w] of want) (byPart.get(w.part) || byPart.set(w.part, []).get(w.part)).push(uid);
+          for (const [part, uids] of byPart) {
+            for await (const m of c.fetch(uids, { uid: true, bodyParts: [{ key: part, start: 0, maxLength: 2048 }] }, { uid: true })) {
+              const w = want.get(m.uid);
+              const raw = m.bodyParts && [...m.bodyParts.values()][0];
+              byUid.get(m.uid).meta.snip = raw ? MailService.snippetOf(raw, w) : '';
+            }
+          }
         });
-        const part = plain || html;
-        if (!part) return '';
-        const { content } = await c.download(String(e.primary.uid), part, { uid: true, maxBytes: 4096 });
-        let s = (await streamToBuffer(content)).toString('utf8');
-        if (!plain) s = s.replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ');
-        return s.replace(/^>.*$/gm, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
-      });
-    } catch { e.meta.snip = ''; }
-    this.saveSoon();
+      } catch { /* left empty; tried again next time */ }
+    }
+    if (todo.length) this.saveSoon();
   }
+
+  static snippetOf(raw, { html, encoding, charset }) {
+    let buf = Buffer.from(raw);
+    if (encoding === 'base64') { const t = buf.toString('latin1').replace(/[^A-Za-z0-9+/]/g, ''); buf = Buffer.from(t.slice(0, t.length - (t.length % 4)), 'base64'); }
+    else if (encoding === 'quoted-printable') buf = Buffer.from(libqp.decode(buf.toString('latin1')));
+    let s;
+    try { s = iconv.decode(buf, iconv.encodingExists(charset) ? charset : 'utf-8'); } catch { s = buf.toString('utf8'); }
+    if (html) s = s.replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]*>?/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"');
+    return s.replace(/^>.*$/gm, ' ').replace(/\uFFFD/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  }
+
+  async ensureSnippet(e) { return this.ensureSnippets([e]); }
 
   async getThreadsMeta(ids) {
     await this.sync();
     const { threads } = this.view();
-    const out = [];
-    for (const id of ids) {
+    await this.ensureSnippets(ids.map((id) => threads.get(id)).filter(Boolean).map((t) => t.msgs[t.msgs.length - 1]));
+    return ids.map((id) => {
       const t = threads.get(id);
-      if (!t) { out.push({ id, messages: [] }); continue; }
-      await this.ensureSnippet(t.msgs[t.msgs.length - 1]);
-      out.push({ id, messages: t.msgs.map((e) => this.metaMessage(e)) });
-    }
-    return out;
+      return { id, messages: t ? t.msgs.map((e) => this.metaMessage(e)) : [] };
+    });
   }
 
   /** One message as the Gmail API returns it with format=full. */
@@ -770,13 +819,9 @@ export class MailService {
 
   async getDraftsMeta(ids) {
     await this.sync();
-    const out = [];
-    for (const id of ids) {
-      const e = this.draftEntry(id);
-      await this.ensureSnippet(e);
-      out.push({ id, message: this.metaMessage(e) });
-    }
-    return out;
+    const list = ids.map((id) => this.draftEntry(id));
+    await this.ensureSnippets(list);
+    return ids.map((id, i) => ({ id, message: this.metaMessage(list[i]) }));
   }
 
   async appendTo(role, name, raw, flags) {

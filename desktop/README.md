@@ -55,6 +55,7 @@ enters it and deletes that email. With no server set, ECS stays off.
 cd desktop && npm test                                   # mail layer, against a real Dovecot server
 cd .. && npm run build:desktop && xvfb-run -a node desktop/test/app.e2e.mjs   # the whole app
 xvfb-run -a node desktop/test/ecs.e2e.mjs   # ECS between two users, through the server
+node desktop/test/perf.mjs                  # timing on a Gmail-sized account over a slow link
 ```
 
 The tests need `dovecot` and PostgreSQL installed (they start their own private copies).
