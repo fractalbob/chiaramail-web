@@ -10,6 +10,7 @@ import EmailLinkFinisher from './components/EmailLinkFinisher.jsx';
 import Compose from './components/Compose.jsx';
 import MessagePage from './components/MessagePage.jsx';
 import ReaderHome from './components/ReaderHome.jsx';
+import DownloadNote from './mail/DownloadNote.jsx';
 
 function Header() {
   const { user } = useAuth();
@@ -88,6 +89,7 @@ export default function App() {
           <Header />
           <main className="main"><Routed /></main>
           <Footer />
+          <DownloadNote />
         </div>
       </MailProvider>
     </AuthProvider>

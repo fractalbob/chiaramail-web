@@ -717,3 +717,13 @@ html.busy body::before {
 .ecs-soon { padding: 10px 12px; border-left: 3px solid var(--rule); background: var(--sky); border-radius: var(--radius-s); }
 .signin .help + .dsignin { margin-top: 16px; }
 .dsrv-said { word-break: break-word; font-family: ui-monospace, monospace; font-size: 0.8125rem; margin-top: 4px; }
+
+/* Desktop app: "Saved to Downloads" with Open / Show in folder. */
+.download-note {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 50;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: calc(100vw - 32px);
+  background: #14313b; color: #fff; padding: 8px 10px 8px 16px; border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+.download-note .btn-quiet { color: #fff; }
+.download-note .chip-x { color: #fff; }

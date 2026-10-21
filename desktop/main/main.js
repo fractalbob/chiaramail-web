@@ -79,9 +79,19 @@ function saveDownloads() {
     let path = join(dir, name);
     for (let i = 1; existsSync(path); i += 1) path = join(dir, `${stem} (${i})${ext}`);
     item.setSavePath(path);
-    item.once('done', (_ev, state) => { if (state === 'completed' && win) win.webContents.send('download:done', basename(path)); });
+    item.once('done', (_ev, state) => {
+      if (state !== 'completed' || !win) return;
+      const id = ++downloadSeq;
+      saved.set(id, path);
+      win.webContents.send('download:done', { id, name: basename(path) });
+    });
   });
+  // The screens can open, or show in its folder, only a file this app has just saved.
+  ipcMain.handle('download:open', (_e, id) => reply(async () => { const p = saved.get(id); if (p) { const err = await shell.openPath(p); if (err) throw new Error(err); } }));
+  ipcMain.handle('download:show', (_e, id) => reply(async () => { const p = saved.get(id); if (p) shell.showItemInFolder(p); }));
 }
+const saved = new Map(); // id → path of files saved to Downloads in this session
+let downloadSeq = 0;
 
 function createWindow() {
   win = new BrowserWindow({

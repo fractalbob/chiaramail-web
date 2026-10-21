@@ -2,6 +2,10 @@
 // Gmail-specific wording of the web app where they differ.
 export const desktopText = {
   en: {
+    dlSaved: 'Saved to Downloads: {name}',
+    dlOpen: 'Open',
+    dlShow: 'Show in folder',
+    dlClose: 'Close',
     mailEyebrow: 'ChiaraMail™ for your mailbox',
     appIntro: 'ChiaraMail™ is a mail app for the email address you already have, at any provider: Orange, Free, SFR, La Poste, OVHcloud, your own domain… Read, write, search and organise your mail as usual, in an app on your computer.',
     mailPoint1: 'Your mail stays with your provider. ChiaraMail reads and sends it directly from this computer; it is never copied to any ChiaraMail server.',
@@ -43,6 +47,10 @@ export const desktopText = {
     rateLimited: 'Your provider is asking ChiaraMail to slow down for a moment. Wait a minute, then click Refresh.',
   },
   fr: {
+    dlSaved: 'Enregistré dans Téléchargements : {name}',
+    dlOpen: 'Ouvrir',
+    dlShow: 'Afficher dans le dossier',
+    dlClose: 'Fermer',
     mailEyebrow: 'ChiaraMail™ pour votre messagerie',
     appIntro: 'ChiaraMail™ est une messagerie pour l’adresse e-mail que vous avez déjà, chez n’importe quel fournisseur : Orange, Free, SFR, La Poste, OVHcloud, votre propre domaine… Lisez, écrivez, cherchez et classez vos e-mails comme d’habitude, dans une application sur votre ordinateur.',
     mailPoint1: 'Vos e-mails restent chez votre fournisseur. ChiaraMail les lit et les envoie directement depuis cet ordinateur ; ils ne sont jamais copiés sur un serveur de ChiaraMail.',

@@ -136,6 +136,8 @@ try {
   const saved = join(downloads, 'devis.txt');
   for (let i = 0; i < 50 && !existsSync(saved); i += 1) await page.waitForTimeout(200);
   await must(existsSync(saved) && readFileSync(saved, 'utf8').startsWith('Devis : 3 tirages 50×70'), 'attachment decrypts and saves to Downloads');
+  await page.locator('.download-note', { hasText: 'Saved to Downloads: devis.txt' }).waitFor();
+  await must(page.locator('.download-note').getByRole('button', { name: 'Open' }).isVisible(), 'Open offered');
   await shot('e04-alice-reads');
   log('Alice reads it and downloads the attachment');
   await page.waitForTimeout(1500); // the read receipt

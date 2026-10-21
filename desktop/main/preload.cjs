@@ -11,6 +11,17 @@ contextBridge.exposeInMainWorld('chiaramailDesktop', {
   connect: (cfg) => ipcRenderer.invoke('account:connect', cfg),
   signOut: () => ipcRenderer.invoke('account:signOut'),
   call: (method, args) => ipcRenderer.invoke('mail', method, args),
+  // Attachments save to the Downloads folder; the screens hear of each one and
+  // can open it or show it in its folder.
+  downloads: {
+    onSaved: (cb) => {
+      const fn = (_e, d) => cb(d);
+      ipcRenderer.on('download:done', fn);
+      return () => ipcRenderer.removeListener('download:done', fn);
+    },
+    open: (id) => ipcRenderer.invoke('download:open', id),
+    show: (id) => ipcRenderer.invoke('download:show', id),
+  },
   ecs: {
     ...ipcRenderer.sendSync('ecs:config'),
     session: (email) => ipcRenderer.invoke('ecs:session', email),
