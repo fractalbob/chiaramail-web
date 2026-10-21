@@ -142,6 +142,40 @@ try {
   await page.locator('.trow', { hasText: 'Tirages photo' }).waitFor();
   log('after a restart: straight to the inbox');
 
+  // A long Inbox: open a conversation far down, come back to the same place (as in Gmail).
+  {
+    const b = new ImapFlow({ ...srv.imap, auth: { user: 'bob@example.fr', pass: USERS['bob@example.fr'] }, logger: false });
+    await b.connect();
+    for (let i = 1; i <= 40; i += 1) {
+      await b.append('INBOX', `From: Carla <carla@example.fr>\r\nTo: bob@example.fr\r\nSubject: Note ${String(i).padStart(2, '0')}\r\nDate: ${new Date(Date.UTC(2026, 0, 1, 8, i)).toUTCString()}\r\nMessage-ID: <note${i}@example.fr>\r\n\r\nNote ${i}\r\n`);
+    }
+    await b.logout();
+  }
+  await page.getByRole('button', { name: 'Refresh' }).first().click();
+  await page.locator('.trow', { hasText: 'Note 40' }).waitFor({ timeout: 10_000 });
+  log('Refresh asks the mail server at once');
+  const row = page.locator('.trow', { hasText: 'Note 22' });
+  await row.scrollIntoViewIfNeeded();
+  await page.evaluate(() => window.scrollBy(0, 120));
+  const before = await page.evaluate(() => window.scrollY);
+  await must(before > 300, `the list is scrolled down (${before})`);
+  await row.locator('.trow-link').click();
+  await page.locator('.mcard').first().waitFor();
+  await must((await page.evaluate(() => window.scrollY)) === 0, 'the conversation opens at its top');
+  await page.getByRole('link', { name: 'Back', exact: true }).first().click();
+  await page.locator('.trow', { hasText: 'Note 22' }).waitFor();
+  const after = await page.evaluate(() => window.scrollY);
+  const box = await page.locator('.trow', { hasText: 'Note 22' }).boundingBox();
+  await must(Math.abs(after - before) < 5 && box.y > 0 && box.y + box.height < 860, `back at the same place (${before} → ${after})`);
+  await page.locator('.trow', { hasText: 'Note 22' }).locator('.trow-link').click();
+  await page.locator('.mcard').first().waitFor();
+  await page.goBack();
+  await page.locator('.trow', { hasText: 'Note 22' }).waitFor();
+  await must(Math.abs((await page.evaluate(() => window.scrollY)) - before) < 5, 'the same with the browser’s Back');
+  await page.getByRole('link', { name: /^Inbox/ }).first().click();
+  await page.waitForTimeout(300);
+  log('back from a conversation: same place in the list, its row in view');
+
   // French.
   await page.getByRole('button', { name: 'Français' }).click().catch(() => {});
   if (await page.getByRole('heading', { name: 'Boîte de réception' }).count()) { await shot('d07-inbox-fr'); log('French'); }

@@ -766,3 +766,7 @@ html.busy body::before {
 .aview-text { width: min(900px, 100%); max-height: 100%; overflow: auto; margin: 0; padding: 20px; background: #fff; color: #14313b; white-space: pre-wrap; font: 0.875rem/1.5 ui-monospace, monospace; border-radius: 6px; }
 .aview-msg, .aview-none { color: #fff; text-align: center; }
 .aview-none .btn { margin-top: 8px; }
+
+/* The row of the conversation just left, for a moment, when coming back to the list. */
+.trow-back { animation: trow-back 1.5s ease-out; }
+@keyframes trow-back { from { background: color-mix(in srgb, var(--lumen) 45%, transparent); } to { background: transparent; } }

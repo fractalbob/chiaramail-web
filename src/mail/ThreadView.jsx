@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import * as gmail from '@gmail';
 import { parseMessage, b64urlToBytes, displayName, deliveryInfo } from '../gmail/mime.js';
@@ -174,6 +174,8 @@ export default function ThreadView() {
   const [state, setState] = useState({ id: null });
   const [open, setOpen] = useState({});
   const mounted = useRef(true);
+  // A conversation opens at its top, wherever the list was scrolled (as in Gmail).
+  useLayoutEffect(() => { window.scrollTo(0, 0); }, [threadId]);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const back = `/mail/${encodeURIComponent(folder)}${params.get('q') ? `?q=${encodeURIComponent(params.get('q'))}` : ''}`;
   const { handle, refreshCounts } = mail;
@@ -196,13 +198,13 @@ export default function ThreadView() {
   }, [fetchThread, fail, threadId, refreshCounts]);
 
   if (state.id !== threadId) return <p className="loading">{t('loading')}</p>;
-  if (state.error) return <><p className="back"><Link to={back}>{t('backToList')}</Link></p><p className="error">{state.error}</p></>;
+  if (state.error) return <><p className="back"><Link to={back} state={{ back: true }}>{t('backToList')}</Link></p><p className="error">{state.error}</p></>;
 
   const msgs = state.msgs;
   const labels = new Set(msgs.flatMap((m) => m.labelIds));
   const act = async (fn, leave = true) => {
     // If the reader has already moved elsewhere, don't pull them back.
-    try { await fn(); refreshCounts(); if (!mounted.current) return; if (leave) nav(back); else load(); } catch (e) { handle(e); }
+    try { await fn(); refreshCounts(); if (!mounted.current) return; if (leave) nav(back, { state: { back: true } }); else load(); } catch (e) { handle(e); }
   };
   const subject = msgs[0]?.subject || t('noSubject');
   const lastReal = msgs.map((m) => m.labelIds.includes('DRAFT')).lastIndexOf(false);
@@ -211,7 +213,7 @@ export default function ThreadView() {
   return (
     <article className="thread">
       <div className="toolbar thread-toolbar" role="toolbar" aria-label={t('threadActions')}>
-        <Link to={back} className="ibtn" aria-label={t('backToList')} title={t('backToList')}><Icon name="back" /></Link>
+        <Link to={back} state={{ back: true }} className="ibtn" aria-label={t('backToList')} title={t('backToList')}><Icon name="back" /></Link>
         {labels.has('INBOX') && <IconButton label={t('archive')} onClick={() => act(() => gmail.modifyThread(threadId, [], ['INBOX']))}><Icon name="archive" /></IconButton>}
         {!labels.has('INBOX') && !labels.has('TRASH') && !labels.has('SPAM') && <IconButton label={t('moveToInbox')} onClick={() => act(() => gmail.modifyThread(threadId, ['INBOX'], []), false)}><Icon name="inbox" /></IconButton>}
         {labels.has('SPAM')

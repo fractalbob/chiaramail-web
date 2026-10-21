@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useNavigationType, useParams, useSearchParams } from 'react-router-dom';
 import * as gmail from '@gmail';
 import { summarize, bouncedAddresses } from '../gmail/mime.js';
 import { useMail } from './context.jsx';
@@ -14,6 +14,11 @@ import { hue } from './avatar.js';
 import PersonHover from './PersonCard.jsx';
 
 const PAGE = 25;
+
+// As in Gmail, coming back from a conversation (its ← or the browser's Back)
+// returns to the same page of the list, scrolled to where it was, with the
+// conversation's row in view. Kept per folder and search, for this session.
+const returnTo = new Map(); // `${folder}|${q}` → { pages, state, scrollY, threadId }
 const phone = () => window.matchMedia('(max-width: 600px)').matches;
 
 // A row's label chips, as in Gmail: at most two (one on a phone), then "+N" for the rest,
@@ -37,27 +42,33 @@ export default function ThreadList() {
   const q = params.get('q') || '';
   const mail = useMail();
   const { t, formatShort } = useI18n();
-  const [pages, setPages] = useState(['']); // page tokens; last is current
-  const [state, setState] = useState({ key: null, rows: null, next: null, total: 0, error: '' });
+  const loc = useLocation();
+  const navType = useNavigationType();
+  const listKey = `${folder}|${q}`;
+  // Coming back to this list: what it showed when the conversation was opened.
+  const [back] = useState(() => ((navType === 'POP' || loc.state?.back) ? returnTo.get(listKey) || null : null));
+  const [pages, setPages] = useState(() => back?.pages || ['']); // page tokens; last is current
+  const [state, setState] = useState(() => back?.state || { key: null, rows: null, next: null, total: 0, error: '' });
   const key = `${folder}|${q}|${pages[pages.length - 1]}`;
   const { handle } = mail;
   const viewLabel = q ? null : labelIdFor(folder); // the label every row in this view carries
   // User labels shown as chips on each row, as in Gmail.
   const labelNames = Object.fromEntries(mail.userLabels.map((l) => [l.id, l.name]));
 
-  const fetchPage = useCallback(async () => {
+  // fresh: the Refresh button: ask the mail server now, not from the last few seconds' copy.
+  const fetchPage = useCallback(async (fresh) => {
     const pageToken = pages[pages.length - 1] || undefined;
     const labelId = labelIdFor(folder) || undefined;
     // The count after "1–25 of": the label's own total when browsing a folder, Gmail's estimate otherwise.
     const [{ ids, nextPageToken, estimate }, label] = await Promise.all([
-      gmail.listThreads({ labelId, q, pageToken, max: PAGE }),
+      gmail.listThreads({ labelId, q, pageToken, max: PAGE, ...(fresh ? { fresh: true } : {}) }),
       labelId && !q ? gmail.getLabel(labelId).catch(() => null) : null,
     ]);
     const threads = await gmail.getThreadsMeta(ids);
     return { key, rows: threads.map((th) => summarize(th, mail.account)), next: nextPageToken, total: label?.threadsTotal ?? estimate ?? 0, exact: !!label, error: '' };
   }, [folder, q, pages, key, mail.account]);
 
-  const load = useCallback((silent) => fetchPage().then(setState).catch((e) => {
+  const load = useCallback((silent, fresh) => fetchPage(fresh).then(setState).catch((e) => {
     if (!handle(e) && !silent) setState({ key, rows: null, next: null, total: 0, error: e.code === 'rate-limit' ? t('rateLimited') : e.message });
   }), [fetchPage, handle, key, t]);
 
@@ -86,6 +97,25 @@ export default function ThreadList() {
   if (lastReset !== resetKey) { setLastReset(resetKey); setPages(['']); }
 
   const rows = state.key === key ? state.rows : null;
+  const restored = useRef(false);
+  const [flash, setFlash] = useState(back?.threadId || null);
+  useLayoutEffect(() => {
+    if (restored.current || !back || !rows) return;
+    restored.current = true;
+    window.scrollTo(0, back.scrollY || 0);
+    // The list may have changed since: make sure the conversation's row is in view.
+    const row = back.threadId && document.querySelector(`[data-thread="${CSS.escape(back.threadId)}"]`);
+    if (row) {
+      const r = row.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > window.innerHeight) row.scrollIntoView({ block: 'center' });
+    }
+  }, [rows, back]);
+  useEffect(() => {
+    if (!flash) return undefined;
+    const id = setTimeout(() => setFlash(null), 1500);
+    return () => clearTimeout(id);
+  }, [flash]);
+  const remember = (threadId) => returnTo.set(listKey, { pages, state, scrollY: window.scrollY, threadId });
   const marks = useEcsMarks(rows, (mail.account || '').toLowerCase());
 
   // Gmail-style selection: a checkbox on each row, one in the toolbar with a
@@ -352,7 +382,7 @@ export default function ThreadList() {
             <span className="bulkcount working" role="status">{t('working')}</span>
           ) : (
             <>
-              <IconButton label={t('refresh')} onClick={() => load(false)}><Icon name="refresh" /></IconButton>
+              <IconButton label={t('refresh')} onClick={() => load(false, true)}><Icon name="refresh" /></IconButton>
               {rows?.some((r) => r.unread) && (
                 <Menu label={t('moreActions')} button={<Icon name="more" />}>
                   <MenuItem onClick={() => labelBulk([], ['UNREAD'], rows.filter((r) => r.unread).map((r) => r.id))}>{t('markAllRead')}</MenuItem>
@@ -375,9 +405,9 @@ export default function ThreadList() {
       {rows && rows.length > 0 && (
         <ul className="msglist">
           {rows.map((r) => (
-            <li key={r.id} onContextMenu={(e) => openCtx(e, r)}
+            <li key={r.id} data-thread={r.id} onContextMenu={(e) => openCtx(e, r)}
               onPointerDown={(e) => startPress(e, r.id)} onPointerMove={movePress} onPointerUp={endPress} onPointerCancel={endPress}
-              className={`trow${r.unread ? ' trow-unread' : ''}${selected.has(r.id) ? ' trow-selected' : ''}${ctx?.id === r.id ? ' trow-ctx' : ''}`}>
+              className={`trow${r.unread ? ' trow-unread' : ''}${selected.has(r.id) ? ' trow-selected' : ''}${ctx?.id === r.id ? ' trow-ctx' : ''}${flash === r.id ? ' trow-back' : ''}`}>
               <input type="checkbox" className="rowcheck" checked={selected.has(r.id)} onChange={() => toggle(r.id)}
                 aria-label={t('selectRow', { name: r.subject || t('noSubject') })} />
               {(() => {
@@ -397,7 +427,7 @@ export default function ThreadList() {
               <button type="button" className={r.important ? 'imp imp-on' : 'imp'} aria-pressed={r.important}
                 aria-label={r.important ? t('markNotImportant') : t('markImportant')} title={r.important ? t('importantTitle') : t('markImportant')}
                 onClick={() => flip(r, 'IMPORTANT', 'important')}><Icon name="important" size={18} /></button>
-              <Link to={`/mail/${encodeURIComponent(folder)}/${r.id}${q ? `?q=${encodeURIComponent(q)}` : ''}`} className="trow-link" onClick={(e) => tapRow(e, r.id)} draggable={false}>
+              <Link to={`/mail/${encodeURIComponent(folder)}/${r.id}${q ? `?q=${encodeURIComponent(q)}` : ''}`} className="trow-link" onClick={(e) => { tapRow(e, r.id); if (!e.defaultPrevented) remember(r.id); }} draggable={false}>
                 <span className="row-people">
                   {r.people.length ? r.people.map((p, i) => (
                     <span key={p.email + i}>

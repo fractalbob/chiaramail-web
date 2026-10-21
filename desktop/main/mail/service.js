@@ -509,10 +509,10 @@ export class MailService {
     return hits;
   }
 
-  async listThreads({ labelId, q, pageToken, max = 25 } = {}) {
+  async listThreads({ labelId, q, pageToken, max = 25, fresh = false } = {}) {
     const own = ['STARRED', 'IMPORTANT', 'UNREAD'].includes(labelId) || !labelId ? null : this.pathOfLabel(labelId);
     if (own && !this.folders.some((f) => f.path === own)) await this.loadFolders(); // created elsewhere since
-    if (own && (!this.idx.folders[own]?.ready || Date.now() - (this.idx.folders[own].at || 0) > 10_000)) await this.sync({ paths: [own] });
+    if (own && (fresh || !this.idx.folders[own]?.ready || Date.now() - (this.idx.folders[own].at || 0) > 10_000)) await this.sync({ paths: [own] });
     // A folder's own list doesn't wait for the other folders; views across folders do.
     if (own) this.freshen(); else await this.sync();
     const hits = q ? await this.searchServer(q, labelId) : null;
