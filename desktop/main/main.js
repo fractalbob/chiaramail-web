@@ -5,6 +5,7 @@ import { app, BrowserWindow, ipcMain, protocol, net, shell, safeStorage, Menu, s
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, normalize, sep, extname, basename } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
+import { mkdtemp, writeFile } from 'node:fs/promises';
 import { AccountManager } from './account.js';
 import { EcsClient } from './ecs.js';
 
@@ -91,6 +92,23 @@ function saveDownloads() {
   ipcMain.handle('download:show', (_e, id) => reply(async () => { const p = saved.get(id); if (p) shell.showItemInFolder(p); }));
 }
 const saved = new Map(); // id → path of files saved to Downloads in this session
+
+// "Open with": the attachment viewer hands over a file to open in the
+// computer's own app for it. It goes to a private temporary folder first.
+// Programs and scripts are refused: they're saved, never opened, from here.
+const RISKY = /\.(exe|com|bat|cmd|msi|msp|scr|pif|cpl|ps1|psm1|vbs|vbe|js|jse|wsf|wsh|hta|jar|lnk|reg|sh|bash|zsh|command|app|pkg|dmg|desktop|appimage|run|bin|py|pl|rb|deb|rpm|apk|iso|img)$/i;
+function openWith() {
+  ipcMain.handle('file:openWith', (_e, name, bytes) => reply(async () => {
+    const clean = basename(String(name || 'attachment')).replace(/[\\/:*?"<>|]/g, '_') || 'attachment';
+    if (RISKY.test(clean)) throw Object.assign(new Error('This kind of file can only be saved, not opened from ChiaraMail.'), { code: 'risky' });
+    if (!(bytes instanceof Uint8Array) || bytes.length > 60 * 1024 * 1024) throw new Error('Bad file');
+    const dir = await mkdtemp(join(app.getPath('temp'), 'chiaramail-open-'));
+    const path = join(dir, clean);
+    await writeFile(path, bytes, { mode: 0o600 });
+    const err = await shell.openPath(path);
+    if (err) throw new Error(err);
+  }));
+}
 let downloadSeq = 0;
 
 function createWindow() {
@@ -105,6 +123,7 @@ function createWindow() {
       sandbox: true,
       nodeIntegration: false,
       spellcheck: true,
+      plugins: true, // the built-in PDF viewer, for PDF attachments
     },
   });
   win.once('ready-to-show', () => win.show());
@@ -166,5 +185,6 @@ app.whenReady().then(async () => {
   serveApp();
   wireIpc();
   saveDownloads();
+  openWith();
   createWindow();
 });

@@ -727,3 +727,42 @@ html.busy body::before {
 }
 .download-note .btn-quiet { color: #fff; }
 .download-note .chip-x { color: #fff; }
+
+/* Attachments as cards (a thumbnail for pictures), and the viewer they open in. */
+.acards { list-style: none; display: flex; flex-wrap: wrap; gap: 12px; padding: 0; margin: 14px 0 0; }
+.acard { position: relative; width: 180px; }
+.acard-open {
+  display: flex; flex-direction: column; width: 100%; padding: 0; border: 1px solid var(--rule); border-radius: var(--radius-m);
+  background: var(--sky); overflow: hidden; cursor: pointer; text-align: left; color: var(--ink); font: inherit;
+}
+.acard-open:hover, .acard-open:focus-visible { border-color: var(--slate); }
+.acard-thumb { width: 100%; height: 110px; object-fit: cover; display: block; background: var(--paper); }
+.acard-icon { height: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--slate); background: var(--paper); }
+.acard-ext { font: 600 0.75rem/1 var(--sans); letter-spacing: 0.04em; }
+.acard-label { display: flex; flex-direction: column; padding: 8px 10px; gap: 2px; min-width: 0; }
+.acard-name { font: 0.875rem/1.3 var(--sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acard-size { font: 0.75rem/1.2 var(--sans); color: var(--slate); }
+.acard-dl {
+  position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; border-radius: 6px; border: 0;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  background: rgba(20, 49, 59, 0.72); color: #fff;
+}
+.acard-dl:hover, .acard-dl:focus-visible { background: rgba(20, 49, 59, 0.9); }
+.aview { position: fixed; inset: 0; z-index: 60; background: rgba(10, 20, 24, 0.95); display: flex; flex-direction: column; }
+.aview-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; color: #fff; }
+.aview-name { display: inline-flex; align-items: center; gap: 8px; font: 1rem/1.3 var(--sans); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aview-size { color: #b9c8ce; font-size: 0.875rem; }
+.aview-tools { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.aview-btn {
+  border: 0; background: transparent; color: #fff; height: 40px; min-width: 40px; border-radius: 20px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; font: 0.9375rem/1 var(--sans); padding: 0 10px;
+}
+.aview-btn:hover, .aview-btn:focus-visible { background: rgba(255, 255, 255, 0.14); }
+.aview-btn:disabled { opacity: 0.5; cursor: default; }
+.aview-open { border: 1px solid rgba(255, 255, 255, 0.5); padding: 0 16px; }
+.aview-body { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 16px 16px; }
+.aview-img { max-width: 100%; max-height: 100%; object-fit: contain; background: #fff; }
+.aview-pdf { width: min(1000px, 100%); height: 100%; border: 0; background: #fff; }
+.aview-text { width: min(900px, 100%); max-height: 100%; overflow: auto; margin: 0; padding: 20px; background: #fff; color: #14313b; white-space: pre-wrap; font: 0.875rem/1.5 ui-monospace, monospace; border-radius: 6px; }
+.aview-msg, .aview-none { color: #fff; text-align: center; }
+.aview-none .btn { margin-top: 8px; }

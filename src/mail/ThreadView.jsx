@@ -10,38 +10,21 @@ import { useI18n } from '../i18n.jsx';
 import HtmlBody from './HtmlBody.jsx';
 import LiveMessage from './LiveMessage.jsx';
 import PlainBody from './PlainBody.jsx';
-import { fmtSize } from '../lib.js';
 import { useIsEcsUser } from './ecsCheck.js';
 import { markSpamHandled } from './prefs.js';
 import Icon from './icons.jsx';
 import { IconButton, Menu, MenuItem } from './Menu.jsx';
 import LabelPicker from './LabelPicker.jsx';
+import AttachmentCards from './AttachmentCards.jsx';
 
 
 function Attachments({ message }) {
   const { t } = useI18n();
-  const { handle } = useMail();
-  const download = async (a) => {
-    try {
-      const data = a.data || await gmail.getAttachment(message.id, a.attachmentId);
-      const url = URL.createObjectURL(new Blob([b64urlToBytes(data)], { type: a.mimeType }));
-      const link = document.createElement('a');
-      link.href = url; link.download = a.filename; link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    } catch (e) { handle(e); }
-  };
-  if (!message.attachments.length) return null;
-  return (
-    <ul className="attachments" aria-label={t('attachments')}>
-      {message.attachments.map((a, i) => (
-        <li key={i}>
-          <button type="button" className="chip" onClick={() => download(a)}>
-            📎 {a.filename} <span className="chip-size">{fmtSize(a.size)}</span>
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
+  const items = message.attachments.map((a, i) => ({
+    key: a.attachmentId || `p${i}`, name: a.filename, type: a.mimeType, size: a.size,
+    load: async () => new Blob([b64urlToBytes(a.data || await gmail.getAttachment(message.id, a.attachmentId))], { type: a.mimeType }),
+  }));
+  return <AttachmentCards items={items} label={t('attachments')} />;
 }
 
 // Gmail's "Show details" (▾ beside the recipients): who sent it, to whom, when, and how it

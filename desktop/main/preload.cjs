@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('chiaramailDesktop', {
     },
     open: (id) => ipcRenderer.invoke('download:open', id),
     show: (id) => ipcRenderer.invoke('download:show', id),
+    openWith: (name, bytes) => ipcRenderer.invoke('file:openWith', name, bytes),
   },
   ecs: {
     ...ipcRenderer.sendSync('ecs:config'),

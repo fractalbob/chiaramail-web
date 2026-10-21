@@ -1,36 +1,16 @@
-import { useState } from 'react';
 import { useI18n } from '../i18n.jsx';
-import { fmtSize } from '../lib.js';
 import { getEcsAttachment } from '../ecs.js';
+import AttachmentCards from '../mail/AttachmentCards.jsx';
 
-// Files stored with an ECS message's body (never in the email itself).
+// Files stored with an ECS message's body (never in the email itself),
+// decrypted here with the message's key.
 export default function EcsAttachments({ id, message, ecsKey }) {
   const { t } = useI18n();
-  const [error, setError] = useState('');
   const list = message.attachments || [];
   if (!list.length || message.withdrawn || message.locked) return null;
-  const download = async (a, i) => {
-    setError('');
-    try {
-      const blob = await getEcsAttachment(id, i, message, ecsKey);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url; link.download = a.name; link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    } catch (e) { setError(t('errorGeneric', { msg: e.message })); }
-  };
-  return (
-    <>
-      <ul className="attachments" aria-label={t('attachments')}>
-        {list.map((a, i) => (
-          <li key={i}>
-            <button type="button" className="chip" onClick={() => download(a, i)}>
-              📎 {a.name} <span className="chip-size">{fmtSize(a.size)}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-      {error && <p className="error" role="alert">{error}</p>}
-    </>
-  );
+  const items = list.map((a, i) => ({
+    key: `${id}/${Number.isInteger(a.slot) ? a.slot : i}`, name: a.name, type: a.type, size: a.size,
+    load: () => getEcsAttachment(id, i, message, ecsKey),
+  }));
+  return <AttachmentCards items={items} label={t('attachments')} />;
 }
