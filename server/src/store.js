@@ -1,5 +1,5 @@
 // Where ECS attachments are kept: files on the server's own disk, one folder
-// per message (FILES_DIR/<message id>/<index>). They are already encrypted by
+// per message (FILES_DIR/<message id>/<slot>). They are already encrypted by
 // the sender's app. Back this folder up together with the database.
 import { mkdir, rm, rename, stat } from 'node:fs/promises';
 import { createReadStream, createWriteStream } from 'node:fs';
@@ -12,7 +12,7 @@ const SAFE_ID = /^[A-Za-z0-9]{20}$/;
 
 export function fileStore(dir) {
   const pathOf = (id, i) => {
-    if (!SAFE_ID.test(id) || !Number.isInteger(i) || i < 0 || i > 99) throw new Error('bad file name');
+    if (!SAFE_ID.test(id) || !Number.isInteger(i) || i < 0 || i > 999) throw new Error('bad file name');
     return join(dir, id, String(i));
   };
   return {

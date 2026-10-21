@@ -172,6 +172,48 @@ test('attachments: only readers fetch them; size limits; the 1 GB allowance', as
   assert.equal((await call('POST', `/messages/${id}/editions`, { token: bob.token, json: { subject: 'S', body: 'B' } })).status, 409, 'no edits after withdrawing');
 });
 
+test('an edition can change the attachments; earlier files stay for the sender', async () => {
+  const start = (await call('GET', '/usage', { token: bob.token })).data.used;
+  const { data: { id } } = await newMsg(bob.token, { attachments: [{ name: 'a', type: 't', size: 3 }, { name: 'b', type: 't', size: 4 }] });
+  await call('PUT', `/messages/${id}/files/0`, { token: bob.token, body: Buffer.from('aaa') });
+  await call('PUT', `/messages/${id}/files/1`, { token: bob.token, body: Buffer.from('bbbb') });
+  const m1 = (await call('GET', `/messages/${id}`, { token: alice.token })).data;
+  assert.deepEqual(m1.attachments.map((a) => [a.name, a.slot]), [['a', 0], ['b', 1]]);
+  // Keep b, drop a, add c.
+  const edit = (token, attachments) => call('POST', `/messages/${id}/editions`, { token, json: { subject: 'S2', body: 'B2', attachments } });
+  assert.equal((await edit(alice.token, [{ keep: 1 }])).status, 404, 'only the sender');
+  assert.equal((await edit(bob.token, [{ keep: 7 }])).status, 400, 'only files of the current edition can be kept');
+  assert.equal((await edit(bob.token, [{ keep: 1 }, { keep: 1 }])).status, 400, 'a file kept once');
+  const e = await edit(bob.token, [{ keep: 1 }, { name: 'c', type: 't', size: 5 }]);
+  assert.equal(e.status, 200);
+  assert.deepEqual(e.data, { edition: 2, slots: [2] });
+  assert.equal((await call('GET', '/usage', { token: bob.token })).data.used, start + 12, 'the new file counts; the old ones still do');
+  assert.equal((await call('PUT', `/messages/${id}/files/0`, { token: bob.token, body: Buffer.from('x') })).status, 400, 'no uploads to a dropped file');
+  assert.equal((await call('PUT', `/messages/${id}/files/2`, { token: bob.token, body: Buffer.from('ccccc') })).status, 200);
+  const m2 = (await call('GET', `/messages/${id}`, { token: alice.token })).data;
+  assert.deepEqual(m2.attachments.map((a) => [a.name, a.slot]), [['b', 1], ['c', 2]]);
+  assert.equal((await call('GET', `/messages/${id}/files/2`, { token: alice.token })).data.toString(), 'ccccc');
+  assert.equal((await call('GET', `/messages/${id}/files/0`, { token: alice.token })).status, 404, 'recipients: current files only');
+  assert.equal((await call('GET', `/messages/${id}/files/0`, { token: bob.token })).data.toString(), 'aaa', 'the sender keeps the earlier file');
+  const eds = (await call('GET', `/messages/${id}/editions`, { token: bob.token })).data;
+  assert.deepEqual(eds.map((x) => (x.attachments || []).map((a) => a.name)), [['b', 'c'], ['a', 'b']]);
+  // An edition without `attachments` keeps the files as they are; an empty list removes them all.
+  await call('POST', `/messages/${id}/editions`, { token: bob.token, json: { subject: 'S3', body: 'B3' } });
+  assert.equal((await call('GET', `/messages/${id}`, { token: alice.token })).data.attachments.length, 2);
+  await edit(bob.token, []);
+  assert.equal((await call('GET', `/messages/${id}`, { token: alice.token })).data.attachments, undefined);
+  // Over the allowance: refused, nothing changed.
+  await db.query('UPDATE usage SET bytes = $2 WHERE uid = $1', [bob.user.uid, QUOTA - 2]);
+  const over = await edit(bob.token, [{ name: 'd', type: 't', size: 10 }]);
+  assert.equal(over.status, 409);
+  assert.equal((await call('GET', `/messages/${id}`, { token: bob.token })).data.edition, 4);
+  await db.query('UPDATE usage SET bytes = $2 WHERE uid = $1', [bob.user.uid, start + 12]);
+  // Deleting gives back every file it ever had.
+  await call('DELETE', `/messages/${id}`, { token: bob.token });
+  assert.equal((await call('GET', '/usage', { token: bob.token })).data.used, start);
+  assert.ok(!existsSync(join(files, id)));
+});
+
 test('deleting: sender only; frees the space; everything goes', async () => {
   const { data: { id } } = await newMsg(bob.token, { attachments: [{ name: 'n', type: 't', size: 4 }] });
   await call('PUT', `/messages/${id}/files/0`, { token: bob.token, body: Buffer.from('abcd') });

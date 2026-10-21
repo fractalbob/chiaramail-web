@@ -164,6 +164,40 @@ try {
   await shot('e06-alice-sees-update');
   log('Alice sees the corrected edition, marked as updated');
 
+  // ---- Bob replaces the attachment in a new edition.
+  await open('bob');
+  await page.getByRole('heading', { name: 'Inbox' }).waitFor({ timeout: 30_000 });
+  await page.getByRole('link', { name: /^Sent/ }).first().click();
+  await openRow('Tirages pour l’exposition');
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const v2 = join(dataDirs.bob, 'devis-v2.txt');
+  writeFileSync(v2, 'Devis révisé : 3 tirages 50×70, 420 €\n');
+  await page.locator('.live-edit').getByRole('button', { name: 'Remove devis.txt' }).click();
+  await page.locator('.live-edit input[type=file]').setInputFiles(v2);
+  await page.locator('.live-edit').getByText('devis-v2.txt').waitFor();
+  await page.getByRole('button', { name: 'Save new edition' }).click();
+  await page.getByText('Edition 3 saved.').waitFor({ timeout: 30_000 });
+  await page.locator('.live-block').getByRole('button', { name: /devis-v2\.txt/ }).waitFor();
+  await must(!(await page.locator('.live-block > .attachments').getByRole('button', { name: /^📎 devis\.txt/ }).count()), 'the old file is no longer listed');
+  await page.locator('.live-details summary', { hasText: 'Editions' }).click();
+  await page.locator('.editions li', { hasText: 'Edition 1' }).locator('summary').click();
+  await page.locator('.editions li', { hasText: 'Edition 1' }).getByRole('button', { name: /devis\.txt/ }).waitFor();
+  await shot('e06b-bob-replaced-file');
+  {
+    const stored = readdirSync(join(files, row.id)).map((f) => readFileSync(join(files, row.id, f)).toString('latin1')).join('');
+    for (const plain of ['devis-v2', 'révisé', '420']) await must(!stored.includes(plain), `server must not hold "${plain}"`);
+  }
+  log('Bob replaces the attachment in edition 3; the old one stays in his history (encrypted on the server)');
+  await open('alice');
+  await page.getByRole('heading', { name: 'Inbox' }).waitFor({ timeout: 30_000 });
+  await openRow('Tirages pour l’exposition');
+  await page.locator('.live-block').getByRole('button', { name: /devis-v2\.txt/ }).click();
+  const saved2 = join(downloads, 'devis-v2.txt');
+  for (let i = 0; i < 50 && !existsSync(saved2); i += 1) await page.waitForTimeout(200);
+  await must(existsSync(saved2) && readFileSync(saved2, 'utf8').startsWith('Devis révisé'), 'Alice gets the new file');
+  await must(!(await page.locator('.live-block').getByRole('button', { name: /^📎 devis\.txt/ }).count()), 'Alice no longer sees the old file');
+  log('Alice sees and downloads the new file only');
+
   // ---- Bob withdraws it; Alice can no longer read it.
   await open('bob');
   await page.getByRole('heading', { name: 'Inbox' }).waitFor({ timeout: 30_000 });

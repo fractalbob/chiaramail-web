@@ -13,6 +13,7 @@ export const QUOTA = 1024 * 1024 * 1024;
 export const MAX_FILE = 25 * 1024 * 1024;
 const FILE_SLACK = 1024; // encryption adds a few bytes to each file
 const MAX_FILES = 20;
+const MAX_SLOTS = 1000; // files over a message's lifetime, all editions together
 const MAX_RECIPIENTS = 50;
 const MAX_JSON = 2 * 1024 * 1024;
 const CODE_TTL_MIN = 15;
@@ -52,12 +53,17 @@ const out = (m) => {
     edition: m.edition, withdrawn: m.withdrawn, allowForward: m.allow_forward,
   };
   if (m.sender_name) d.senderName = m.sender_name;
-  if (m.attachments) d.attachments = m.attachments;
+  if (m.attachments) d.attachments = withSlots(m.attachments);
   if (m.enc) d.enc = m.enc;
   if (m.counted) d.counted = true;
   return d;
 };
 const total = (atts) => (atts || []).reduce((n, a) => n + (a.size || 0), 0);
+// A file's slot (its name on disk). Messages from before editable attachments: their position.
+const slotOf = (a, i) => (Number.isInteger(a?.slot) ? a.slot : i);
+const withSlots = (atts) => (atts || []).map((a, i) => ({ ...a, slot: slotOf(a, i) }));
+const nextSlot = (m) => m.next_slot ?? (m.attachments || []).length;
+const storedBytes = (m) => m.stored_bytes ?? total(m.attachments);
 
 /**
  * db: openDb(); store: fileStore(); mailer: smtpMailer()/memoryMailer();
@@ -104,7 +110,7 @@ export function createApp({ db, store, mailer, origins = [], secret = randomByte
   };
   // Gives a counted message's files back to its sender's allowance.
   const free = async (c, m) => {
-    if (m.counted && !m.withdrawn) await c.query('UPDATE usage SET bytes = GREATEST(0, bytes - $2) WHERE uid = $1', [m.sender_uid, total(m.attachments)]);
+    if (m.counted && !m.withdrawn) await c.query('UPDATE usage SET bytes = GREATEST(0, bytes - $2) WHERE uid = $1', [m.sender_uid, storedBytes(m)]);
   };
 
   // ---- sign-in -----------------------------------------------------------------
@@ -153,6 +159,19 @@ export function createApp({ db, store, mailer, origins = [], secret = randomByte
   }
 
   // ---- messages ------------------------------------------------------------------
+  function newFile(a) {
+    if (!a || typeof a.name !== 'string' || a.name.length > 2000 || typeof a.type !== 'string' || a.type.length > 2000
+      || !Number.isInteger(a.size) || a.size < 0 || a.size > MAX_FILE + FILE_SLACK) throw bad('Bad attachment');
+    return { name: a.name, type: a.type || 'application/octet-stream', size: a.size };
+  }
+  // Takes room from the sender's allowance (in transaction c), or refuses.
+  async function reserve(c, uid, needBytes) {
+    await c.query('INSERT INTO usage (uid) VALUES ($1) ON CONFLICT DO NOTHING', [uid]);
+    const used = (await c.query('SELECT bytes FROM usage WHERE uid = $1 FOR UPDATE', [uid])).rows[0].bytes;
+    if (used + needBytes > QUOTA) throw Object.assign(new Error('quota'), { status: 409, code: 'quota', used, need: needBytes, quota: QUOTA });
+    await c.query('UPDATE usage SET bytes = bytes + $2 WHERE uid = $1', [uid, needBytes]);
+  }
+
   function checkContent(subject, body) {
     if (typeof subject !== 'string' || subject.length > 2000) throw bad('Bad subject');
     if (typeof body !== 'string' || body.length < 1 || body.length > 300000) throw bad('Bad body');
@@ -169,27 +188,18 @@ export function createApp({ db, store, mailer, origins = [], secret = randomByte
     let atts = null;
     if (b.attachments !== undefined && !(Array.isArray(b.attachments) && b.attachments.length === 0)) {
       if (!Array.isArray(b.attachments) || b.attachments.length > MAX_FILES) throw bad('Bad attachments');
-      atts = b.attachments.map((a) => {
-        if (!a || typeof a.name !== 'string' || a.name.length > 2000 || typeof a.type !== 'string' || a.type.length > 2000
-          || !Number.isInteger(a.size) || a.size < 0 || a.size > MAX_FILE + FILE_SLACK) throw bad('Bad attachment');
-        return { name: a.name, type: a.type || 'application/octet-stream', size: a.size };
-      });
+      atts = b.attachments.map((a, i) => ({ ...newFile(a), slot: i }));
     }
     const id = newId();
     await db.tx(async (c) => {
-      if (atts) {
-        await c.query('INSERT INTO usage (uid) VALUES ($1) ON CONFLICT DO NOTHING', [u.uid]);
-        const used = (await c.query('SELECT bytes FROM usage WHERE uid = $1 FOR UPDATE', [u.uid])).rows[0].bytes;
-        const needBytes = total(atts);
-        if (used + needBytes > QUOTA) throw Object.assign(new Error('quota'), { status: 409, code: 'quota', used, need: needBytes, quota: QUOTA });
-        await c.query('UPDATE usage SET bytes = bytes + $2 WHERE uid = $1', [u.uid, needBytes]);
-      }
+      if (atts) await reserve(c, u.uid, total(atts));
       await c.query(
-        `INSERT INTO messages (id, sender_uid, sender_email, sender_name, recipients, subject, body, allow_forward, attachments, enc, counted)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        `INSERT INTO messages (id, sender_uid, sender_email, sender_name, recipients, subject, body, allow_forward, attachments, enc, counted, next_slot, stored_bytes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [id, u.uid, u.email, b.senderName ? b.senderName.slice(0, 120) : null, recipients, b.subject, b.body, !!b.allowForward,
-          atts ? JSON.stringify(atts) : null, b.enc === 1 ? 1 : null, !!atts]);
-      await c.query('INSERT INTO editions (message_id, edition, subject, body) VALUES ($1, 1, $2, $3)', [id, b.subject, b.body]);
+          atts ? JSON.stringify(atts) : null, b.enc === 1 ? 1 : null, !!atts, atts ? atts.length : 0, total(atts)]);
+      await c.query('INSERT INTO editions (message_id, edition, subject, body, attachments) VALUES ($1, 1, $2, $3, $4)',
+        [id, b.subject, b.body, atts ? JSON.stringify(atts) : null]);
     });
     return { id };
   }
@@ -197,7 +207,7 @@ export function createApp({ db, store, mailer, origins = [], secret = randomByte
   async function putFile(u, id, i, req) {
     const m = await mine(u, id);
     if (m.withdrawn) throw denied();
-    const a = (m.attachments || [])[i];
+    const a = withSlots(m.attachments).find((x) => x.slot === i); // only files of the current edition
     if (!a) throw bad('No such attachment');
     const max = Math.min(MAX_FILE + FILE_SLACK, a.size + FILE_SLACK);
     const declared = Number(req.headers['content-length']);
@@ -211,23 +221,51 @@ export function createApp({ db, store, mailer, origins = [], secret = randomByte
 
   async function getFile(u, id, i, res) {
     const m = await readable(u, id);
-    if (m.withdrawn || !(m.attachments || [])[i]) throw denied();
+    // Recipients: the files of the current edition. The sender: those of earlier editions too.
+    const current = withSlots(m.attachments).some((x) => x.slot === i);
+    if (m.withdrawn || !(current || (isSender(u, m) && i < nextSlot(m)))) throw denied();
     const f = await store.get(id, i);
     if (!f) throw denied();
     res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': f.size, 'Cache-Control': 'no-store' });
     f.stream.pipe(res);
   }
 
+  // A new edition: new subject and text and, if `attachments` is given, a new
+  // list of files: { keep: slot } for a file of the current edition, or
+  // { name, type, size } for a new one, which the sender then uploads to the
+  // slot returned for it (in `slots`, in order).
   async function saveEdition(u, id, req) {
     const b = await readJson(req);
     checkContent(b.subject, b.body);
+    if (b.attachments !== undefined && (!Array.isArray(b.attachments) || b.attachments.length > MAX_FILES)) throw bad('Bad attachments');
     return db.tx(async (c) => {
       const m = await mine(u, id, c, true);
       if (m.withdrawn) throw Object.assign(new Error('Withdrawn'), { status: 409, code: 'withdrawn' });
       const next = m.edition + 1;
-      await c.query('UPDATE messages SET subject = $2, body = $3, edition = $4, updated_at = now() WHERE id = $1', [id, b.subject, b.body, next]);
-      await c.query('INSERT INTO editions (message_id, edition, subject, body) VALUES ($1, $2, $3, $4)', [id, next, b.subject, b.body]);
-      return { edition: next };
+      const current = withSlots(m.attachments);
+      let atts = current; const slots = []; let slot = nextSlot(m); let added = 0;
+      if (b.attachments !== undefined) {
+        atts = b.attachments.map((a) => {
+          if (a && a.keep !== undefined) {
+            const kept = current.find((x) => x.slot === a.keep);
+            if (!kept) throw bad('No such attachment');
+            return kept;
+          }
+          const f = { ...newFile(a), slot: slot++ };
+          slots.push(f.slot); added += f.size;
+          return f;
+        });
+        if (new Set(atts.map((a) => a.slot)).size !== atts.length) throw bad('Bad attachments');
+        if (slot > MAX_SLOTS) throw bad('Too many files for this message');
+        if (added) await reserve(c, u.uid, added);
+      }
+      const list = atts.length ? JSON.stringify(atts) : null;
+      await c.query(
+        `UPDATE messages SET subject = $2, body = $3, edition = $4, updated_at = now(), attachments = $5, next_slot = $6,
+           stored_bytes = $7, counted = (counted OR $8) WHERE id = $1`,
+        [id, b.subject, b.body, next, list, slot, storedBytes(m) + added, added > 0]);
+      await c.query('INSERT INTO editions (message_id, edition, subject, body, attachments) VALUES ($1, $2, $3, $4, $5)', [id, next, b.subject, b.body, list]);
+      return { edition: next, slots };
     });
   }
 
@@ -263,8 +301,8 @@ export function createApp({ db, store, mailer, origins = [], secret = randomByte
 
   async function editions(u, id) {
     await mine(u, id);
-    const r = await db.query('SELECT edition, subject, body, saved_at FROM editions WHERE message_id = $1 ORDER BY edition DESC', [id]);
-    return r.rows.map((e) => ({ edition: e.edition, subject: e.subject, body: e.body, savedAt: e.saved_at }));
+    const r = await db.query('SELECT edition, subject, body, saved_at, attachments FROM editions WHERE message_id = $1 ORDER BY edition DESC', [id]);
+    return r.rows.map((e) => ({ edition: e.edition, subject: e.subject, body: e.body, savedAt: e.saved_at, ...(e.attachments ? { attachments: e.attachments } : {}) }));
   }
 
   async function markRead(u, id, req) {
@@ -341,8 +379,8 @@ export function createApp({ db, store, mailer, origins = [], secret = randomByte
     ['PUT', /^\/messages\/([A-Za-z0-9]+)\/read$/, async (req, [id]) => markRead(await need(req), id, req)],
     ['GET', /^\/messages\/([A-Za-z0-9]+)\/reads$/, async (req, [id]) => reads(await need(req), id)],
     ['GET', /^\/messages\/([A-Za-z0-9]+)\/reads\/me$/, async (req, [id]) => myRead(await need(req), id)],
-    ['PUT', /^\/messages\/([A-Za-z0-9]+)\/files\/(\d{1,2})$/, async (req, [id, i]) => putFile(await need(req), id, Number(i), req)],
-    ['GET', /^\/messages\/([A-Za-z0-9]+)\/files\/(\d{1,2})$/, async (req, [id, i], res) => { await getFile(await need(req), id, Number(i), res); return undefined; }],
+    ['PUT', /^\/messages\/([A-Za-z0-9]+)\/files\/(\d{1,3})$/, async (req, [id, i]) => putFile(await need(req), id, Number(i), req)],
+    ['GET', /^\/messages\/([A-Za-z0-9]+)\/files\/(\d{1,3})$/, async (req, [id, i], res) => { await getFile(await need(req), id, Number(i), res); return undefined; }],
   ];
 
   return async function handle(req, res) {

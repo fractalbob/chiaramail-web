@@ -10,6 +10,9 @@ import RichEditor from './RichEditor.jsx';
 import { bodyHtml, storeRich, richIsEmpty } from '../richtext.js';
 import EcsAttachments from '../components/EcsAttachments.jsx';
 import { watchEcs, saveEcsEdition } from '../ecs.js';
+import { fmtSize } from '../lib.js';
+
+const MAX_FILES = 20;
 
 // The content of an ECS message (body and attachments): fetched live from
 // ChiaraMail (the original's FETCH CONTENT), editable in place by its sender
@@ -24,6 +27,9 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  // While editing, where attachments can change: { keep: slot, name, size } | { file: { name, type, size, bytes } }
+  const [files, setFiles] = useState([]);
+  const [progress, setProgress] = useState(null);
   const receiptFor = useRef(null);
   const [fwdPending, setFwdPending] = useState(null); // { value, base } until the server confirms
 
@@ -74,10 +80,32 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
 
   const fresh = !isSender && lastSeen > 0 && lastSeen < d.edition && !d.withdrawn;
 
+  const current = (d.attachments || []).map((a, i) => ({ keep: Number.isInteger(a.slot) ? a.slot : i, name: a.name, size: a.size }));
+  const canEditFiles = !!backend.editAttachments && !!d.enc;
+  const startEdit = () => { setDraft(bodyHtml(d.body)); setFiles(current); setEditing(true); setSaved(false); setError(''); };
+  const addFiles = (list) => {
+    const more = Array.from(list || []).map((f) => ({ file: { name: f.name, type: f.type, size: f.size, bytes: f } }));
+    if (more.some((f) => f.file.size > backend.MAX_FILE)) return setError(t('tooBigEcs'));
+    setError('');
+    setFiles((fs) => [...fs, ...more]);
+  };
+  const filesChanged = canEditFiles && (files.length !== current.length || files.some((f, i) => f.keep === undefined || f.keep !== current[i].keep));
   const save = async () => {
-    if (richIsEmpty(draft) && !d.attachments?.length) return setError(t('needBody'));
-    setBusy(true); setError('');
-    try { await saveEcsEdition(pointer, d, { subject: d.subject, body: storeRich(draft) }, key); setEditing(false); setSaved(true); } catch (e) { setError(t('errorGeneric', { msg: e.message })); } finally { setBusy(false); }
+    const list = canEditFiles ? files : current;
+    if (richIsEmpty(draft) && !list.length) return setError(t('needBody'));
+    if (list.length > MAX_FILES) return setError(t('tooManyFiles', { n: MAX_FILES }));
+    setBusy(true); setError(''); setProgress(null);
+    try {
+      await saveEcsEdition(pointer, d, {
+        subject: d.subject, body: storeRich(draft),
+        ...(filesChanged ? { files: files.map((f) => (f.file ? { file: f.file } : { keep: f.keep })) } : {}),
+      }, key, (x) => setProgress(Math.round(x * 100)));
+      setEditing(false); setSaved(true);
+    } catch (e) {
+      setError(e.code === 'quota'
+        ? t('ecsQuota', { quota: fmtSize(e.quota), need: fmtSize(e.need), left: fmtSize(Math.max(0, e.quota - e.used)) })
+        : t('errorGeneric', { msg: e.message }));
+    } finally { setBusy(false); setProgress(null); }
   };
   const withdraw = async () => {
     if (!window.confirm(t('withdrawConfirm'))) return;
@@ -120,16 +148,41 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
       ) : editing ? (
         <div className="live-edit">
           <RichEditor id={`edit-${pointer}`} label={t('message')} labelClass="sr-only" value={draft} onChange={setDraft} minRows={10} />
+          {canEditFiles && (
+            <div className="field edit-files">
+              <span className="field-label">{t('attachments')}</span>
+              {files.length > 0 && (
+                <ul className="attachments">
+                  {files.map((f, i) => {
+                    const name = f.file ? f.file.name : f.name;
+                    return (
+                      <li key={f.file ? `new-${i}` : `keep-${f.keep}`} className="chip">
+                        📎 {name} <span className="chip-size">{fmtSize(f.file ? f.file.size : f.size)}</span>
+                        {f.file && <em className="chip-new">{t('newFile')}</em>}
+                        <button type="button" className="chip-x" aria-label={t('removeAttachment', { name })}
+                          onClick={() => setFiles(files.filter((_, j) => j !== i))}>×</button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <label className="btn filebtn">
+                {t('attachFiles')}
+                <input type="file" multiple onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
+              </label>
+              {filesChanged && <p className="help">{t('filesEditNote')}</p>}
+            </div>
+          )}
           <p className="help">{t('editNote')}</p>
           <div className="actions">
-            <button type="button" className="btn btn-primary" disabled={busy} onClick={save}>{busy ? t('saving') : t('saveEdition')}</button>
+            <button type="button" className="btn btn-primary" disabled={busy} onClick={save}>{busy ? (progress !== null && progress < 100 ? t('uploading', { n: progress }) : t('saving')) : t('saveEdition')}</button>
             <button type="button" className="btn btn-quiet" onClick={() => setEditing(false)}>{t('cancel')}</button>
           </div>
         </div>
       ) : (
         <div className="letter-body live-body"><RichBody body={d.body} /></div>
       )}
-      {!d.locked && <EcsAttachments id={pointer} message={d} ecsKey={key} />}
+      {!d.locked && !(editing && canEditFiles) && <EcsAttachments id={pointer} message={d} ecsKey={key} />}
 
       {!isSender && !d.withdrawn && <p className="fineprint">{t('readNotice')}</p>}
 
@@ -143,7 +196,7 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
           )}
           {!d.withdrawn && !editing && (
             <div className="actions">
-              {!d.locked && <button type="button" className="btn btn-primary" onClick={() => { setDraft(bodyHtml(d.body)); setEditing(true); setSaved(false); }}>{t('edit')}</button>}
+              {!d.locked && <button type="button" className="btn btn-primary" onClick={startEdit}>{t('edit')}</button>}
               <button type="button" className="btn btn-danger" onClick={withdraw}>{t('withdraw')}</button>
             </div>
           )}

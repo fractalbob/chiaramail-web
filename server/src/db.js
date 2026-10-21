@@ -70,6 +70,12 @@ CREATE TABLE IF NOT EXISTS editions (
   saved_at    timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (message_id, edition)
 );
+-- Attachments can change with an edition: each file has a slot (its file name
+-- on disk); each edition records its list; files of earlier editions are kept
+-- for the sender's record (and still count against their allowance).
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS next_slot int;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS stored_bytes bigint;
+ALTER TABLE editions ADD COLUMN IF NOT EXISTS attachments jsonb;
 CREATE TABLE IF NOT EXISTS reads (
   message_id    text NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
   email         text NOT NULL,

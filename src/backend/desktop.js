@@ -13,6 +13,8 @@ export let ecsReady = false;
 /** True while signing in to the ECS server. */
 export let ecsPending = false;
 
+/** Attachments can change with a new edition (the ECS server; not yet the Firebase version). */
+export const editAttachments = true;
 export const QUOTA = 1024 * 1024 * 1024;
 export const MAX_FILE = 25 * 1024 * 1024;
 export class QuotaError extends Error {
@@ -131,14 +133,15 @@ async function createMessage_(u, { recipients, subject, body, allowForward = fal
   }
 }
 
-async function uploadAttachments_(id, files, onProgress) {
+// slots: where each file goes (from saveEdition); by default 0, 1, 2…
+async function uploadAttachments_(id, files, onProgress, slots) {
   const sizes = files.map((f) => f.bytes.size ?? f.bytes.length);
   const all = sizes.reduce((a, b) => a + b, 0) || 1;
   let done = 0;
   for (let i = 0; i < files.length; i += 1) {
     const b = files[i].bytes;
     const bytes = b instanceof Uint8Array ? b : new Uint8Array(await b.arrayBuffer());
-    await api('PUT', `/messages/${id}/files/${i}`, { bytes });
+    await api('PUT', `/messages/${id}/files/${slots?.[i] ?? i}`, { bytes });
     done += sizes[i];
     onProgress?.(done / all);
   }
@@ -149,8 +152,14 @@ async function getAttachment_(id, i) {
   return new Blob([bytes], { type: 'application/octet-stream' });
 }
 
-async function saveEdition_(id, _current, { subject, body }) {
-  return (await api('POST', `/messages/${id}/editions`, { json: { subject, body } })).edition;
+// Returns { edition, slots }: slots, where to upload the new files, in order.
+async function saveEdition_(id, _current, { subject, body, attachments }) {
+  try {
+    return await api('POST', `/messages/${id}/editions`, { json: { subject, body, ...(attachments ? { attachments } : {}) } });
+  } catch (e) {
+    if (e.code === 'quota') throw new QuotaError(e.used, e.need, e.quota || QUOTA);
+    throw e;
+  }
 }
 const setAllowForward_ = (id, allow) => api('PATCH', `/messages/${id}`, { json: { allowForward: !!allow } });
 const withdraw_ = (id) => api('POST', `/messages/${id}/withdraw`);

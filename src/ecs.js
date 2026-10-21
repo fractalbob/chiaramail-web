@@ -50,22 +50,39 @@ export function watchEcs(id, key, cb, onErr) {
   }, onErr);
 }
 
-export async function saveEcsEdition(id, current, { subject, body }, key) {
+// A new edition. `files` (only where backend.editAttachments): the new list of
+// attachments, each { keep: slot } for a file of the current edition or
+// { file: { name, type, size, bytes } } for a new one; left out, they don't change.
+export async function saveEcsEdition(id, current, { subject, body, files }, key, onProgress) {
   if (!current.enc) return backend.saveEdition(id, current, { subject, body });
-  return backend.saveEdition(id, current, { subject: await encryptText(key, subject), body: await encryptText(key, body) });
+  const fresh = (files || []).filter((f) => f.file).map((f) => f.file);
+  const attachments = files && await Promise.all(files.map(async (f) => (f.file
+    ? { name: await encryptText(key, f.file.name), type: await encryptText(key, f.file.type || 'application/octet-stream'), size: f.file.size }
+    : { keep: f.keep })));
+  const r = await backend.saveEdition(id, current, { subject: await encryptText(key, subject), body: await encryptText(key, body), ...(attachments ? { attachments } : {}) });
+  const edition = typeof r === 'number' ? r : r.edition;
+  if (fresh.length) {
+    const sealed = await Promise.all(fresh.map(async (f) => ({ name: '', type: 'application/octet-stream', bytes: await encryptBytes(key, await toBytes(f.bytes)) })));
+    await backend.uploadAttachments(id, sealed, onProgress, r.slots);
+  }
+  return edition;
 }
 
 export async function listEcsEditions(id, key) {
   const eds = await backend.listEditions(id);
   return Promise.all(eds.map(async (e) => {
-    try { return { ...e, subject: await decryptText(key, e.subject), body: await decryptText(key, e.body) }; } catch { return { ...e, subject: '', body: '', locked: true }; }
+    try {
+      const attachments = e.attachments && await Promise.all(e.attachments.map(async (a) => ({ ...a, name: await decryptText(key, a.name), type: await decryptText(key, a.type) })));
+      return { ...e, subject: await decryptText(key, e.subject), body: await decryptText(key, e.body), ...(attachments ? { attachments } : {}) };
+    } catch { return { ...e, subject: '', body: '', attachments: undefined, locked: true }; }
   }));
 }
 
 // A stored attachment as a Blob the reader can save.
+// i: its position in message.attachments (stored under its slot, when it has one).
 export async function getEcsAttachment(id, i, message, key) {
-  const blob = await backend.getAttachment(id, i);
   const a = message.attachments?.[i] || {};
+  const blob = await backend.getAttachment(id, Number.isInteger(a.slot) ? a.slot : i);
   if (!message.enc) return blob;
   return new Blob([await decryptBytes(key, await toBytes(blob))], { type: a.type || 'application/octet-stream' });
 }

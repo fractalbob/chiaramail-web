@@ -4,6 +4,7 @@ import * as backend from '@backend';
 import { useI18n } from '../i18n.jsx';
 import RichBody from '../mail/RichBody.jsx';
 import { listEcsEditions } from '../ecs.js';
+import EcsAttachments from './EcsAttachments.jsx';
 
 export function Readers({ message }) {
   const { t, formatDate } = useI18n();
@@ -50,6 +51,9 @@ export function Editions({ message, ecsKey }) {
             <div className="ed-body">
               {e.subject && <p className="ed-subject">{e.subject}</p>}
               <RichBody body={e.body} />
+              {e.attachments?.length > 0 && (
+                <EcsAttachments id={message.id} message={{ enc: message.enc, attachments: e.attachments }} ecsKey={ecsKey} />
+              )}
             </div>
           </details>
         </li>
