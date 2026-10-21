@@ -26,9 +26,10 @@ put(join(md, '.Sent'), 3000, 'sent');
 for (let k = 0; k < FOLDERS; k += 1) put(join(md, `.Label${k}`), 20, `l${k}`);
 execFileSync('chown', ['-R', 'vmail:vmail', md]);
 
+let watch = false; let cmds = 0; // commands sent to the server (lines), to count round trips
 const relay = net.createServer((a) => {
   const b = net.connect(srv.imap.port, '127.0.0.1');
-  a.on('data', (d) => setTimeout(() => b.write(d), DELAY));
+  a.on('data', (d) => { cmds += (d.toString('latin1').match(/\r\n/g) || []).length; if (process.env.SHOWCMDS && watch) console.log('   >', d.toString('latin1').trim().slice(0, 90)); setTimeout(() => b.write(d), DELAY); });
   b.on('data', (d) => setTimeout(() => a.write(d), DELAY));
   a.on('close', () => b.destroy()); b.on('close', () => a.destroy());
   a.on('error', () => {}); b.on('error', () => {});
@@ -37,7 +38,8 @@ await new Promise((r) => relay.once('listening', r));
 const s = new MailService({ email: 'b@x.fr', imap: { host: '127.0.0.1', port: relay.address().port, secure: false }, smtp: srv.smtp, auth: { user: 'b@x.fr', pass: 'x' }, dataDir: mkdtempSync(join(tmpdir(), 'perf-')) });
 const T = async (label, p) => {
   const t = Date.now();
-  try { const r = await p; console.log(`${label}: ${Date.now() - t} ms`); return r; } catch (e) { console.log(`${label}: ERROR ${e.message}`); return null; }
+  const c0 = cmds;
+  try { const r = await p; console.log(`${label}: ${Date.now() - t} ms, ${cmds - c0} commands`); return r; } catch (e) { console.log(`${label}: ERROR ${e.message}`); return null; }
 };
 // What the app asks for when it starts, all at once.
 const startup = () => [s.listLabels(), s.getLabel('INBOX'), s.getLabel('SPAM'), s.getLabel('DRAFT'), s.listThreads({ labelId: 'SPAM', q: '"ECS message"', max: 20 }), s.recentAddresses('in:sent', 100)];
@@ -62,6 +64,14 @@ for (let round = 1; round <= 3; round += 1) {
   await T(`round ${round}: inbox list`, s.listThreads({ labelId: 'INBOX', max: 25 }));
 }
 await T('page 2', s.listThreads({ labelId: 'INBOX', max: 25, pageToken: '25' }));
+// Switching folders, as the screens do it: the list, its count, then the previews.
+const open = async (labelId) => { const [r] = await Promise.all([s.listThreads({ labelId, max: 25 }), s.getLabel(labelId)]); await s.getThreadsMeta(r.ids); };
+await new Promise((x) => setTimeout(x, 11_000));
+watch = true;
+await T('switch to Sent', open('SENT'));
+watch = false;
+await T('switch to Drafts', (async () => { const d = await s.listDrafts({ max: 25 }); await s.getDraftsMeta(d.drafts.map((x) => x.id)); })());
+await T('back to Inbox', open('INBOX'));
 await T('open a label', s.listThreads({ labelId: (await s.listLabels()).find((l) => l.name === 'Label7').id, max: 25 }));
 stop = true;
 await other.logout(); await s.close(); relay.close(); await srv.stop();

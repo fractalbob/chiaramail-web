@@ -230,6 +230,16 @@ export class MailService {
   /** The folders kept up to date all the time (others: when they're opened). */
   corePaths() { return ['INBOX', 'SENT', 'DRAFT'].map((r) => this.pathOf(r)).filter(Boolean); }
 
+  /**
+   * Brings the Inbox, Sent and Drafts up to date without waiting for it: a
+   * folder being looked at is synced first, and the others follow (conversations
+   * then gain their replies a few seconds later at most).
+   */
+  freshen() {
+    if (this.freshening) return;
+    this.freshening = this.sync().catch(() => {}).finally(() => { this.freshening = null; });
+  }
+
   /** A folder already being checked isn't checked a second time in parallel. */
   syncOnce(path) {
     this.syncing = this.syncing || new Map();
@@ -260,6 +270,10 @@ export class MailService {
       uidNext: Number(st.uidNext || 0), count: st.messages, modseq: st.highestModseq ? String(st.highestModseq) : null, at: Date.now(), ready: true,
     });
     if (!st.messages) { fx.msgs = {}; fx.complete = true; fx.lowest = 0; finish(); return; }
+    // Nothing new, nothing gone, no flag changed: no need to open the folder
+    // (opening one costs a second or two on a large Gmail account).
+    if (fx.ready && condstore && st.highestModseq && fx.modseq === String(st.highestModseq)
+      && Number(st.uidNext) === fx.uidNext && st.messages === fx.count) { finish(); return; }
     await this.inBox(path, async (cc) => {
       if (!fx.ready) {
         const uids = ((await cc.search({ all: true }, { uid: true })) || []).sort((a, b) => a - b);
@@ -429,7 +443,12 @@ export class MailService {
 
   async getLabel(id) {
     const path = ['STARRED', 'IMPORTANT', 'UNREAD'].includes(id) || !id ? null : this.pathOfLabel(id);
-    if (path && !(this.idx.folders[path]?.ready && this.idx.folders[path].complete)) {
+    const fx = path && this.idx.folders[path];
+    // Sent and Drafts have no unread count: the figure from the last sync will do.
+    if ((id === 'SENT' || id === 'DRAFT') && fx?.ready && Date.now() - (fx.at || 0) < 30_000) {
+      return { id, threadsTotal: fx.count, threadsUnread: 0, messagesTotal: fx.count };
+    }
+    if (path && !(fx?.ready && fx.complete)) {
       // A folder not read in full: its counts come straight from the server.
       const c = await this.conn();
       const st = await c.status(path, { messages: true, unseen: true });
@@ -494,7 +513,8 @@ export class MailService {
     const own = ['STARRED', 'IMPORTANT', 'UNREAD'].includes(labelId) || !labelId ? null : this.pathOfLabel(labelId);
     if (own && !this.folders.some((f) => f.path === own)) await this.loadFolders(); // created elsewhere since
     if (own && (!this.idx.folders[own]?.ready || Date.now() - (this.idx.folders[own].at || 0) > 10_000)) await this.sync({ paths: [own] });
-    await this.sync();
+    // A folder's own list doesn't wait for the other folders; views across folders do.
+    if (own) this.freshen(); else await this.sync();
     const hits = q ? await this.searchServer(q, labelId) : null;
     const start = Number(pageToken || 0);
     const relevant = () => (own ? [own] : this.corePaths()).filter((p) => this.idx.folders[p]?.ready);
@@ -592,7 +612,8 @@ export class MailService {
   async ensureSnippet(e) { return this.ensureSnippets([e]); }
 
   async getThreadsMeta(ids) {
-    await this.sync();
+    // The ids come from a list just made: the index already has them.
+    if (!Object.keys(this.idx.folders).length) await this.sync();
     const { threads } = this.view();
     await this.ensureSnippets(ids.map((id) => threads.get(id)).filter(Boolean).map((t) => t.msgs[t.msgs.length - 1]));
     return ids.map((id) => {
@@ -816,8 +837,16 @@ export class MailService {
     return { raw: Buffer.from(s, 'binary'), mid: id.toLowerCase() };
   }
 
+  /** Syncs the Drafts folder if it hasn't been in the last 10 seconds. */
+  async syncDrafts() {
+    const path = this.pathOf('DRAFT');
+    const fx = path && this.idx.folders[path];
+    if (path && (!fx?.ready || Date.now() - (fx.at || 0) > 10_000)) await this.sync({ paths: [path] });
+  }
+
   async listDrafts({ pageToken, max = 25 } = {}) {
-    await this.sync();
+    await this.syncDrafts();
+    this.freshen();
     const list = this.view().entries.filter((e) => e.locs.some((l) => l.role === 'DRAFT')).sort((a, b) => byDate(b, a));
     const start = Number(pageToken || 0);
     return {
@@ -833,12 +862,12 @@ export class MailService {
   }
 
   async getDraft(id) {
-    await this.sync();
+    await this.syncDrafts();
     return { id, message: await this.fullMessage(this.draftEntry(id)) };
   }
 
   async getDraftsMeta(ids) {
-    await this.sync();
+    await this.syncDrafts();
     const list = ids.map((id) => this.draftEntry(id));
     await this.ensureSnippets(list);
     return ids.map((id, i) => ({ id, message: this.metaMessage(list[i]) }));

@@ -153,7 +153,17 @@ function wireIpc() {
     return ecs.request(method, path, { json: opts?.json, bytes: opts?.bytes });
   }));
   let seq = 0;
-  ipcMain.handle('mail', (_e, method, args) => reply(async () => {
+  // The screens sometimes ask the same question twice at once (a list and its
+  // refresh): the second waits for the first's answer instead of asking again.
+  const READS = new Set(['listLabels', 'getLabel', 'listThreads', 'getThreadsMeta', 'getThread', 'listDrafts', 'getDraftsMeta', 'getDraft', 'recentAddresses', 'getProfile', 'getGmailSignature']);
+  const inflight = new Map();
+  const shared = (method, args, run) => {
+    if (!READS.has(method)) return run();
+    const k = `${method} ${JSON.stringify(args)}`;
+    if (!inflight.has(k)) inflight.set(k, run().finally(() => inflight.delete(k)));
+    return inflight.get(k);
+  };
+  ipcMain.handle('mail', (_e, method, args) => reply(() => shared(method, args, async () => {
     if (!MAIL_METHODS.has(method)) throw Object.assign(new Error(`Unknown: ${method}`), { code: 'bad-call' });
     const n = ++seq; const t = Date.now();
     const what = `#${n} ${method}${['listThreads', 'getLabel', 'recentAddresses'].includes(method) ? ` ${short(JSON.stringify(args))}` : ''}`;
@@ -167,13 +177,21 @@ function wireIpc() {
       dlog('✗', what, `${Date.now() - t} ms`, e.message);
       throw e;
     }
-  }));
+  })));
 }
 
 app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
-app.on('before-quit', () => { accounts?.close(); });
+// Quitting waits (a moment at most) for the message index to be written, so
+// what was read this time isn't fetched again next time.
+let closing = false;
+app.on('before-quit', (e) => {
+  if (closing || !accounts) return;
+  closing = true;
+  e.preventDefault();
+  Promise.race([accounts.close(), new Promise((r) => setTimeout(r, 3000))]).finally(() => app.quit());
+});
 
 app.whenReady().then(async () => {
   accounts = new AccountManager({ dataDir: app.getPath('userData'), safeStorage, logger: imapLogger });
