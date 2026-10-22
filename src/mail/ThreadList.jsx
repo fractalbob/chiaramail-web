@@ -13,7 +13,7 @@ import LabelPicker from './LabelPicker.jsx';
 import { hue } from './avatar.js';
 import PersonHover from './PersonCard.jsx';
 
-const PAGE = 25;
+const PAGE = 50; // conversations per page, as in Gmail
 
 // As in Gmail, coming back from a conversation (its ← or the browser's Back)
 // returns to the same page of the list, scrolled to where it was, with the
@@ -48,7 +48,15 @@ export default function ThreadList() {
   // Coming back to this list: what it showed when the conversation was opened.
   const [back] = useState(() => ((navType === 'POP' || loc.state?.back) ? returnTo.get(listKey) || null : null));
   const [pages, setPages] = useState(() => back?.pages || ['']); // page tokens; last is current
-  const [state, setState] = useState(() => back?.state || { key: null, rows: null, next: null, total: 0, error: '' });
+  // The snapshot as it is now: the conversation just read is read, and one just
+  // archived or deleted from its own page is gone (the refresh that follows confirms).
+  const [state, setState] = useState(() => {
+    const st = back?.state;
+    if (!st?.rows) return st || { key: null, rows: null, next: null, total: 0, error: '' };
+    const { gone, unread } = loc.state || {};
+    const rows = st.rows.filter((r) => r.id !== gone).map((r) => (r.id === back.threadId ? { ...r, unread: r.id === unread } : r));
+    return { ...st, rows, total: Math.max(0, (st.total || 0) - (st.rows.length - rows.length)) };
+  });
   const key = `${folder}|${q}|${pages[pages.length - 1]}`;
   const { handle } = mail;
   const viewLabel = q ? null : labelIdFor(folder); // the label every row in this view carries
@@ -59,7 +67,7 @@ export default function ThreadList() {
   const fetchPage = useCallback(async (fresh) => {
     const pageToken = pages[pages.length - 1] || undefined;
     const labelId = labelIdFor(folder) || undefined;
-    // The count after "1–25 of": the label's own total when browsing a folder, Gmail's estimate otherwise.
+    // The count after "1–50 of": the label's own total when browsing a folder, Gmail's estimate otherwise.
     const [{ ids, nextPageToken, estimate }, label] = await Promise.all([
       gmail.listThreads({ labelId, q, pageToken, max: PAGE, ...(fresh ? { fresh: true } : {}) }),
       labelId && !q ? gmail.getLabel(labelId).catch(() => null) : null,

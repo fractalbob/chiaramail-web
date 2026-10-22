@@ -17,7 +17,7 @@ export default function DraftList() {
   const { handle, refreshCounts } = mail;
 
   const fetchPage = useCallback(async () => {
-    const { drafts, nextPageToken } = await gmail.listDrafts({ pageToken: key || undefined });
+    const { drafts, nextPageToken } = await gmail.listDrafts({ pageToken: key || undefined, max: 50 }); // 50 a page, as in Gmail
     const full = await gmail.getDraftsMeta(drafts.map((d) => d.id));
     const rows = full.map((d) => {
       const h = headerMap(d.message?.payload?.headers);

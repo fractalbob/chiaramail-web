@@ -202,9 +202,13 @@ export default function ThreadView() {
 
   const msgs = state.msgs;
   const labels = new Set(msgs.flatMap((m) => m.labelIds));
+  // leave: back to the list afterwards ('unread': it stays there, unread; otherwise it has left the folder).
   const act = async (fn, leave = true) => {
     // If the reader has already moved elsewhere, don't pull them back.
-    try { await fn(); refreshCounts(); if (!mounted.current) return; if (leave) nav(back, { state: { back: true } }); else load(); } catch (e) { handle(e); }
+    try {
+      await fn(); refreshCounts(); if (!mounted.current) return;
+      if (leave) nav(back, { state: leave === 'unread' ? { back: true, unread: threadId } : { back: true, gone: threadId } }); else load();
+    } catch (e) { handle(e); }
   };
   const subject = msgs[0]?.subject || t('noSubject');
   const lastReal = msgs.map((m) => m.labelIds.includes('DRAFT')).lastIndexOf(false);
@@ -223,7 +227,7 @@ export default function ThreadView() {
           ? <IconButton label={t('restore')} onClick={() => act(() => gmail.untrashThread(threadId))}><Icon name="restore" /></IconButton>
           : <IconButton label={t('trash')} onClick={() => act(() => gmail.trashThread(threadId))}><Icon name="delete" /></IconButton>}
         <span className="tool-sep" aria-hidden="true" />
-        <IconButton label={t('markUnread')} onClick={() => act(() => gmail.modifyThread(threadId, ['UNREAD'], []))}><Icon name="unread" /></IconButton>
+        <IconButton label={t('markUnread')} onClick={() => act(() => gmail.modifyThread(threadId, ['UNREAD'], []), 'unread')}><Icon name="unread" /></IconButton>
         <IconButton label={labels.has('STARRED') ? t('unstar') : t('star')} className={labels.has('STARRED') ? 'star-on' : ''} aria-pressed={labels.has('STARRED')}
           onClick={() => act(() => gmail.modifyThread(threadId, labels.has('STARRED') ? [] : ['STARRED'], labels.has('STARRED') ? ['STARRED'] : []), false)}>
           <Icon name="star" />
