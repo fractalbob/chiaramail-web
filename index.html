@@ -50,6 +50,23 @@
           document.querySelector('#splash .splash-tag').textContent = 'Restez maître des e-mails que vous envoyez. Indéfiniment.';
           document.querySelector('#splash .splash-for').textContent = 'pour Gmail';
         }
+        // Safety net: the start screen never stays. A phone can wake a suspended or
+        // half-loaded copy of the app; after 8 seconds the screen goes, or, if the
+        // app itself never started, it offers to reload.
+        var gone = function () { var s = document.getElementById('splash'); if (s) s.remove(); };
+        window.addEventListener('pageshow', function (e) { if (e.persisted) gone(); });
+        setTimeout(function () {
+          var s = document.getElementById('splash');
+          if (!s) return;
+          var root = document.getElementById('root');
+          if (root && root.children.length) { gone(); return; }
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = l === 'fr' ? 'ChiaraMail ne démarre pas. Toucher pour recharger.' : 'ChiaraMail didn’t start. Tap to reload.';
+          b.style.cssText = 'margin-top:24px;padding:12px 20px;border:1px solid #c9d6dc;border-radius:999px;background:#e9f0f4;color:#14313b;font:1rem system-ui,sans-serif';
+          b.onclick = function () { location.reload(); };
+          s.appendChild(b);
+        }, 8000);
       })();
     </script>
     <div id="root"></div>
