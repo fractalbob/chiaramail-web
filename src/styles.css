@@ -395,6 +395,7 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .thread-subject { font: 600 clamp(1.4rem, 3vw, 1.9rem)/1.25 var(--serif); margin: 20px 0 16px; overflow-wrap: anywhere; }
 .mcards { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .mcard { background: var(--paper); border: 1px solid var(--rule); border-radius: var(--radius-m); padding: 18px 22px; }
+.mcard { min-width: 0; }
 .mcard-collapsed { padding: 0; }
 .mcard-toggle {
   all: unset; box-sizing: border-box; display: flex; gap: 12px; width: 100%; align-items: baseline; cursor: pointer;
@@ -403,7 +404,8 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .mcard-toggle:focus-visible { outline: 3px solid var(--focus); }
 .mcard-toggle-open { padding: 0; }
 .mcard-toggle:disabled { cursor: default; }
-.mfrom { font-weight: 600; overflow-wrap: anywhere; }
+.mfrom { font-weight: 600; min-width: 0; overflow-wrap: break-word; }
+.mcard-collapsed .mfrom { flex: 0 1 auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .maddr { font-weight: 400; color: var(--slate); font-size: 0.875rem; }
 .msnip { flex: 1; min-width: 0; color: var(--slate); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mdate { margin-left: auto; color: var(--slate); font-size: 0.875rem; white-space: nowrap; }
@@ -518,7 +520,8 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
   .trow-link .row-subject { grid-column: 1 / -1; }
   .mcard { padding: 14px 14px; }
   .mcard-toggle { padding: 12px 14px; }
-  .mcard-toggle-open { padding: 0; }
+  .mcard-toggle-open { padding: 0; flex-direction: column; align-items: flex-start; gap: 2px; }
+  .mcard-toggle-open .mdate { margin-left: 0; white-space: normal; }
   .mhead .maddr { display: none; }
   .mhead-actions { margin-right: -12px; }
 }
