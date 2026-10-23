@@ -38,3 +38,14 @@ if (splash) {
     splash.addEventListener('pointerdown', hide);
   } else hide();
 }
+
+// Back after a long sleep (overnight, say): start afresh rather than carry on in a copy
+// that the phone froze hours ago, unless a message is being written.
+const STALE_MS = 30 * 60 * 1000;
+let hiddenAt = document.hidden ? Date.now() : 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  const away = hiddenAt ? Date.now() - hiddenAt : 0;
+  hiddenAt = 0;
+  if (away > STALE_MS && !/^\/compose|\/edit$/.test(location.pathname)) location.reload();
+});
