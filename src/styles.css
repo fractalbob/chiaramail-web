@@ -673,9 +673,10 @@ html.busy body::before {
   box-shadow: 0 2px 6px rgba(0, 0, 0, .25), 0 6px 18px rgba(0, 0, 0, .15);
 }
 @media (prefers-color-scheme: dark) { .fab { background: #24404b; } }
+/* The sidebar (and its Compose button) is folded into the ☰ menu below 860px, so Compose floats from there. */
+@media (max-width: 860px) { .fab { display: inline-flex; } }
 @media (max-width: 600px) {
   .avatar { display: inline-flex; }
-  .fab { display: inline-flex; }
   .sidebar .compose-btn { display: none; }
   .ibtn.phone-only { display: inline-flex; }
   .menu .phone-only { display: block; }
