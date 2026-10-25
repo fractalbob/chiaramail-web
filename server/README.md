@@ -131,6 +131,26 @@ sudo rsync -a --delete --exclude node_modules ~/server/ /srv/chiaramail/app/serv
 sudo systemctl restart chiaramail-ecs
 ```
 
+### The Outlook add-in
+
+The same build carries the ChiaraMail add-in for Outlook (`outlook.html`, from
+`src/outlook/`), which this server serves next to the reader page. While
+writing a message in Outlook, it turns it into an ECS message: the text and
+attachments are encrypted in the task pane and stored here, and the email
+becomes a short note with the reader link. While reading one, it shows the
+content; for its sender, it can edit it, let the readers know, or withdraw it.
+Sign-in is the same 6-digit code as the reader page.
+
+Outlook frames the page, so `outlook.html` alone gets a CSP that allows
+Outlook's domains as frame ancestors and Office.js from Microsoft (no
+`X-Frame-Options`); every other page keeps `frame-ancestors 'none'`.
+
+Install it in Outlook from its manifest: **Get Add-ins → My add-ins → Add a
+custom add-in → Add from URL**, with `https://<server>/outlook/manifest.xml`
+(the manifest names ecs.chiaramail.com; edit `public/outlook/manifest.xml` for
+another server). Tests: `npm run test:outlook` at the top level (a private
+PostgreSQL and a stand-in for Office.js).
+
 ### 5. Point the desktop app at it
 
 In `desktop/package.json`: `"chiaramail": { "ecsUrl": "https://ecs.chiaramail.fr", ... }`,

@@ -17,7 +17,9 @@ const MAX_FILES = 20;
 // The content of an ECS message (body and attachments): fetched live from
 // ChiaraMail (the original's FETCH CONTENT), editable in place by its sender
 // (UPDATE CONTENT).
-export default function LiveMessage({ pointer, message, threadId, onInfo }) {
+// onLetThemKnow: instead of the link to a reply in ChiaraMail (the Outlook add-in opens Outlook's own).
+// inlineConfirm: asks before withdrawing on the page itself (Outlook add-ins can't show confirm boxes).
+export default function LiveMessage({ pointer, message, threadId, onInfo, onLetThemKnow, inlineConfirm }) {
   const { user } = useAuth();
   const { t, formatDate } = useI18n();
   const [loaded, setLoaded] = useState({ id: null });
@@ -32,6 +34,7 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
   const [progress, setProgress] = useState(null);
   const receiptFor = useRef(null);
   const [fwdPending, setFwdPending] = useState(null); // { value, base } until the server confirms
+  const [asking, setAsking] = useState(false); // inlineConfirm: the withdraw question is showing
 
   const key = message.key;
   useEffect(() => watchEcs(pointer, key,
@@ -107,8 +110,10 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
         : t('errorGeneric', { msg: e.message }));
     } finally { setBusy(false); setProgress(null); }
   };
-  const withdraw = async () => {
-    if (!window.confirm(t('withdrawConfirm'))) return;
+  const withdraw = async (confirmed) => {
+    if (inlineConfirm && !confirmed) { setAsking(true); return; }
+    if (!inlineConfirm && !window.confirm(t('withdrawConfirm'))) return;
+    setAsking(false);
     try { await backend.withdraw(pointer); } catch (e) { setError(t('errorGeneric', { msg: e.message })); }
   };
 
@@ -191,13 +196,24 @@ export default function LiveMessage({ pointer, message, threadId, onInfo }) {
           {saved && !editing && (
             <p className="note" role="status">
               {t('editionSaved', { n: d.edition })}{' '}
-              <Link to={`/compose?thread=${threadId}&msg=${message.id}&mode=replyAll&note=updated`}>{t('letThemKnow')}</Link>
+              {onLetThemKnow
+                ? <button type="button" className="linklike" onClick={onLetThemKnow}>{t('letThemKnow')}</button>
+                : <Link to={`/compose?thread=${threadId}&msg=${message.id}&mode=replyAll&note=updated`}>{t('letThemKnow')}</Link>}
             </p>
           )}
-          {!d.withdrawn && !editing && (
+          {!d.withdrawn && !editing && !asking && (
             <div className="actions">
               {!d.locked && <button type="button" className="btn btn-primary" onClick={startEdit}>{t('edit')}</button>}
-              <button type="button" className="btn btn-danger" onClick={withdraw}>{t('withdraw')}</button>
+              <button type="button" className="btn btn-danger" onClick={() => withdraw(false)}>{t('withdraw')}</button>
+            </div>
+          )}
+          {asking && !d.withdrawn && (
+            <div className="withdraw-ask" role="alertdialog" aria-label={t('withdraw')}>
+              <p>{t('withdrawConfirm')}</p>
+              <div className="actions">
+                <button type="button" className="btn btn-danger" onClick={() => withdraw(true)}>{t('ol_withdrawYes')}</button>
+                <button type="button" className="btn btn-quiet" onClick={() => setAsking(false)}>{t('cancel')}</button>
+              </div>
             </div>
           )}
           {!d.withdrawn && (

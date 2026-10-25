@@ -16,7 +16,8 @@
     "test:unit": "node --test tests/mime.test.js",
     "test:e2e": "npm run build:mock && echo \"Run: npx vite preview, then BASE=http://localhost:4173 node tests/e2e-mail.mjs shots\"",
     "build:desktop": "vite build --mode desktop --outDir desktop/renderer --emptyOutDir",
-    "build:reader": "vite build --mode reader --outDir server/reader --emptyOutDir"
+    "build:reader": "vite build --mode reader --outDir server/reader --emptyOutDir",
+    "test:outlook": "npm run build:reader && node tests/outlook.e2e.mjs"
   },
   "dependencies": {
     "@fontsource-variable/literata": "^5.3.0",

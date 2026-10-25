@@ -4,9 +4,9 @@ import { useI18n } from '../i18n.jsx';
 import { isEmail } from '../lib.js';
 
 // The reader page: a 6-digit code emailed to the address (backend/reader.js).
-function CodeSignIn() {
+function CodeSignIn({ initialEmail = '' }) {
   const { t } = useI18n();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [sent, setSent] = useState(null); // { email, from }
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -61,8 +61,8 @@ function CodeSignIn() {
   );
 }
 
-export default function SignIn({ returnPath = '/' }) {
-  if (backend.mode === 'reader') return <CodeSignIn />;
+export default function SignIn({ returnPath = '/', email = '' }) {
+  if (backend.mode === 'reader') return <CodeSignIn initialEmail={email} />;
   return <WebSignIn returnPath={returnPath} />;
 }
 

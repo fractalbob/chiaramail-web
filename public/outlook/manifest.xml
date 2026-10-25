@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The ChiaraMail add-in for Outlook. Install it in Outlook: Get Add-ins > My add-ins >
+     Add a custom add-in > Add from URL, with https://ecs.chiaramail.com/outlook/manifest.xml -->
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+  xsi:type="MailApp">
+  <Id>a6d1cf42-97dc-4ea1-9507-913bb7f572f2</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>The Fractal Images Company</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="ChiaraMail"/>
+  <Description DefaultValue="ECS messages in Outlook: send email whose text and attachments stay encrypted with ChiaraMail, and correct or withdraw it after sending.">
+    <Override Locale="fr-FR" Value="Les messages ECS dans Outlook : envoyez des e-mails dont le texte et les pièces jointes restent chiffrés chez ChiaraMail, et corrigez-les ou retirez-les après l’envoi."/>
+  </Description>
+  <IconUrl DefaultValue="https://ecs.chiaramail.com/outlook/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://ecs.chiaramail.com/outlook/icon-128.png"/>
+  <SupportUrl DefaultValue="https://chiaramail.com"/>
+  <AppDomains>
+    <AppDomain>https://ecs.chiaramail.com</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Mailbox"/>
+  </Hosts>
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.8"/>
+    </Sets>
+  </Requirements>
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://ecs.chiaramail.com/outlook.html"/>
+        <RequestedHeight>250</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+  <Permissions>ReadWriteItem</Permissions>
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Edit"/>
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+  </Rule>
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Requirements>
+      <bt:Sets DefaultMinVersion="1.8">
+        <bt:Set Name="Mailbox"/>
+      </bt:Sets>
+    </Requirements>
+    <Hosts>
+      <Host xsi:type="MailHost">
+        <DesktopFormFactor>
+            <ExtensionPoint xsi:type="MessageReadCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="readGroup">
+                  <Label resid="GroupLabel"/>
+                  <Control xsi:type="Button" id="readButton">
+                    <Label resid="ReadLabel"/>
+                    <Supertip>
+                      <Title resid="ReadLabel"/>
+                      <Description resid="ReadTip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="Icon16"/>
+                      <bt:Image size="32" resid="Icon32"/>
+                      <bt:Image size="80" resid="Icon80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="Taskpane"/>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+            <ExtensionPoint xsi:type="MessageComposeCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="composeGroup">
+                  <Label resid="GroupLabel"/>
+                  <Control xsi:type="Button" id="composeButton">
+                    <Label resid="ComposeLabel"/>
+                    <Supertip>
+                      <Title resid="ComposeLabel"/>
+                      <Description resid="ComposeTip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="Icon16"/>
+                      <bt:Image size="32" resid="Icon32"/>
+                      <bt:Image size="80" resid="Icon80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="Taskpane"/>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon16" DefaultValue="https://ecs.chiaramail.com/outlook/icon-16.png"/>
+        <bt:Image id="Icon32" DefaultValue="https://ecs.chiaramail.com/outlook/icon-32.png"/>
+        <bt:Image id="Icon80" DefaultValue="https://ecs.chiaramail.com/outlook/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Taskpane" DefaultValue="https://ecs.chiaramail.com/outlook.html"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GroupLabel" DefaultValue="ChiaraMail"><bt:Override Locale="fr-FR" Value="ChiaraMail"/></bt:String>
+        <bt:String id="ReadLabel" DefaultValue="ChiaraMail"><bt:Override Locale="fr-FR" Value="ChiaraMail"/></bt:String>
+        <bt:String id="ComposeLabel" DefaultValue="ECS message"><bt:Override Locale="fr-FR" Value="Message ECS"/></bt:String>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="ReadTip" DefaultValue="Read this ECS message, or edit or withdraw one you sent."><bt:Override Locale="fr-FR" Value="Lire ce message ECS, ou modifier ou retirer un message que vous avez envoyé."/></bt:String>
+        <bt:String id="ComposeTip" DefaultValue="Send this message as an ECS message: its text and attachments are encrypted and stay with ChiaraMail, and you can edit or withdraw it after sending."><bt:Override Locale="fr-FR" Value="Envoyer ce message comme message ECS : son texte et ses pièces jointes sont chiffrés et restent chez ChiaraMail, et vous pouvez le modifier ou le retirer après l’envoi."/></bt:String>
+      </bt:LongStrings>
+    </Resources>
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+      <Requirements>
+        <bt:Sets DefaultMinVersion="1.8">
+          <bt:Set Name="Mailbox"/>
+        </bt:Sets>
+      </Requirements>
+      <Hosts>
+        <Host xsi:type="MailHost">
+          <DesktopFormFactor>
+            <ExtensionPoint xsi:type="MessageReadCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="readGroup">
+                  <Label resid="GroupLabel"/>
+                  <Control xsi:type="Button" id="readButton">
+                    <Label resid="ReadLabel"/>
+                    <Supertip>
+                      <Title resid="ReadLabel"/>
+                      <Description resid="ReadTip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="Icon16"/>
+                      <bt:Image size="32" resid="Icon32"/>
+                      <bt:Image size="80" resid="Icon80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="Taskpane"/>
+                      <SupportsPinning>true</SupportsPinning>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+            <ExtensionPoint xsi:type="MessageComposeCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="composeGroup">
+                  <Label resid="GroupLabel"/>
+                  <Control xsi:type="Button" id="composeButton">
+                    <Label resid="ComposeLabel"/>
+                    <Supertip>
+                      <Title resid="ComposeLabel"/>
+                      <Description resid="ComposeTip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="Icon16"/>
+                      <bt:Image size="32" resid="Icon32"/>
+                      <bt:Image size="80" resid="Icon80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="Taskpane"/>
+                      <SupportsPinning>true</SupportsPinning>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+          </DesktopFormFactor>
+        </Host>
+      </Hosts>
+      <Resources>
+        <bt:Images>
+          <bt:Image id="Icon16" DefaultValue="https://ecs.chiaramail.com/outlook/icon-16.png"/>
+          <bt:Image id="Icon32" DefaultValue="https://ecs.chiaramail.com/outlook/icon-32.png"/>
+          <bt:Image id="Icon80" DefaultValue="https://ecs.chiaramail.com/outlook/icon-80.png"/>
+        </bt:Images>
+        <bt:Urls>
+          <bt:Url id="Taskpane" DefaultValue="https://ecs.chiaramail.com/outlook.html"/>
+        </bt:Urls>
+        <bt:ShortStrings>
+          <bt:String id="GroupLabel" DefaultValue="ChiaraMail"><bt:Override Locale="fr-FR" Value="ChiaraMail"/></bt:String>
+          <bt:String id="ReadLabel" DefaultValue="ChiaraMail"><bt:Override Locale="fr-FR" Value="ChiaraMail"/></bt:String>
+          <bt:String id="ComposeLabel" DefaultValue="ECS message"><bt:Override Locale="fr-FR" Value="Message ECS"/></bt:String>
+        </bt:ShortStrings>
+        <bt:LongStrings>
+          <bt:String id="ReadTip" DefaultValue="Read this ECS message, or edit or withdraw one you sent."><bt:Override Locale="fr-FR" Value="Lire ce message ECS, ou modifier ou retirer un message que vous avez envoyé."/></bt:String>
+          <bt:String id="ComposeTip" DefaultValue="Send this message as an ECS message: its text and attachments are encrypted and stay with ChiaraMail, and you can edit or withdraw it after sending."><bt:Override Locale="fr-FR" Value="Envoyer ce message comme message ECS : son texte et ses pièces jointes sont chiffrés et restent chez ChiaraMail, et vous pouvez le modifier ou le retirer après l’envoi."/></bt:String>
+        </bt:LongStrings>
+      </Resources>
+    </VersionOverrides>
+  </VersionOverrides>
+</OfficeApp>
