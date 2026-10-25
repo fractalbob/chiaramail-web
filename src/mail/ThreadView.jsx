@@ -13,7 +13,7 @@ import PlainBody from './PlainBody.jsx';
 import { useIsEcsUser } from './ecsCheck.js';
 import { markSpamHandled } from './prefs.js';
 import Icon from './icons.jsx';
-import { IconButton, Menu, MenuItem } from './Menu.jsx';
+import { ContextMenu, IconButton, Menu, MenuItem } from './Menu.jsx';
 import LabelPicker from './LabelPicker.jsx';
 import AttachmentCards from './AttachmentCards.jsx';
 
@@ -173,6 +173,7 @@ export default function ThreadView() {
   const { t } = useI18n();
   const [state, setState] = useState({ id: null });
   const [open, setOpen] = useState({});
+  const [chipMenu, setChipMenu] = useState(null); // { x, y }: the labels, opened from a label next to the subject
   const mounted = useRef(true);
   // A conversation opens at its top, wherever the list was scrolled (as in Gmail).
   useLayoutEffect(() => { window.scrollTo(0, 0); }, [threadId]);
@@ -211,6 +212,14 @@ export default function ThreadView() {
     } catch (e) { handle(e); }
   };
   const subject = msgs[0]?.subject || t('noSubject');
+  const picker = (
+    <LabelPicker state={(id) => labels.has(id)}
+      onToggle={(l) => act(() => gmail.modifyThread(threadId, labels.has(l.id) ? [] : [l.id], labels.has(l.id) ? [l.id] : []), false)}
+      onNew={(name) => act(async () => {
+        const l = mail.userLabels.find((x) => x.name.toLowerCase() === name.toLowerCase()) || await mail.createLabel(name);
+        await gmail.modifyThread(threadId, [l.id], []);
+      }, false)} />
+  );
   const lastReal = msgs.map((m) => m.labelIds.includes('DRAFT')).lastIndexOf(false);
   const isOpen = (m, i) => open[m.id] ?? (i === lastReal || m.labelIds.includes('UNREAD') || !!m.pointer);
 
@@ -233,19 +242,17 @@ export default function ThreadView() {
           <Icon name="star" />
         </IconButton>
         {!labels.has('TRASH') && !labels.has('SPAM') && (
-          <Menu align="right" label={t('labelAs')} button={<Icon name="label" />}>
-            <LabelPicker state={(id) => labels.has(id)}
-              onToggle={(l) => act(() => gmail.modifyThread(threadId, labels.has(l.id) ? [] : [l.id], labels.has(l.id) ? [l.id] : []), false)}
-              onNew={(name) => act(async () => {
-                const l = mail.userLabels.find((x) => x.name.toLowerCase() === name.toLowerCase()) || await mail.createLabel(name);
-                await gmail.modifyThread(threadId, [l.id], []);
-              }, false)} />
-          </Menu>
+          <Menu align="right" label={t('labelAs')} button={<Icon name="label" />}>{picker}</Menu>
         )}
       </div>
       <h1 className="thread-subject">
         {subject}
-        {mail.userLabels.filter((l) => labels.has(l.id)).map((l) => <span key={l.id} className="lchip lchip-title">{l.name}</span>)}
+        {/* Gmail: tapping a label opens the labels, to add or remove some. */}
+        {mail.userLabels.filter((l) => labels.has(l.id)).map((l) => (
+          <button key={l.id} type="button" className="lchip lchip-title" aria-haspopup="menu" title={t('labelAs')}
+            onClick={(e) => { const b = e.currentTarget.getBoundingClientRect(); setChipMenu({ x: b.left, y: b.bottom + 4 }); }}>{l.name}</button>
+        ))}
+        {chipMenu && <ContextMenu x={chipMenu.x} y={chipMenu.y} label={t('labelAs')} onClose={() => setChipMenu(null)}>{picker}</ContextMenu>}
         <button type="button" className={labels.has('IMPORTANT') ? 'imp imp-on' : 'imp'} aria-pressed={labels.has('IMPORTANT')}
           aria-label={labels.has('IMPORTANT') ? t('markNotImportant') : t('markImportant')} title={labels.has('IMPORTANT') ? t('importantTitle') : t('markImportant')}
           onClick={() => act(() => gmail.modifyThread(threadId, labels.has('IMPORTANT') ? [] : ['IMPORTANT'], labels.has('IMPORTANT') ? ['IMPORTANT'] : []), false)}>

@@ -144,7 +144,11 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .row-people { color: var(--slate); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-subject { font-family: var(--serif); font-size: 1.0625rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-fresh .row-subject { font-weight: 600; }
-.lchip { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 9%, transparent); color: var(--ink); font: 400 0.75rem/1.5 var(--sans); vertical-align: 2px; white-space: nowrap; }
+.lchip { display: inline-block; margin-right: 6px; padding: 1px 7px; border: 0; border-radius: 4px; background: #d3e3fd; color: #0b3a8c; font: 400 0.75rem/1.5 var(--sans); vertical-align: 2px; white-space: nowrap; }
+@media (prefers-color-scheme: dark) { .lchip { background: #2c4a7c; color: #d3e3fd; } }
+.lchip[role="button"], button.lchip { cursor: pointer; }
+.lchip[role="button"]:hover, button.lchip:hover { filter: brightness(0.95); }
+.lchip[role="button"]:focus-visible, button.lchip:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
 .lchip-title { font-size: 0.8125rem; margin-left: 10px; vertical-align: 4px; }
 .trow .lchip { max-width: 11em; overflow: hidden; text-overflow: ellipsis; vertical-align: -3px; }
 .lchip-more-1 { display: none; }

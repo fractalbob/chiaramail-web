@@ -23,13 +23,20 @@ const phone = () => window.matchMedia('(max-width: 600px)').matches;
 
 // A row's label chips, as in Gmail: at most two (one on a phone), then "+N" for the rest,
 // so labels never push the subject out of sight. The full list is in the tooltip.
-function LabelChips({ ids, names }) {
+// Gmail: tapping a label opens the labels of that conversation, to add or remove some.
+// onOpen(e) when tapped (inside the row's link, so not a <button>).
+function LabelChips({ ids, names, onOpen, label }) {
   if (!ids.length) return null;
   const all = ids.map((id) => names[id]);
-  const more = (n) => (all.length > n ? <span className={`lchip lchip-more lchip-more-${n}`} title={all.join(', ')}>+{all.length - n}</span> : null);
+  const tap = onOpen ? {
+    role: 'button', tabIndex: 0, 'aria-haspopup': 'menu', 'aria-label': label,
+    onClick: onOpen,
+    onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') onOpen(e); },
+  } : {};
+  const more = (n) => (all.length > n ? <span className={`lchip lchip-more lchip-more-${n}`} title={all.join(', ')} {...tap}>+{all.length - n}</span> : null);
   return (
     <>
-      {all.slice(0, 2).map((name, i) => <span key={ids[i]} className={i ? 'lchip lchip-2' : 'lchip'} title={name}>{name}</span>)}
+      {all.slice(0, 2).map((name, i) => <span key={ids[i]} className={i ? 'lchip lchip-2' : 'lchip'} title={name} {...tap}>{name}</span>)}
       {more(2)}
       {more(1)}
     </>
@@ -242,13 +249,20 @@ export default function ThreadList() {
   // Right-click on a row (Gmail's context menu). It acts on the ticked rows when
   // the row is one of them, otherwise on that row alone.
   const nav = useNavigate();
-  const [ctx, setCtx] = useState(null); // { x, y, id }
+  const [ctx, setCtx] = useState(null); // { x, y, id, labels }: labels, only the labels (from tapping one)
   const closeCtx = useCallback(() => setCtx(null), []);
   const openCtx = (e, r) => {
     if (e.shiftKey) return; // Shift + right-click: the browser's own menu
     e.preventDefault();
     if (press.current?.touch) return; // a long press on a phone selects instead
     setCtx({ x: e.clientX, y: e.clientY, id: r.id });
+  };
+  const openLabels = (e, r) => {
+    // In selection mode on a phone, or right after a long press, a tap selects the row instead.
+    if (press.current?.fired || (selected.size > 0 && phone())) return;
+    e.preventDefault(); e.stopPropagation();
+    const b = e.currentTarget.getBoundingClientRect();
+    setCtx({ x: b.left, y: b.bottom + 4, id: r.id, labels: true });
   };
   const ctxMenu = () => {
     const row = rows?.find((r) => r.id === ctx.id);
@@ -262,6 +276,14 @@ export default function ThreadList() {
     const sender = row.people.find((p) => p.label !== 'me') || row.people[0];
     const find = (query) => nav(`/mail/all?q=${encodeURIComponent(query)}`);
     const openUrl = `/mail/${encodeURIComponent(folder)}/${row.id}${q ? `?q=${encodeURIComponent(q)}` : ''}`;
+    if (ctx.labels) {
+      return (
+        <ContextMenu x={ctx.x} y={ctx.y} label={t('labelAs')} onClose={closeCtx}>
+          <LabelPicker state={(l) => row.labelIds.includes(l)} onNew={(name) => newLabel(name, [row.id])}
+            onToggle={(l) => (row.labelIds.includes(l.id) ? labelBulk([], [l.id], [row.id]) : labelBulk([l.id], [], [row.id]))} />
+        </ContextMenu>
+      );
+    }
     return (
       <ContextMenu x={ctx.x} y={ctx.y} label={t('rowMenu')} onClose={closeCtx}>
         {one && row.lastId && (
@@ -455,7 +477,8 @@ export default function ThreadList() {
                 <span className="row-subject">
                   {r.live && <span className="live" title={t('liveTitle')}>{t('live')}</span>}
                   {marks.verdicts[r.id] === 'spoof' && <span className="spoof-tag">{t('spoofTag')}</span>}
-                  <LabelChips ids={r.labelIds.filter((id) => id !== viewLabel && labelNames[id])} names={labelNames} />
+                  <LabelChips ids={r.labelIds.filter((id) => id !== viewLabel && labelNames[id])} names={labelNames}
+                    onOpen={(e) => openLabels(e, r)} label={t('labelAs')} />
                   <span className={marks.verdicts[r.id] === 'ok' ? 'subj subj-verified' : marks.verdicts[r.id] === 'spoof' ? 'subj subj-spoof' : 'subj'}
                     title={marks.verdicts[r.id] === 'ok' ? t('verifiedTitle') : marks.verdicts[r.id] === 'spoof' ? t('spoofTitle') : undefined}>
                     {r.subject || t('noSubject')}

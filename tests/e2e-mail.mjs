@@ -747,6 +747,33 @@ await shot('m16-label-as');
 await page.locator('.folder', { hasText: 'Inbox' }).first().click();
 // The row shows its labels as chips, as in Gmail.
 await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.lchip', { hasText: 'Estate firms' }).first().waitFor();
+// Tapping a label opens that conversation's labels (as in Gmail), without opening the conversation.
+{
+  const chip = page.locator('.trow', { hasText: 'Ordinary note' }).locator('.lchip', { hasText: /^Estate firms$/ }).first();
+  const before = page.url();
+  await must(await chip.evaluate((c) => getComputedStyle(c).backgroundColor) !== 'rgba(0, 0, 0, 0)', 'labels are coloured');
+  await chip.click();
+  await page.getByRole('menuitemcheckbox', { name: 'Estate firms', exact: true }).waitFor();
+  await must(page.url() === before, 'tapping a label doesn’t open the conversation');
+  await must((await page.getByRole('menuitemcheckbox', { name: 'Estate firms', exact: true }).getAttribute('aria-checked')) === 'true', 'its labels are ticked');
+  await page.getByRole('menuitemcheckbox', { name: 'Estate firms', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await page.locator('.working').waitFor({ state: 'detached' });
+  await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.lchip', { hasText: /^Estate firms$/ }).waitFor({ state: 'detached' });
+  // …and back again, from the label next to the subject of the open conversation.
+  await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.rowcheck').check();
+  await page.locator('.bulkbar').getByRole('button', { name: 'Label as' }).click();
+  await page.getByRole('menuitemcheckbox', { name: 'Estate firms', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await page.locator('.working').waitFor({ state: 'detached' });
+  await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.rowcheck').uncheck().catch(() => {});
+  await page.locator('.trow-link', { hasText: 'Ordinary note' }).click();
+  await page.locator('.thread-subject .lchip', { hasText: /^Estate firms$/ }).click();
+  await page.getByRole('menuitemcheckbox', { name: 'Estate firms', exact: true }).waitFor();
+  await page.keyboard.press('Escape');
+  await page.locator('.folder', { hasText: 'Inbox' }).first().click();
+  log('tapping a label opens the labels to add or remove (list and open conversation); labels are blue');
+}
 log('Label as: search on top, list, Create new at the bottom (New label box with Nest under); existing names reused');
 log('toolbar: select ▾ menu, Label as, Move to, ⋮ Mark as important, Mark all as read, 1–N of total');
 
@@ -1058,7 +1085,8 @@ await mp.getByRole('menuitem', { name: 'Select all' }).tap();
 await mp.getByText(`${await mp.locator('.trow').count()} selected`).waitFor();
 await mp.getByRole('button', { name: 'Clear selection' }).tap();
 await mp.locator('.bulkbar').waitFor({ state: 'detached' });
-await mp.locator('.trow-link', { hasText: 'Ordinary note' }).tap();
+// (Tap the sender: the middle of the row may be a label, which opens the labels instead.)
+await mp.locator('.trow-link', { hasText: 'Ordinary note' }).locator('.row-people').tap();
 await mp.locator('.thread-subject').waitFor();
 await mp.goBack();
 // Search, then tap ×: the box empties, the results stay.
