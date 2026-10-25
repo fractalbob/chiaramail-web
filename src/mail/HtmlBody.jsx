@@ -29,7 +29,31 @@ function clean(html, allowRemote, inlineSrc) {
   });
   const out = DOMPurify.sanitize(html, { WHOLE_DOCUMENT: false, FORBID_TAGS: ['style', 'form', 'input', 'button', 'textarea', 'select'], ADD_ATTR: ['target'] });
   DOMPurify.removeHook('afterSanitizeAttributes');
-  return { out, blocked };
+  const css = senderCss(html, allowRemote);
+  return { out, css, blocked: blocked + css.blocked };
+}
+
+// Newsletters depend on their own <style> blocks (mostly in <head>) for
+// mobile layout — fonts, line heights, media queries. Dropping them made
+// wrapped headings overlap. Keep the CSS, but neutralise what could leak:
+// no @import, no remote url() until images are allowed, and nothing that
+// could close the <style> element. The frame runs no scripts either way.
+function senderCss(html, allowRemote) {
+  let blocked = 0;
+  let text;
+  try {
+    const d = new DOMParser().parseFromString(html || '', 'text/html');
+    text = [...d.querySelectorAll('style')].map((s) => s.textContent).join('\n');
+  } catch { return { text: '', blocked: 0 }; }
+  text = text
+    .replace(/<\/?\s*style/gi, '')
+    .replace(/</g, '\\3c ')
+    .replace(/@import[^;]*;?/gi, '')
+    .replace(/expression\s*\(/gi, 'x(');
+  if (!allowRemote) {
+    text = text.replace(/url\(\s*['"]?\s*(https?:)?\/\/[^)]*\)/gi, () => { blocked += 1; return 'none'; });
+  }
+  return { text, blocked };
 }
 
 export default function HtmlBody({ message }) {
@@ -52,11 +76,12 @@ export default function HtmlBody({ message }) {
     return () => { live = false; };
   }, [message]);
 
-  const { out, blocked } = useMemo(() => clean(message.html, allow, inline), [message.html, allow, inline]);
-  const doc = `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>
+  const { out, css, blocked } = useMemo(() => clean(message.html, allow, inline), [message.html, allow, inline]);
+  const doc = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"><style>
+    html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
     html,body{margin:0;padding:0;background:#fff;color:#1d2a30;font:15px/1.5 -apple-system,'Segoe UI',Helvetica,Arial,sans-serif;overflow-wrap:anywhere}
     body{padding:4px 2px} img{max-width:100%;height:auto} table{max-width:100%} a{color:#1d58b5}
-  </style></head><body>${out}</body></html>`;
+  </style><style>${css.text}</style></head><body>${out}</body></html>`;
 
   useEffect(() => {
     const f = frame.current;
