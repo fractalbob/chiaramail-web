@@ -65,6 +65,7 @@ const OFFICE = `window.Office = (() => {
   const people = (l) => l.map((e) => ({ emailAddress: e, displayName: '' }));
   const item = cfg.mode === 'compose' ? {
     itemType: 'message',
+    ...(cfg.sendFrom ? { from: { getAsync: (cb) => ok(cb, { emailAddress: cfg.sendFrom, displayName: '' }) } } : {}),
     subject: { getAsync: (cb) => ok(cb, st.subject) },
     to: { getAsync: (cb) => ok(cb, people(st.to)) }, cc: { getAsync: (cb) => ok(cb, people(st.cc)) }, bcc: { getAsync: (cb) => ok(cb, people(st.bcc)) },
     body: { getAsync: (t, cb) => ok(cb, st.body), setAsync: (html, o, cb) => { st.body = html; ok(cb); } },
@@ -228,8 +229,16 @@ try {
 
   // ---- signed in with another address than the mailbox ---------------------------------------------
   const other = await pane('bob@example.fr', { mode: 'compose', me: 'bob@work.example', to: ['alice@example.fr'], body: '<p>Hi</p>' });
-  await other.getByText('This Outlook mailbox is bob@work.example').waitFor();
+  await other.getByText('This message goes out from bob@work.example').waitFor();
   console.log('ok other-account warning');
+  // outlook.com: the mailbox's internal name differs from the From address; the From address counts.
+  const ocom = await pane('dave@example.fr', { mode: 'compose', me: 'outlook_79c1192107c52657@outlook.com', sendFrom: 'dave@example.fr', to: ['alice@example.fr'], body: '<p>Hi</p>' });
+  await ocom.getByRole('button', { name: 'Email me a code' }).waitFor();
+  assert.equal(await ocom.getByLabel('Your email address').inputValue(), 'dave@example.fr', 'signs in with the From address');
+  await signIn(ocom, 'dave@example.fr');
+  await ocom.getByRole('heading', { name: 'Send as an ECS message' }).waitFor();
+  assert.equal(await ocom.getByText('This message goes out from').count(), 0, 'no mismatch note');
+  console.log('ok outlook.com: the From address, not the mailbox name');
   console.log('\nAll Outlook add-in checks passed.');
 } finally {
   await browser.close();

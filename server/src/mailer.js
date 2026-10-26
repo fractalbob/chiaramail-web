@@ -6,11 +6,11 @@ import nodemailer from 'nodemailer';
 const TEXT = {
   fr: {
     subject: (code, ref) => `ChiaraMail : votre code ${code} (réf. ${ref})`,
-    body: (code) => `Votre code de connexion à ChiaraMail est :\n\n    ${code}\n\nIl est valable 15 minutes. L’application ChiaraMail le saisit d’elle-même ; vous pouvez supprimer cet e-mail.\n\nSi vous n’avez pas demandé ce code, ignorez ce message : personne ne peut se connecter sans lui.\n`,
+    body: (code) => `Votre code de connexion à ChiaraMail est :\n\n    ${code}\n\nIl est valable 15 minutes. Saisissez-le là où ChiaraMail le demande (l’application de bureau le saisit d’elle-même), puis vous pouvez supprimer cet e-mail.\n\nSi vous n’avez pas demandé ce code, ignorez ce message : personne ne peut se connecter sans lui.\n`,
   },
   en: {
     subject: (code, ref) => `ChiaraMail: your code ${code} (ref. ${ref})`,
-    body: (code) => `Your ChiaraMail sign-in code is:\n\n    ${code}\n\nIt is valid for 15 minutes. The ChiaraMail app enters it by itself; you can delete this email.\n\nIf you didn't ask for this code, ignore this message: nobody can sign in without it.\n`,
+    body: (code) => `Your ChiaraMail sign-in code is:\n\n    ${code}\n\nIt is valid for 15 minutes. Enter it where ChiaraMail asks for it (the desktop app enters it by itself), then you can delete this email.\n\nIf you didn't ask for this code, ignore this message: nobody can sign in without it.\n`,
   },
 };
 

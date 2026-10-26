@@ -774,6 +774,25 @@ await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.lchip', { ha
   await page.locator('.folder', { hasText: 'Inbox' }).first().click();
   log('tapping a label opens the labels to add or remove (list and open conversation); labels are blue');
 }
+// An ECS message stored on ChiaraMail Europe (sent from Outlook or the desktop app): the app
+// doesn't find it in its own store, so it offers the email's own link instead of "deleted".
+{
+  const ptr = 'EuroPtr0123456789AbC'; const key = 'k'.repeat(43);
+  const link = `https://ecs.chiaramail.com/m/${ptr}#k=${key}`;
+  await page.evaluate(([p, k, l]) => window.__mockGmail.sendRaw([
+    'From: Outlook User <someone@outlook.com>', `To: ${'bob@example.com'}`, 'Subject: Sent from Outlook',
+    `X-ChiaraMail-Content-Pointer: ${p}`, `X-ChiaraMail-Content-Key: ${k}`, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', '',
+    `Outlook User sent you a message: "Sent from Outlook"`, '', `Read it here: ${l}`, '',
+  ].join('\r\n')), [ptr, key, link]);
+  await page.reload();
+  await page.locator('.trow-link', { hasText: 'Sent from Outlook' }).first().waitFor();
+  await openRow('Sent from Outlook');
+  await page.getByText('kept on another ChiaraMail server').waitFor();
+  await must((await page.getByRole('link', { name: 'Read the message' }).getAttribute('href')) === link, 'links to the message on its own server');
+  await must(!(await page.getByText('The sender deleted this ECS message').count()), 'not called deleted');
+  await page.locator('.folder', { hasText: 'Inbox' }).first().click();
+  log('an ECS message kept on ChiaraMail Europe opens from its own link, not "deleted"');
+}
 log('Label as: search on top, list, Create new at the bottom (New label box with Nest under); existing names reused');
 log('toolbar: select ▾ menu, Label as, Move to, ⋮ Mark as important, Mark all as read, 1–N of total');
 

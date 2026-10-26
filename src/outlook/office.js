@@ -15,6 +15,18 @@ export const item = () => mailbox().item;
 /** Writing a message (compose) rather than reading one. */
 export const isCompose = () => !!item() && typeof item().subject === 'object' && typeof item().subject.getAsync === 'function';
 export const me = () => ({ email: (mailbox().userProfile?.emailAddress || '').toLowerCase(), name: mailbox().userProfile?.displayName || '' });
+/** The address this message goes out from (an outlook.com account's mailbox can have an
+ *  internal name, outlook_…@outlook.com, that nobody sees). Falls back to the mailbox's. */
+export async function sendingAddress() {
+  const it = item();
+  try {
+    if (isCompose() && it.from?.getAsync) {
+      const f = await call((cb) => it.from.getAsync(cb));
+      if (f?.emailAddress) return f.emailAddress.toLowerCase();
+    }
+  } catch { /* older Outlook */ }
+  return me().email;
+}
 
 // ---- writing --------------------------------------------------------------------
 export const getSubject = () => call((cb) => item().subject.getAsync(cb));

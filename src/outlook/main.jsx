@@ -21,12 +21,20 @@ function Pane() {
   const { user } = useAuth();
   const { t, toggle } = useI18n();
   const [compose, setCompose] = useState(() => office.isCompose());
-  useEffect(() => office.onItemChanged(() => setCompose(office.isCompose())), []);
-  const mailboxEmail = office.me().email;
+  const [n, setN] = useState(0);
+  useEffect(() => office.onItemChanged(() => { setCompose(office.isCompose()); setN((x) => x + 1); }), []);
+  // The From address of the message being written (for signing in and the mismatch note).
+  const [from, setFrom] = useState({ n: -1, email: '' });
+  useEffect(() => {
+    let live = true;
+    office.sendingAddress().then((email) => { if (live) setFrom({ n, email }); });
+    return () => { live = false; };
+  }, [n]);
+  const mailboxEmail = from.n === n ? from.email : '';
 
   let body;
   if (user === undefined) body = <p className="loading">{t('loading')}</p>;
-  else if (!user) body = <SignIn email={mailboxEmail} />;
+  else if (!user) body = from.n === n ? <SignIn key={mailboxEmail} email={mailboxEmail} /> : <p className="loading">{t('loading')}</p>;
   else body = compose ? <ComposePane /> : <ReadPane />;
 
   return (
@@ -37,7 +45,7 @@ function Pane() {
           <span>Chiara<span className="wordmark-mail">Mail</span><sup className="wordmark-tm">™</sup></span>
         </span>
       </header>
-      {user && mailboxEmail && user.email !== mailboxEmail && (
+      {user && compose && mailboxEmail && user.email !== mailboxEmail && (
         <p className="notice ol-other" role="alert">{t('ol_otherAccount', { mailbox: mailboxEmail, email: user.email })}</p>
       )}
       <main>{body}</main>

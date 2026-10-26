@@ -10,9 +10,21 @@ import RichEditor from './RichEditor.jsx';
 import { bodyHtml, storeRich, richIsEmpty } from '../richtext.js';
 import EcsAttachments from '../components/EcsAttachments.jsx';
 import { watchEcs, saveEcsEdition } from '../ecs.js';
-import { fmtSize } from '../lib.js';
+import { fmtSize, messageUrl } from '../lib.js';
 
 const MAX_FILES = 20;
+
+// The email's own reader link, when it points at another ChiaraMail server than this
+// app's (an Outlook or desktop sender's European server, read in the Gmail version,
+// or the other way round): the content is there, not missing.
+function linkElsewhere(message, pointer) {
+  const re = new RegExp(`https://([A-Za-z0-9.-]+)/m/${pointer}#k=[A-Za-z0-9_-]{43}`);
+  const m = re.exec(message.text || '') || re.exec((message.html || '').replace(/&amp;/g, '&'));
+  if (!m) return null;
+  let here = window.location.host;
+  try { here = new URL(messageUrl(pointer)).host; } catch { /* keep this page's */ }
+  return m[1] !== here && m[1] !== window.location.host ? m[0] : null;
+}
 
 // The content of an ECS message (body and attachments): fetched live from
 // ChiaraMail (the original's FETCH CONTENT), editable in place by its sender
@@ -72,6 +84,17 @@ export default function LiveMessage({ pointer, message, threadId, onInfo, onLetT
   }, [pointer, edition, withdrawn, isSender, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (state.status === 'loading') return <p className="loading">{t('loading')}</p>;
+  if (state.status === 'missing') {
+    const other = linkElsewhere(message, pointer);
+    if (other) {
+      return (
+        <div className="live-block">
+          <p className="notice-lead">{t('liveElsewhere')}</p>
+          <a className="btn btn-primary" href={other} target="_blank" rel="noopener noreferrer">{t('liveFallbackButton')}</a>
+        </div>
+      );
+    }
+  }
   if (state.status !== 'ok') {
     return (
       <div className="live-block live-unavailable">
