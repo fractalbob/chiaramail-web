@@ -7,7 +7,7 @@
   xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
   xsi:type="MailApp">
   <Id>a6d1cf42-97dc-4ea1-9507-913bb7f572f2</Id>
-  <Version>1.0.0.0</Version>
+  <Version>1.1.0.0</Version>
   <ProviderName>The Fractal Images Company</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="ChiaraMail"/>
@@ -118,13 +118,20 @@
       </bt:LongStrings>
     </Resources>
     <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+      <!-- 1.12: the send handler (LaunchEvent OnMessageSend). Older Outlook uses the
+           1.0 overrides above: the buttons only. -->
       <Requirements>
-        <bt:Sets DefaultMinVersion="1.8">
+        <bt:Sets DefaultMinVersion="1.12">
           <bt:Set Name="Mailbox"/>
         </bt:Sets>
       </Requirements>
       <Hosts>
         <Host xsi:type="MailHost">
+          <!-- Outlook runs this page by itself: on a new message and when Send is pressed.
+               It works where an administrator installed the add-in. -->
+          <Runtimes>
+            <Runtime resid="EventsRuntime"/>
+          </Runtimes>
           <DesktopFormFactor>
             <ExtensionPoint xsi:type="MessageReadCommandSurface">
               <OfficeTab id="TabDefault">
@@ -172,6 +179,13 @@
                 </Group>
               </OfficeTab>
             </ExtensionPoint>
+            <ExtensionPoint xsi:type="LaunchEvent">
+              <LaunchEvents>
+                <LaunchEvent Type="OnNewMessageCompose" FunctionName="onNewMessageComposeHandler"/>
+                <LaunchEvent Type="OnMessageSend" FunctionName="onMessageSendHandler" SendMode="PromptUser"/>
+              </LaunchEvents>
+              <SourceLocation resid="EventsRuntime"/>
+            </ExtensionPoint>
           </DesktopFormFactor>
         </Host>
       </Hosts>
@@ -183,6 +197,7 @@
         </bt:Images>
         <bt:Urls>
           <bt:Url id="Taskpane" DefaultValue="https://ecs.chiaramail.com/outlook.html"/>
+          <bt:Url id="EventsRuntime" DefaultValue="https://ecs.chiaramail.com/outlook-events.html"/>
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="ChiaraMail"><bt:Override Locale="fr-FR" Value="ChiaraMail"/></bt:String>

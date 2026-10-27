@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
   // The reader build also carries the Outlook add-in (outlook.html), served from the same server.
-  build: mode === 'reader' ? { rollupOptions: { input: { main: 'index.html', outlook: 'outlook.html' } } } : {},
+  build: mode === 'reader' ? { rollupOptions: { input: { main: 'index.html', outlook: 'outlook.html', 'outlook-events': 'outlook-events.html' } } } : {},
   resolve: {
     alias: {
       '@backend': fileURLToPath(new URL(

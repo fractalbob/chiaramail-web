@@ -626,6 +626,15 @@ const pickInitial = () => {
   return nav.find((l) => dicts[l]) || 'en';
 };
 
+/** A plain translator, outside React (the Outlook add-in's send handler). */
+export function makeT(lang = pickInitial()) {
+  return (key, vars) => {
+    let s = dicts[lang]?.[key] ?? en[key] ?? key;
+    if (vars) s = s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? ''));
+    return s;
+  };
+}
+
 const I18n = createContext(null);
 
 export function I18nProvider({ children }) {

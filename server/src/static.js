@@ -1,7 +1,8 @@
 // Serves the reader page (the web screens built with `npm run build:reader`
 // at the top level) for paths the API doesn't use: /m/<id>, its scripts and
 // styles. Every page path gets index.html; the screens route from there.
-// outlook.html is the Outlook add-in, which Outlook shows in a frame.
+// outlook.html is the Outlook add-in, which Outlook shows in a frame;
+// outlook-events.html is its send handler, which Outlook runs in a hidden one.
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { join, normalize, extname, sep } from 'node:path';
@@ -46,7 +47,7 @@ export function staticSite(dir) {
       if (!file) return false;
     }
     const immutable = p.startsWith('/assets/'); // file names carry a hash of the content
-    const addIn = file.endsWith(`${sep}outlook.html`);
+    const addIn = file.endsWith(`${sep}outlook.html`) || file.endsWith(`${sep}outlook-events.html`);
     res.writeHead(200, {
       'Content-Type': TYPES[extname(file).toLowerCase()] || 'application/octet-stream',
       'Cache-Control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',

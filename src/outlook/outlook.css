@@ -15,3 +15,4 @@ body { margin: 0; }
 .ol-pane .actions { flex-wrap: wrap; }
 .withdraw-ask { border: 1px solid var(--rule); border-radius: var(--radius-m, 8px); padding: 10px 12px; }
 .withdraw-ask p { margin: 0 0 10px; }
+.ol-rule { border: 0; border-top: 1px solid var(--rule); margin: 4px 0; width: 100%; }

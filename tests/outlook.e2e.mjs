@@ -45,6 +45,12 @@ const BASE = `http://127.0.0.1:${server.address().port}`;
   assert.match(csp, /frame-ancestors 'self' https:\/\/\*\.office\.com/);
   assert.match(csp, /script-src [^;]*https:\/\/appsforoffice\.microsoft\.com/);
   assert.equal(r.headers.get('x-frame-options'), null);
+  const ev = await fetch(`${BASE}/outlook-events.html`);
+  assert.match(ev.headers.get('content-security-policy'), /frame-ancestors 'self' https:\/\/\*\.office\.com/);
+  assert.equal(ev.headers.get('x-frame-options'), null);
+  const manText = await (await fetch(`${BASE}/outlook/manifest.xml`)).text();
+  assert.match(manText, /<LaunchEvent Type="OnMessageSend" FunctionName="onMessageSendHandler" SendMode="PromptUser"\/>/);
+  assert.match(manText, /outlook-events\.html/);
   const idx = await fetch(`${BASE}/m/x`);
   assert.equal(idx.headers.get('x-frame-options'), 'DENY');
   const man = await fetch(`${BASE}/outlook/manifest.xml`);
@@ -60,8 +66,10 @@ const OFFICE = `window.Office = (() => {
   const cfg = window.__mock;
   const S = { Succeeded: 'succeeded', Failed: 'failed' };
   const ok = (cb, value) => setTimeout(() => cb && cb({ status: S.Succeeded, value }), 0);
+  const bad = (cb) => setTimeout(() => cb && cb({ status: S.Failed, error: { name: 'NotFound', message: 'Not found' } }), 0);
   const st = window.__st = { body: cfg.body || '', to: cfg.to || [], cc: cfg.cc || [], bcc: cfg.bcc || [], subject: cfg.subject || '',
-    attachments: (cfg.attachments || []).map((a, i) => ({ id: 'a' + i, ...a })), headers: {}, replyAll: null, next: 1 };
+    attachments: (cfg.attachments || []).map((a, i) => ({ id: 'a' + i, ...a })), headers: {}, replyAll: null, next: 1,
+    session: { ...(cfg.session || {}) }, bars: {}, roaming: { ...(cfg.roaming || {}) } };
   const people = (l) => l.map((e) => ({ emailAddress: e, displayName: '' }));
   const item = cfg.mode === 'compose' ? {
     itemType: 'message',
@@ -74,6 +82,8 @@ const OFFICE = `window.Office = (() => {
     removeAttachmentAsync: (id, cb) => { st.attachments = st.attachments.filter((a) => a.id !== id); ok(cb); },
     addFileAttachmentFromBase64Async: (b64, name, o, cb) => { const id = 'n' + (st.next++); st.attachments.push({ id, name, b64, isInline: !!o.isInline }); ok(cb, id); },
     internetHeaders: { setAsync: (h, cb) => { Object.assign(st.headers, h); ok(cb); }, removeAsync: (n, cb) => { n.forEach((k) => delete st.headers[k]); ok(cb); } },
+    sessionData: { getAsync: (n, cb) => (n in st.session ? ok(cb, st.session[n]) : bad(cb)), setAsync: (n, v, cb) => { st.session[n] = v; ok(cb); } },
+    notificationMessages: { replaceAsync: (k, d, cb) => { st.bars[k] = d; ok(cb); }, removeAsync: (k, cb) => { delete st.bars[k]; ok(cb); } },
   } : {
     itemType: 'message', subject: st.subject, from: { emailAddress: cfg.from, displayName: '' },
     body: { getAsync: (t, cb) => ok(cb, st.body) },
@@ -81,7 +91,13 @@ const OFFICE = `window.Office = (() => {
   };
   return {
     AsyncResultStatus: S, CoercionType: { Html: 'html', Text: 'text' }, EventType: { ItemChanged: 'olkItemSelectedChanged' }, HostType: { Outlook: 'Outlook' },
-    context: { mailbox: { item, userProfile: { emailAddress: cfg.me, displayName: cfg.meName || '' }, addHandlerAsync: (t, h, cb) => { window.__changed = h; ok(cb); } } },
+    MailboxEnums: { ItemNotificationMessageType: { InformationalMessage: 'informationalMessage' } },
+    actions: { associate: (name, fn) => { (window.__handlers ||= {})[name] = fn; } },
+    context: {
+      mailbox: { item, userProfile: { emailAddress: cfg.me, displayName: cfg.meName || '' }, addHandlerAsync: (t, h, cb) => { window.__changed = h; ok(cb); } },
+      roamingSettings: { get: (n) => st.roaming[n], set: (n, v) => { st.roaming[n] = v; }, saveAsync: (cb) => ok(cb) },
+      requirements: { isSetSupported: (n, v) => parseFloat(v) <= (cfg.mailboxVersion || 1.14) },
+    },
     onReady: (cb) => { const info = { host: 'Outlook' }; setTimeout(() => cb && cb(info), 0); return Promise.resolve(info); },
   };
 })();`;
@@ -98,6 +114,23 @@ async function pane(who, mock) {
   await page.route('https://appsforoffice.microsoft.com/**', (r) => r.fulfill({ contentType: 'text/javascript', body: OFFICE }));
   await page.addInitScript((m) => { window.__mock = m; }, { me: who, ...mock });
   await page.goto(`${BASE}/outlook.html`);
+  return page;
+}
+// The send handler's page, as Outlook runs it (hidden); fire(name) calls a handler
+// with an event and resolves with what it passed to event.completed().
+async function events(who, mock) {
+  contexts[who] ||= await browser.newContext({ viewport: { width: 380, height: 900 } });
+  const page = await contexts[who].newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.errors = errors;
+  await page.route('https://appsforoffice.microsoft.com/**', (r) => r.fulfill({ contentType: 'text/javascript', body: OFFICE }));
+  await page.addInitScript((m) => { window.__mock = m; }, { me: who, mode: 'compose', ...mock });
+  await page.goto(`${BASE}/outlook-events.html`);
+  await page.waitForFunction(() => window.__handlers?.onMessageSendHandler);
+  page.fire = (name) => page.evaluate((n) => new Promise((resolve) => {
+    window.__handlers[n]({ completed: (o) => resolve(o ?? null) });
+  }), name);
   return page;
 }
 async function signIn(page, email) {
@@ -239,6 +272,99 @@ try {
   await ocom.getByRole('heading', { name: 'Send as an ECS message' }).waitFor();
   assert.equal(await ocom.getByText('This message goes out from').count(), 0, 'no mismatch note');
   console.log('ok outlook.com: the From address, not the mailbox name');
+
+  // ---- ECS by default: Outlook runs the add-in by itself (administrator install) ------------------
+  {
+    // A new message: marked, ECS on, and the bar shown.
+    let ev = await events('bob@example.fr', {
+      meName: 'Bob Uomini', subject: 'Wire', to: ['alice@example.fr'], body: '<p>The <b>account number</b> is below.</p>',
+      attachments: [{ name: 'rib.txt', type: 'text/plain', b64: b64('FR76 1111') }],
+    });
+    assert.equal(await ev.fire('onNewMessageComposeHandler'), null);
+    let s2 = await st(ev);
+    assert.equal(s2.session['chiaramail.auto'], '1');
+    assert.equal(s2.session['chiaramail.ecs'], '1');
+    assert.match(s2.bars.chiaramail.message, /will be sent as an ECS message/);
+    assert.ok(s2.bars.chiaramail.message.length <= 150);
+    // Send: converted before it leaves, and allowed.
+    assert.deepEqual(await ev.fire('onMessageSendHandler'), { allowEvent: true });
+    s2 = await st(ev);
+    assert.ok(!s2.body.includes('account number'), 'the text left the email');
+    assert.equal(s2.attachments.length, 0, 'the attachment left the email');
+    const auto = findEcsLink(s2.body, BASE);
+    assert.ok(auto, 'the email links to the reader page');
+    assert.equal(s2.headers['X-ChiaraMail-Content-Pointer'], auto.id);
+    assert.equal(s2.bars.chiaramail, undefined, 'the bar is gone');
+    assert.deepEqual(ev.errors, []);
+    // Alice can read it.
+    const a3 = await pane('alice@example.fr', { mode: 'read', from: 'bob@example.fr', body: s2.body });
+    await a3.getByText('account number').waitFor();
+    await a3.getByText('rib.txt').waitFor();
+    await a3.close();
+    // Sending it again (already an ECS message, e.g. converted with the button): left as is.
+    const before = (await db.query('SELECT count(*)::int AS n FROM messages')).rows[0].n;
+    ev = await events('bob@example.fr', { to: ['alice@example.fr'], body: s2.body, session: { 'chiaramail.auto': '1', 'chiaramail.ecs': '1' } });
+    assert.deepEqual(await ev.fire('onMessageSendHandler'), { allowEvent: true });
+    assert.equal((await st(ev)).body, s2.body);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM messages')).rows[0].n, before, 'nothing new stored');
+    console.log('ok by default: bar on a new message, converted on Send, readable');
+
+    // Turned off for this message: ordinary email.
+    ev = await events('bob@example.fr', { to: ['alice@example.fr'], body: '<p>Lunch?</p>', session: { 'chiaramail.auto': '1', 'chiaramail.ecs': '0' } });
+    assert.deepEqual(await ev.fire('onMessageSendHandler'), { allowEvent: true });
+    assert.equal((await st(ev)).body, '<p>Lunch?</p>');
+    // Turned off by default: a new message starts as ordinary email, with no bar.
+    ev = await events('bob@example.fr', { to: ['alice@example.fr'], body: '<p>Hi</p>', roaming: { ecsDefault: false } });
+    await ev.fire('onNewMessageComposeHandler');
+    s2 = await st(ev);
+    assert.equal(s2.session['chiaramail.ecs'], '0');
+    assert.equal(s2.bars.chiaramail, undefined);
+    assert.deepEqual(await ev.fire('onMessageSendHandler'), { allowEvent: true });
+    assert.equal((await st(ev)).body, '<p>Hi</p>');
+    console.log('ok by default: off for one message, off by default');
+
+    // Can't be done: Outlook is told why, the email is untouched, and the pane button is offered.
+    ev = await events('bob@example.fr', { to: ['alice@example.fr'], bcc: ['dave@example.fr'], body: '<p>Secret</p>', session: { 'chiaramail.auto': '1', 'chiaramail.ecs': '1' } });
+    let r = await ev.fire('onMessageSendHandler');
+    assert.equal(r.allowEvent, false);
+    assert.match(r.errorMessage, /couldn’t make this an ECS message: Remove the Bcc recipients first/);
+    assert.equal(r.commandId, 'composeButton');
+    assert.equal(r.cancelLabel, 'Open ChiaraMail');
+    assert.equal((await st(ev)).body, '<p>Secret</p>');
+    ev = await events('erin@example.fr', { to: ['alice@example.fr'], body: '<p>Secret</p>', session: { 'chiaramail.auto': '1', 'chiaramail.ecs': '1' }, mailboxVersion: 1.12 });
+    r = await ev.fire('onMessageSendHandler');
+    assert.equal(r.allowEvent, false);
+    assert.match(r.errorMessage, /aren’t signed in to ChiaraMail/);
+    assert.equal(r.commandId, undefined, 'no pane button before Mailbox 1.14');
+    ev = await events('bob@example.fr', { me: 'bob@work.example', to: ['alice@example.fr'], body: '<p>Secret</p>', session: { 'chiaramail.auto': '1', 'chiaramail.ecs': '1' } });
+    r = await ev.fire('onMessageSendHandler');
+    assert.match(r.errorMessage, /goes out from bob@work\.example, but you’re signed in to ChiaraMail as bob@example\.fr/);
+    assert.equal((await st(ev)).body, '<p>Secret</p>');
+    console.log('ok by default: Bcc, not signed in, other account are explained');
+
+    // The pane, where the add-in runs by itself: a checkbox, not the button.
+    const p2 = await pane('bob@example.fr', { mode: 'compose', to: ['alice@example.fr'], body: '<p>Hi</p>', session: { 'chiaramail.auto': '1', 'chiaramail.ecs': '1' } });
+    const box = p2.getByRole('checkbox', { name: 'Send this message as an ECS message' });
+    await box.waitFor();
+    assert.equal(await box.isChecked(), true);
+    assert.equal(await p2.getByRole('button', { name: 'Make it an ECS message' }).count(), 0);
+    await shot(p2, '6-auto');
+    await box.uncheck();
+    await p2.getByText('This message will go out as ordinary email.').waitFor();
+    s2 = await st(p2);
+    assert.equal(s2.session['chiaramail.ecs'], '0');
+    assert.equal(s2.bars.chiaramail, undefined);
+    await box.check();
+    await p2.getByRole('checkbox', { name: 'Recipients may forward it' }).check();
+    s2 = await st(p2);
+    assert.equal(s2.session['chiaramail.ecs'], '1');
+    assert.equal(s2.session['chiaramail.fwd'], '1');
+    assert.match(s2.bars.chiaramail.message, /ECS message/);
+    await p2.getByRole('checkbox', { name: 'Send new messages as ECS messages by default' }).uncheck();
+    assert.equal((await st(p2)).roaming.ecsDefault, false);
+    assert.deepEqual(p2.errors, []);
+    console.log('ok by default: the pane’s checkboxes');
+  }
   console.log('\nAll Outlook add-in checks passed.');
 } finally {
   await browser.close();

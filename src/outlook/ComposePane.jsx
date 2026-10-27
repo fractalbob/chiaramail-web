@@ -1,43 +1,64 @@
-import { useRef, useState } from 'react';
-import * as backend from '@backend';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
-import { createEcs } from '../ecs.js';
-import { storeRich, richIsEmpty } from '../richtext.js';
-import { b64ToBytes, bytesToB64, escapeHtml, CONTENT_POINTER, CONTENT_KEY } from '../gmail/mime.js';
-import { fmtSize } from '../lib.js';
-import * as office from './office.js';
+import { convertToEcs, undoConvert, convertError } from './convert.js';
+import * as prefs from './prefs.js';
 
-const MAX_FILES = 20;
-const MAX_RECIPIENTS = 50;
-
-// Outlook's own attachments → files for ChiaraMail. Attached emails and
-// meeting requests become .eml and .ics files.
-async function readFiles(list) {
-  return Promise.all(list.map(async (a) => {
-    const c = await office.getAttachmentContent(a.id);
-    let bytes; let name = a.name || 'attachment'; let type = a.contentType || 'application/octet-stream';
-    if (c.format === 'base64') bytes = b64ToBytes(c.content);
-    else {
-      bytes = new TextEncoder().encode(c.content);
-      if (c.format === 'eml') { type = 'message/rfc822'; if (!/\.eml$/i.test(name)) name += '.eml'; }
-      if (c.format === 'iCalendar') { type = 'text/calendar'; if (!/\.ics$/i.test(name)) name += '.ics'; }
-    }
-    return { id: a.id, name, type, size: bytes.length, bytes, isInline: !!a.isInline, base64: c.format === 'base64' ? c.content : null };
-  }));
-}
-
-// The note that replaces the body: what recipients' mail programs show
-// (the same wording as the ChiaraMail apps).
-function noteHtml(t, { name, subject, link }) {
-  const intro = t('ecsMailIntro', { name, subject: subject || t('noSubject') });
-  return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.5">
-<p>${escapeHtml(intro)}</p>
-<p>${escapeHtml(t('ecsMailRead'))} <a href="${link}">${escapeHtml(t('liveFallbackButton'))}</a></p>
-<p style="color:#666;font-size:13px">${escapeHtml(t('ecsMailAbout'))}</p></div>`;
-}
-
+// Where Outlook runs the add-in by itself (installed by an administrator), the
+// message is converted when Send is pressed, and this pane only says whether it
+// will be. Elsewhere (installed by the person), the button here converts it.
 export default function ComposePane() {
+  const { t } = useI18n();
+  const [auto, setAuto] = useState(null); // null while checking
+  useEffect(() => {
+    let live = true;
+    prefs.autoActive().then((a) => { if (live) setAuto(a); });
+    return () => { live = false; };
+  }, []);
+  if (auto === null) return <p className="loading">{t('loading')}</p>;
+  return auto ? <AutoPane /> : <ManualPane />;
+}
+
+function AutoPane() {
+  const { t } = useI18n();
+  const [ecs, setEcs] = useState(null);
+  const [fwd, setFwd] = useState(false);
+  const [byDefault, setByDefault] = useState(prefs.ecsByDefault);
+  useEffect(() => {
+    let live = true;
+    Promise.all([prefs.wantsEcs(), prefs.allowsForward()]).then(([e, f]) => { if (live) { setEcs(e); setFwd(f); } });
+    return () => { live = false; };
+  }, []);
+  if (ecs === null) return <p className="loading">{t('loading')}</p>;
+
+  const changeEcs = async (on) => { setEcs(on); await prefs.setWantsEcs(on); await prefs.showEcsBar(t, on); };
+  const changeFwd = async (on) => { setFwd(on); await prefs.setAllowsForward(on); };
+  const changeDefault = async (on) => { setByDefault(on); await prefs.setEcsByDefault(on); };
+
+  return (
+    <section className="ol-section">
+      <h2 className="ol-title">{t('ol_composeTitle')}</h2>
+      <label className="subtoggle">
+        <input type="checkbox" checked={ecs} onChange={(e) => changeEcs(e.target.checked)} />
+        <span>{t('ol_autoThis')}</span>
+      </label>
+      <p className="help">{ecs ? t('ol_autoOn') : t('ol_autoOff')}</p>
+      {ecs && (
+        <label className="subtoggle">
+          <input type="checkbox" checked={fwd} onChange={(e) => changeFwd(e.target.checked)} />
+          <span>{t('ol_allowForward')}</span>
+        </label>
+      )}
+      <hr className="ol-rule" />
+      <label className="subtoggle">
+        <input type="checkbox" checked={byDefault} onChange={(e) => changeDefault(e.target.checked)} />
+        <span>{t('ol_autoDefault')}</span>
+      </label>
+    </section>
+  );
+}
+
+function ManualPane() {
   const { user } = useAuth();
   const { t } = useI18n();
   const [allowFwd, setAllowFwd] = useState(false);
@@ -48,53 +69,11 @@ export default function ComposePane() {
 
   const convert = async () => {
     setError(''); setState('working'); setProgress(null);
-    let made = null; let original = null;
-    const removed = []; let bodySet = false;
     try {
-      const [to, cc, bcc, subject, html, atts] = await Promise.all([
-        office.getRecipients('to'), office.getRecipients('cc'), office.getRecipients('bcc'),
-        office.getSubject(), office.getBodyHtml(), office.getAttachments(),
-      ]);
-      const fail = (msg) => { throw Object.assign(new Error(msg), { shown: true }); };
-      if (bcc.length) fail(t('ol_bcc'));
-      const recipients = [...new Set([...to, ...cc].map((r) => r.email).filter(Boolean))];
-      if (!recipients.length) fail(t('needRecipient'));
-      if (recipients.length > MAX_RECIPIENTS) fail(t('tooMany'));
-      const cloud = atts.find((a) => a.attachmentType === 'cloud');
-      if (cloud) fail(t('ol_cloud', { name: cloud.name }));
-      if (atts.length > MAX_FILES) fail(t('tooManyFiles', { n: MAX_FILES }));
-      if (atts.some((a) => a.size > backend.MAX_FILE)) fail(t('tooBigEcs'));
-      if (richIsEmpty(html) && !atts.length) fail(t('needBody'));
-      original = html;
-      const files = await readFiles(atts);
-      if (files.some((f) => f.size > backend.MAX_FILE)) fail(t('tooBigEcs'));
-      const total = files.reduce((n, f) => n + f.size, 0);
-      if (total) {
-        const u = await backend.getUsage().catch(() => null);
-        if (u && u.used + total > u.quota) fail(t('ecsQuota', { quota: fmtSize(u.quota), need: fmtSize(total), left: fmtSize(Math.max(0, u.quota - u.used)) }));
-      }
-
-      made = await createEcs(user, { recipients, subject: (subject || '').trim(), body: storeRich(html), allowForward: allowFwd, files },
-        (p) => setProgress(Math.round(p * 100)));
-      // This server's own reader page (not VITE_PUBLIC_ORIGIN, which is the Gmail version's address).
-      const link = `${window.location.origin}/m/${made.id}#k=${made.key}`;
-      const who = office.me().name || user.email;
-      for (const f of files) { await office.removeAttachment(f.id); removed.push(f); }
-      await office.setBodyHtml(noteHtml(t, { name: who, subject: (subject || '').trim(), link }));
-      bodySet = true;
-      await office.setHeaders({ [CONTENT_POINTER]: made.id, [CONTENT_KEY]: made.key }).catch(() => {}); // the link alone is enough
-      undoRef.current = { id: made.id, html, files };
+      undoRef.current = await convertToEcs({ user, t, allowForward: allowFwd, onProgress: (p) => setProgress(Math.round(p * 100)) });
       setState('ready');
     } catch (e) {
-      if (made) {
-        // Stored but not finished: the stored copy goes, and the email is put back as it was.
-        await backend.deleteMessage(made.id).catch(() => {});
-        if (bodySet) await office.setBodyHtml(original).catch(() => {});
-        for (const f of removed) await office.addAttachment(f.base64 || bytesToB64(f.bytes), f.name, f.isInline).catch(() => {});
-      }
-      setError(e.shown ? e.message : e.code === 'quota'
-        ? t('ecsQuota', { quota: fmtSize(e.quota), need: fmtSize(e.need), left: fmtSize(Math.max(0, e.quota - e.used)) })
-        : t('errorGeneric', { msg: e.message }));
+      setError(convertError(t, e));
       setState('idle');
     } finally { setProgress(null); }
   };
@@ -104,12 +83,7 @@ export default function ComposePane() {
     if (!r) return;
     setError(''); setState('undoing');
     try {
-      await office.setBodyHtml(r.html);
-      for (const f of r.files) {
-        await office.addAttachment(f.base64 || bytesToB64(f.bytes), f.name, f.isInline);
-      }
-      await office.removeHeaders([CONTENT_POINTER, CONTENT_KEY]).catch(() => {});
-      await backend.deleteMessage(r.id).catch(() => {});
+      await undoConvert(r);
       undoRef.current = null;
       setState('undone');
     } catch (e) {
