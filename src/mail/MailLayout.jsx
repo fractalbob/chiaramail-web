@@ -236,7 +236,6 @@ export default function MailLayout() {
           <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" fill="currentColor" /></svg>
         </button>
         <div className="search-col">
-          <SearchBox key={loc.search} />
           <AccountLine />
           <div className="settings-row">
             <ImagesSetting />
@@ -247,6 +246,8 @@ export default function MailLayout() {
       </div>
       <Sidebar onNavigate={() => setOpen(false)} />
       <section className="mail-main">
+        {/* Search stays at the top while the list scrolls, just above the list's toolbar. */}
+        <div className="mail-search"><SearchBox key={loc.search} /></div>
         <Routes>
           <Route path="/" element={<Navigate to="/mail/inbox" replace />} />
           <Route path="/mail/drafts" element={<DraftList />} />

@@ -284,6 +284,7 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .points li::before { content: ''; position: absolute; left: 2px; top: 18px; width: 9px; height: 9px; border-radius: 50%; background: var(--lumen); }
 
 .mail {
+  --search-h: 64px; /* the search bar's height: the toolbars below it stick just under it */
   display: grid; grid-template-columns: 220px minmax(0, 1fr); column-gap: 32px;
   grid-template-areas: "bar bar" "side main";
 }
@@ -350,10 +351,12 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .dlg-wide { width: min(620px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
 .dlg-note { margin: 0; font-size: 0.875rem; color: var(--slate); }
 .mail-main { grid-area: main; min-width: 0; }
+.mail-search { position: sticky; top: 0; z-index: 26; height: var(--search-h); display: flex; align-items: center; background: var(--sky); }
+.mail-search .search { max-width: none; }
 
 .list-head { display: flex; justify-content: space-between; align-items: center; gap: 4px 12px; flex-wrap: wrap; border-bottom: 1px solid var(--rule); padding: 2px 0 4px; min-height: 48px; }
 /* The toolbar (select, Archive, Report spam, Delete…) stays at the top while the list scrolls, as in Gmail. */
-.list-head { position: sticky; top: 0; z-index: 25; background: var(--sky); }
+.list-head { position: sticky; top: var(--search-h); z-index: 25; background: var(--sky); }
 .list-title { font: 500 1rem/1.2 var(--sans); margin: 0 8px 0 0; color: var(--slate); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40ch; }
 .pager { display: flex; align-items: center; gap: 0; margin-left: auto; min-width: 0; }
 .range { color: var(--slate); font-size: 0.8125rem; white-space: nowrap; margin-right: 6px; }
@@ -392,7 +395,7 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding-bottom: 6px; border-bottom: 1px solid var(--rule); }
 /* An open message's toolbar (Back, Archive, Report spam, Delete…) stays at the top while the message scrolls. */
-.thread-toolbar { position: sticky; top: 0; z-index: 25; background: var(--sky); padding-top: 6px; }
+.thread-toolbar { position: sticky; top: var(--search-h); z-index: 25; background: var(--sky); padding-top: 6px; }
 .toolbar-reply { display: inline-flex; gap: 2px; margin-left: auto; }
 .ibtn.star-on { color: #d9a400; }
 .star-btn.star-on { color: #b88a00; border-color: #d9a400; }
@@ -692,9 +695,10 @@ html.busy body::before {
   .trow .imp { display: none; }
   .trow-link { padding-left: 8px; }
   /* The toolbar (refresh, folder name, pages) stays at the top while the list scrolls, as when selecting. */
-  .list-head:not(.selecting) { position: sticky; top: 0; z-index: 25; background: var(--sky); margin: 0 -16px; padding: 2px 16px 4px; }
+  .mail-search { margin: 0 -16px; padding: 0 16px; }
+  .list-head:not(.selecting) { position: sticky; top: var(--search-h); z-index: 25; background: var(--sky); margin: 0 -16px; padding: 2px 16px 4px; }
   .list-head.selecting {
-    position: sticky; top: 0; z-index: 25; background: var(--paper); margin: 0 -16px; padding: 4px 8px;
+    position: sticky; top: var(--search-h); z-index: 25; background: var(--paper); margin: 0 -16px; padding: 4px 8px;
     box-shadow: 0 1px 4px rgba(0, 0, 0, .2);
   }
   .list-head.selecting .pager { display: none; }
