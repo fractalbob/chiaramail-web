@@ -213,7 +213,7 @@ export default function ThreadView() {
   };
   const subject = msgs[0]?.subject || t('noSubject');
   const picker = (
-    <LabelPicker state={(id) => labels.has(id)}
+    <LabelPicker inbox state={(id) => labels.has(id)}
       onToggle={(l) => act(() => gmail.modifyThread(threadId, labels.has(l.id) ? [] : [l.id], labels.has(l.id) ? [l.id] : []), false)}
       onNew={(name) => act(async () => {
         const l = mail.userLabels.find((x) => x.name.toLowerCase() === name.toLowerCase()) || await mail.createLabel(name);
@@ -248,7 +248,7 @@ export default function ThreadView() {
       <h1 className="thread-subject">
         {subject}
         {/* Gmail: tapping a label opens the labels, to add or remove some. */}
-        {mail.userLabels.filter((l) => labels.has(l.id)).map((l) => (
+        {[...(labels.has('INBOX') ? [{ id: 'INBOX', name: t('folder_inbox') }] : []), ...mail.userLabels.filter((l) => labels.has(l.id))].map((l) => (
           <button key={l.id} type="button" className="lchip lchip-title" aria-haspopup="menu" title={t('labelAs')}
             onClick={(e) => { const b = e.currentTarget.getBoundingClientRect(); setChipMenu({ x: b.left, y: b.bottom + 4 }); }}>{l.name}</button>
         ))}

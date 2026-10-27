@@ -34,7 +34,8 @@ const send = async () => {
 };
 // Ordinary emails written in ChiaraMail are HTML (they can carry formatting), so they show in the sandboxed frame.
 const inMail = (txt) => page.frameLocator('.htmlbody iframe').last().getByText(txt).first().waitFor();
-const openRow = (text) => page.locator('.trow-link', { hasText: text }).first().click();
+// (The sender: the middle of a row may be a label, which opens the labels instead.)
+const openRow = (text) => page.locator('.trow-link', { hasText: text }).first().locator('.row-people').click();
 // Every MIME part of the emails with this subject: [{ type, text }].
 const partsOf = (subject) => page.evaluate((subj) => {
   const s = JSON.parse(localStorage.getItem('chiaramail.mock.gmail'));
@@ -772,7 +773,31 @@ await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.lchip', { ha
   await page.getByRole('menuitemcheckbox', { name: 'Estate firms', exact: true }).waitFor();
   await page.keyboard.press('Escape');
   await page.locator('.folder', { hasText: 'Inbox' }).first().click();
-  log('tapping a label opens the labels to add or remove (list and open conversation); labels are blue');
+  // Outside the Inbox (here a label), rows in the Inbox carry an Inbox label too; from it the
+  // conversation can leave the Inbox (and come back), as in Gmail's phone app.
+  await page.locator('.folder', { hasText: /^Estate firms$/ }).first().click();
+  const inboxChip = page.locator('.trow', { hasText: 'Ordinary note' }).locator('.lchip', { hasText: /^Inbox$/ });
+  await inboxChip.waitFor();
+  await inboxChip.click();
+  const inboxItem = page.getByRole('menuitemcheckbox', { name: 'Inbox', exact: true });
+  await must((await inboxItem.getAttribute('aria-checked')) === 'true', 'Inbox is ticked');
+  await inboxItem.click();
+  await page.keyboard.press('Escape');
+  await page.locator('.working').waitFor({ state: 'detached' });
+  await inboxChip.waitFor({ state: 'detached' });
+  await page.locator('.folder', { hasText: 'Inbox' }).first().click();
+  await must(!(await page.locator('.trow', { hasText: 'Ordinary note' }).count()), 'unticking Inbox takes it out of the Inbox');
+  await page.locator('.folder', { hasText: /^Estate firms$/ }).first().click();
+  await page.locator('.trow', { hasText: 'Ordinary note' }).locator('.lchip', { hasText: /^Estate firms$/ }).waitFor({ state: 'attached' }).catch(() => {});
+  await page.locator('.trow-link', { hasText: 'Ordinary note' }).locator('.row-people').click();
+  await page.locator('.thread-subject').waitFor();
+  await page.locator('.thread-subject .lchip', { hasText: /^Estate firms$/ }).click();
+  await page.getByRole('menuitemcheckbox', { name: 'Inbox', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await page.locator('.thread-subject .lchip', { hasText: /^Inbox$/ }).waitFor();
+  await page.locator('.folder', { hasText: 'Inbox' }).first().click();
+  await page.locator('.trow', { hasText: 'Ordinary note' }).waitFor();
+  log('tapping a label opens the labels to add or remove (list and open conversation); labels are blue; Inbox shows and can be removed or put back from a label');
 }
 // An ECS message stored on ChiaraMail Europe (sent from Outlook or the desktop app): the app
 // doesn't find it in its own store, so it offers the email's own link instead of "deleted".

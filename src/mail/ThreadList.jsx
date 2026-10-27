@@ -68,7 +68,8 @@ export default function ThreadList() {
   const { handle } = mail;
   const viewLabel = q ? null : labelIdFor(folder); // the label every row in this view carries
   // User labels shown as chips on each row, as in Gmail.
-  const labelNames = Object.fromEntries(mail.userLabels.map((l) => [l.id, l.name]));
+  // Labels shown on rows: the user's own, and Inbox outside the Inbox (as Gmail does in Sent, labels, search).
+  const labelNames = { INBOX: t('folder_inbox'), ...Object.fromEntries(mail.userLabels.map((l) => [l.id, l.name])) };
 
   // fresh: the Refresh button: ask the mail server now, not from the last few seconds' copy.
   const fetchPage = useCallback(async (fresh) => {
@@ -279,7 +280,7 @@ export default function ThreadList() {
     if (ctx.labels) {
       return (
         <ContextMenu x={ctx.x} y={ctx.y} label={t('labelAs')} onClose={closeCtx}>
-          <LabelPicker state={(l) => row.labelIds.includes(l)} onNew={(name) => newLabel(name, [row.id])}
+          <LabelPicker inbox state={(l) => row.labelIds.includes(l)} onNew={(name) => newLabel(name, [row.id])}
             onToggle={(l) => (row.labelIds.includes(l.id) ? labelBulk([], [l.id], [row.id]) : labelBulk([l.id], [], [row.id]))} />
         </ContextMenu>
       );
@@ -477,7 +478,7 @@ export default function ThreadList() {
                 <span className="row-subject">
                   {r.live && <span className="live" title={t('liveTitle')}>{t('live')}</span>}
                   {marks.verdicts[r.id] === 'spoof' && <span className="spoof-tag">{t('spoofTag')}</span>}
-                  <LabelChips ids={r.labelIds.filter((id) => id !== viewLabel && labelNames[id])} names={labelNames}
+                  <LabelChips ids={['INBOX', ...r.labelIds.filter((id) => id !== 'INBOX')].filter((id) => r.labelIds.includes(id) && id !== viewLabel && labelNames[id])} names={labelNames}
                     onOpen={(e) => openLabels(e, r)} label={t('labelAs')} />
                   <span className={marks.verdicts[r.id] === 'ok' ? 'subj subj-verified' : marks.verdicts[r.id] === 'spoof' ? 'subj subj-spoof' : 'subj'}
                     title={marks.verdicts[r.id] === 'ok' ? t('verifiedTitle') : marks.verdicts[r.id] === 'spoof' ? t('spoofTitle') : undefined}>

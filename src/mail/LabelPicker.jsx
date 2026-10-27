@@ -6,7 +6,9 @@ import { MenuItem } from './Menu.jsx';
 // Gmail's "Label as:" menu: a title and a search box at the top, the labels in a list that
 // scrolls on its own, and "Create new" always at the bottom (no scrolling to reach it).
 // state(id) → true | false | 'mixed'; onToggle(label); onNew(fullName) creates and applies.
-export default function LabelPicker({ state, onToggle, onNew }) {
+// inbox: Inbox is in the list too (Gmail's phone app does this from a tapped label), so a
+// conversation can leave the Inbox or come back to it from there.
+export default function LabelPicker({ state, onToggle, onNew, inbox = false }) {
   const { t } = useI18n();
   const mail = useMail();
   const [q, setQ] = useState('');
@@ -15,6 +17,8 @@ export default function LabelPicker({ state, onToggle, onNew }) {
   const needle = q.trim().toLowerCase();
   const shown = mail.userLabels.filter((l) => !needle || l.name.toLowerCase().includes(needle));
   const exact = needle && mail.userLabels.some((l) => l.name.toLowerCase() === needle);
+  const inboxItem = { id: 'INBOX', name: t('folder_inbox') };
+  const showInbox = inbox && (!needle || inboxItem.name.toLowerCase().includes(needle));
   const create = async (initial) => {
     const name = await askNewLabel(initial);
     if (name) onNew(name);
@@ -32,6 +36,7 @@ export default function LabelPicker({ state, onToggle, onNew }) {
           }} />
       </div>
       <div className="lp-list" role="group" aria-labelledby="lp-title">
+        {showInbox && <MenuItem checked={state('INBOX')} onClick={() => onToggle(inboxItem)}>{inboxItem.name}</MenuItem>}
         {shown.map((l) => <MenuItem key={l.id} checked={state(l.id)} onClick={() => onToggle(l)}>{l.name}</MenuItem>)}
         {!shown.length && !needle && <p className="menu-note">{t('noLabels')}</p>}
         {needle && !exact && (
