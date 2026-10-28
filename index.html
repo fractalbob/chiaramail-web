@@ -19,7 +19,7 @@
         #splash {
           position: fixed; inset: 0; z-index: 1000; background: #ffffff;
           display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
-          transition: opacity 0.35s ease;
+          transition: opacity 0.2s ease;
         }
       }
       #splash.splash-out { opacity: 0; pointer-events: none; }
@@ -40,6 +40,8 @@
     </div>
     <script>
       // When the start screen actually reached the screen: it stays readable from then on.
+      // (If the app's code is ready even before that first frame, this moment stands in for it.)
+      window.__splashShownAt = performance.now();
       requestAnimationFrame(function () { window.__splashShownAt = performance.now(); });
       // Same language choice as the app: the one picked in ChiaraMail, else the phone's.
       (function () {

@@ -21,7 +21,7 @@ createRoot(document.getElementById('root')).render(
 // The start screen (index.html, installed app only) shows only briefly: the inbox matters more
 // than the name. Counted from when it actually appeared (the phone's own icon-only splash uses
 // up part of that); a tap dismisses it sooner.
-const SPLASH_MS = 800;
+const SPLASH_MS = 600;
 const splash = document.getElementById('splash');
 if (splash) {
   const shown = getComputedStyle(splash).display !== 'none';
@@ -30,7 +30,7 @@ if (splash) {
     if (gone) return;
     gone = true;
     splash.classList.add('splash-out');
-    setTimeout(() => splash.remove(), shown ? 400 : 0);
+    setTimeout(() => splash.remove(), shown ? 250 : 0);
   };
   if (shown) {
     const since = performance.now() - (window.__splashShownAt ?? performance.now());

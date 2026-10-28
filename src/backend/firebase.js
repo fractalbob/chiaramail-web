@@ -6,14 +6,6 @@ import {
   sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
   signOut as fbSignOut, connectAuthEmulator, signInWithCredential,
 } from 'firebase/auth';
-import {
-  getFirestore, connectFirestoreEmulator, collection, doc, query, where,
-  orderBy, onSnapshot, writeBatch, serverTimestamp, increment, getDoc,
-  getDocs, setDoc, updateDoc, deleteDoc, runTransaction,
-} from 'firebase/firestore';
-import {
-  getStorage, connectStorageEmulator, ref as sref, uploadBytesResumable, getBlob, deleteObject,
-} from 'firebase/storage';
 
 const app = initializeApp({
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -23,13 +15,31 @@ const app = initializeApp({
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
 });
 const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
+const EMULATORS = import.meta.env.VITE_USE_EMULATORS === '1';
+if (EMULATORS) connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
 
-if (import.meta.env.VITE_USE_EMULATORS === '1') {
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-  connectFirestoreEmulator(db, '127.0.0.1', 8080);
-  connectStorageEmulator(storage, '127.0.0.1', 9199);
+// Firestore and Storage are nearly half the app's code, and the inbox (which comes from
+// Gmail) doesn't need them to appear. So they load just after the start, in the background,
+// instead of making the start screen wait for them.
+let fsLoad = null;
+const loadFirestore = () => (fsLoad ||= import('firebase/firestore').then((m) => {
+  const db = m.getFirestore(app);
+  if (EMULATORS) m.connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  return { ...m, db, messages: m.collection(db, 'messages'), ecsUsers: m.collection(db, 'ecsUsers') };
+}));
+let stLoad = null;
+const loadStorage = () => (stLoad ||= import('firebase/storage').then((m) => {
+  const storage = m.getStorage(app);
+  if (EMULATORS) m.connectStorageEmulator(storage, '127.0.0.1', 9199);
+  return { ...m, storage };
+}));
+setTimeout(() => { loadFirestore(); }, 0);
+// A live view that starts once Firestore has loaded; the returned stop works before that too.
+function live(start) {
+  let stop = null;
+  let cancelled = false;
+  loadFirestore().then((F) => { if (!cancelled) stop = start(F); });
+  return () => { cancelled = true; stop?.(); };
 }
 
 const EMAIL_KEY = 'chiaramail.emailForSignIn';
@@ -127,25 +137,25 @@ export async function signOut() {
 
 // ---- messages -----------------------------------------------------------
 
-const messages = collection(db, 'messages');
-
 export function watchSent(uid, cb, onErr) {
-  const q = query(messages, where('senderUid', '==', uid), orderBy('updatedAt', 'desc'));
-  return onSnapshot(q, (s) => cb(s.docs.map(toMessage)), onErr);
+  return live(({ query, where, orderBy, onSnapshot, messages }) => onSnapshot(
+    query(messages, where('senderUid', '==', uid), orderBy('updatedAt', 'desc')),
+    (s) => cb(s.docs.map(toMessage)), onErr));
 }
 
 export function watchReceived(email, cb, onErr) {
-  const q = query(messages, where('recipients', 'array-contains', email), orderBy('updatedAt', 'desc'));
-  return onSnapshot(q, (s) => cb(s.docs.map(toMessage)), onErr);
+  return live(({ query, where, orderBy, onSnapshot, messages }) => onSnapshot(
+    query(messages, where('recipients', 'array-contains', email), orderBy('updatedAt', 'desc')),
+    (s) => cb(s.docs.map(toMessage)), onErr));
 }
 
 export function watchMessage(id, cb, onErr) {
-  return onSnapshot(doc(messages, id), (s) => cb(s.exists() ? toMessage(s) : null), onErr);
+  return live(({ onSnapshot, doc, messages }) => onSnapshot(doc(messages, id), (s) => cb(s.exists() ? toMessage(s) : null), onErr));
 }
 
 // An ECS message's attachments travel with its body, not with the email:
 // they're stored at ecs/{messageId}/{index} and only its readers can fetch them.
-const fileRef = (id, i) => sref(storage, `ecs/${id}/${i}`);
+const fileRef = (S, id, i) => S.ref(S.storage, `ecs/${id}/${i}`);
 const fileMeta = (files) => files.map((f) => ({ name: f.name, type: f.type || 'application/octet-stream', size: f.size }));
 
 // ---- attachment allowance ----------------------------------------------------
@@ -153,25 +163,32 @@ const fileMeta = (files) => files.map((f) => ({ name: f.name, type: f.type || 'a
 // usage/{uid}.bytes is their running total (enforced in firestore.rules).
 export const QUOTA = 1024 * 1024 * 1024;
 export const MAX_FILE = 25 * 1024 * 1024;
-const usageRef = (uid) => doc(db, 'usage', uid);
+const usageRef = (F, uid) => F.doc(F.db, 'usage', uid);
 const filesTotal = (atts) => (atts || []).reduce((n, a) => n + (a.size || 0), 0);
 export async function getUsage(uid) {
-  const s = await getDoc(usageRef(uid)).catch(() => null);
+  const F = await loadFirestore();
+  const s = await F.getDoc(usageRef(F, uid)).catch(() => null);
   return { used: s?.exists() ? s.data().bytes || 0 : 0, quota: QUOTA };
 }
 // prefs/{uid}: the user's own settings (their email signature), shared by all their devices.
-const prefsRef = (uid) => doc(db, 'prefs', uid);
+const prefsRef = (F, uid) => F.doc(F.db, 'prefs', uid);
 export async function getPrefs(uid) {
-  const s = await getDoc(prefsRef(uid));
+  const F = await loadFirestore();
+  const s = await F.getDoc(prefsRef(F, uid));
   return s.exists() ? s.data() : null;
 }
-export const savePrefs = (uid, prefs) => busy(() => setDoc(prefsRef(uid), { ...prefs, updatedAt: serverTimestamp() }, { merge: true }));
+export const savePrefs = (uid, prefs) => busy(async () => {
+  const F = await loadFirestore();
+  return F.setDoc(prefsRef(F, uid), { ...prefs, updatedAt: F.serverTimestamp() }, { merge: true });
+});
 // Thrown when a message's files would go over the allowance.
 export class QuotaError extends Error {
   constructor(used, need) { super('quota'); this.code = 'quota'; this.used = used; this.need = need; this.quota = QUOTA; }
 }
 
 async function createMessage_(user, { recipients, subject, body, allowForward = false, attachments = [], enc = 0 }) {
+  const F = await loadFirestore();
+  const { doc, serverTimestamp, writeBatch, runTransaction, db, messages } = F;
   const ref = doc(messages);
   const data = {
     senderUid: user.uid,
@@ -200,10 +217,10 @@ async function createMessage_(user, { recipients, subject, body, allowForward = 
   data.counted = true;
   const need = filesTotal(data.attachments);
   await runTransaction(db, async (tx) => {
-    const u = await tx.get(usageRef(user.uid));
+    const u = await tx.get(usageRef(F, user.uid));
     const used = u.exists() ? u.data().bytes || 0 : 0;
     if (used + need > QUOTA) throw new QuotaError(used, need);
-    tx.set(usageRef(user.uid), { bytes: used + need });
+    tx.set(usageRef(F, user.uid), { bytes: used + need });
     tx.set(ref, data);
     tx.set(doc(ref, 'editions', '1'), edition);
   });
@@ -212,23 +229,23 @@ async function createMessage_(user, { recipients, subject, body, allowForward = 
 
 // Gives a counted message's files back to the sender's allowance, in the same
 // write that withdraws or deletes it. `change(tx, ref)` does that write.
-async function freeing(id, change) {
-  const ref = doc(messages, id);
+async function freeing(F, id, change) {
+  const ref = F.doc(F.messages, id);
   try {
-    await runTransaction(db, async (tx) => {
+    await F.runTransaction(F.db, async (tx) => {
       const m = await tx.get(ref);
       const d = m.data();
       if (d && d.counted && !d.withdrawn && d.senderUid) {
-        const u = await tx.get(usageRef(d.senderUid));
+        const u = await tx.get(usageRef(F, d.senderUid));
         const used = u.exists() ? u.data().bytes || 0 : 0;
-        tx.set(usageRef(d.senderUid), { bytes: Math.max(0, used - filesTotal(d.attachments)), freed: id });
+        tx.set(usageRef(F, d.senderUid), { bytes: Math.max(0, used - filesTotal(d.attachments)), freed: id });
       }
       change(tx, ref);
     });
   } catch (e) {
     // Never let the allowance stand in the way of withdrawing or deleting.
     if (e?.code === 'permission-denied') {
-      const batch = writeBatch(db);
+      const batch = F.writeBatch(F.db);
       change(batch, ref);
       await batch.commit();
     } else throw e;
@@ -238,10 +255,11 @@ async function freeing(id, change) {
 // files: [{ name, type, bytes: Blob | Uint8Array }] in the same order as
 // createMessage's attachments. onProgress gets the fraction uploaded (0–1).
 async function uploadAttachments_(id, files, onProgress) {
+  const S = await loadStorage();
   const total = files.reduce((n, f) => n + (f.bytes.size ?? f.bytes.length), 0) || 1;
   const done = files.map(() => 0);
   await Promise.all(files.map((f, i) => new Promise((resolve, reject) => {
-    const task = uploadBytesResumable(fileRef(id, i), f.bytes, { contentType: f.type || 'application/octet-stream' });
+    const task = S.uploadBytesResumable(fileRef(S, id, i), f.bytes, { contentType: f.type || 'application/octet-stream' });
     task.on('state_changed', (snap) => {
       done[i] = snap.bytesTransferred;
       onProgress?.(done.reduce((a, b) => a + b, 0) / total);
@@ -249,15 +267,19 @@ async function uploadAttachments_(id, files, onProgress) {
   })));
 }
 
-function getAttachment_(id, i) {
-  return getBlob(fileRef(id, i));
+async function getAttachment_(id, i) {
+  const S = await loadStorage();
+  return S.getBlob(fileRef(S, id, i));
 }
 
-const removeFiles = (id, count) => Promise.all(
-  Array.from({ length: count }, (_, i) => deleteObject(fileRef(id, i)).catch(() => {})),
-);
+async function removeFiles(id, count) {
+  if (!count) return;
+  const S = await loadStorage();
+  await Promise.all(Array.from({ length: count }, (_, i) => S.deleteObject(fileRef(S, id, i)).catch(() => {})));
+}
 
 async function saveEdition_(id, current, { subject, body }) {
+  const { doc, writeBatch, serverTimestamp, increment, db, messages } = await loadFirestore();
   const ref = doc(messages, id);
   const next = current.edition + 1;
   const batch = writeBatch(db);
@@ -267,17 +289,21 @@ async function saveEdition_(id, current, { subject, body }) {
   return next;
 }
 
-function setAllowForward_(id, allow) {
+async function setAllowForward_(id, allow) {
+  const { updateDoc, doc, messages } = await loadFirestore();
   return updateDoc(doc(messages, id), { allowForward: !!allow });
 }
 
 async function withdraw_(id) {
-  const snap = await getDoc(doc(messages, id));
-  await freeing(id, (w, ref) => w.update(ref, { withdrawn: true, body: '', updatedAt: serverTimestamp() }));
+  const F = await loadFirestore();
+  const snap = await F.getDoc(F.doc(F.messages, id));
+  await freeing(F, id, (w, ref) => w.update(ref, { withdrawn: true, body: '', updatedAt: F.serverTimestamp() }));
   await removeFiles(id, snap.data()?.attachments?.length || 0);
 }
 
 async function deleteMessage_(id, fileCount) {
+  const F = await loadFirestore();
+  const { doc, getDoc, getDocs, collection, deleteDoc, messages } = F;
   const ref = doc(messages, id);
   const count = fileCount ?? ((await getDoc(ref).catch(() => null))?.data()?.attachments?.length || 0);
   await removeFiles(id, count);
@@ -286,10 +312,11 @@ async function deleteMessage_(id, fileCount) {
     getDocs(collection(ref, 'reads')),
   ]);
   await Promise.all([...eds.docs, ...reads.docs].map((d) => deleteDoc(d.ref)));
-  await freeing(id, (w, r) => w.delete(r));
+  await freeing(F, id, (w, r) => w.delete(r));
 }
 
 async function listEditions_(id) {
+  const { getDocs, query, collection, doc, orderBy, messages } = await loadFirestore();
   const s = await getDocs(query(collection(doc(messages, id), 'editions'), orderBy('edition', 'desc')));
   return s.docs.map((d) => {
     const e = d.data({ serverTimestamps: 'estimate' });
@@ -298,25 +325,27 @@ async function listEditions_(id) {
 }
 
 export async function getMyReceipt(id, email) {
+  const { getDoc, doc, messages } = await loadFirestore();
   const s = await getDoc(doc(messages, id, 'reads', email));
   if (!s.exists()) return null;
   const r = s.data();
   return { editionSeen: r.editionSeen, lastReadAt: toDate(r.lastReadAt) };
 }
 
-export function markRead(id, email, edition) {
+export async function markRead(id, email, edition) {
+  const { setDoc, doc, serverTimestamp, messages } = await loadFirestore();
   return setDoc(doc(messages, id, 'reads', email), { lastReadAt: serverTimestamp(), editionSeen: edition });
 }
 
 export function watchReads(id, cb, onErr) {
-  return onSnapshot(collection(doc(messages, id), 'reads'), (s) => {
+  return live(({ onSnapshot, collection, doc, messages }) => onSnapshot(collection(doc(messages, id), 'reads'), (s) => {
     const out = {};
     s.docs.forEach((d) => {
       const r = d.data({ serverTimestamps: 'estimate' });
       out[d.id] = { editionSeen: r.editionSeen, lastReadAt: toDate(r.lastReadAt) };
     });
     cb(out);
-  }, onErr);
+  }, onErr));
 }
 
 // ---- sender verification and the ECS directory ------------------------------
@@ -326,7 +355,8 @@ export function watchReads(id, cb, onErr) {
 const senderCache = new Map();
 export function getSender(id) {
   if (!senderCache.has(id)) {
-    senderCache.set(id, getDoc(doc(messages, id))
+    senderCache.set(id, loadFirestore()
+      .then(({ getDoc, doc, messages }) => getDoc(doc(messages, id)))
       .then((s) => (s.exists() ? (s.data().senderEmail || '').toLowerCase() : null))
       .catch(() => null));
   }
@@ -335,9 +365,9 @@ export function getSender(id) {
 
 // ecsUsers/{email}: addresses that have signed in to ChiaraMail. Anyone signed
 // in may look up one address; nobody can list them.
-const ecsUsers = collection(db, 'ecsUsers');
 export async function registerEcsUser(user) {
   if (!user?.email || !user.verified) return;
+  const { doc, getDoc, setDoc, serverTimestamp, ecsUsers } = await loadFirestore();
   const ref = doc(ecsUsers, user.email);
   const s = await getDoc(ref).catch(() => null);
   if (s && !s.exists()) await setDoc(ref, { since: serverTimestamp() }).catch(() => {});
@@ -346,7 +376,11 @@ const ecsCache = new Map();
 export function isEcsUser(email) {
   const e = (email || '').toLowerCase();
   if (!e) return Promise.resolve(false);
-  if (!ecsCache.has(e)) ecsCache.set(e, getDoc(doc(ecsUsers, e)).then((s) => s.exists()).catch(() => false));
+  if (!ecsCache.has(e)) {
+    ecsCache.set(e, loadFirestore()
+      .then(({ getDoc, doc, ecsUsers }) => getDoc(doc(ecsUsers, e)))
+      .then((s) => s.exists()).catch(() => false));
+  }
   return ecsCache.get(e);
 }
 
