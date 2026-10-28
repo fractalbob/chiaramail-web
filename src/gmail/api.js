@@ -33,19 +33,25 @@ function loadGis() {
   return gisLoaded;
 }
 
+// The access token (Google gives it for an hour) is kept in this browser until it
+// expires, so reopening the app within the hour goes straight to the inbox. Signing
+// out removes it. (Never a refresh token: there is none in the browser.)
 function saveToken(t) {
   token = t;
   try {
-    if (t) sessionStorage.setItem(TOKEN_KEY, JSON.stringify(t)); else sessionStorage.removeItem(TOKEN_KEY);
+    if (t) localStorage.setItem(TOKEN_KEY, JSON.stringify(t)); else localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(TOKEN_KEY); // where earlier versions kept it
   } catch { /* private mode */ }
 }
 
-/** Silent: reuse this tab's still-valid token. Returns the address or null. */
+/** Silent: reuse a still-valid token from this browser. Returns the address or null. */
 export function restore() {
-  try {
-    const t = JSON.parse(sessionStorage.getItem(TOKEN_KEY));
-    if (t && t.expiresAt > Date.now() + 60_000) { token = t; return t.email; }
-  } catch { /* ignore */ }
+  for (const store of [() => localStorage, () => sessionStorage]) {
+    try {
+      const t = JSON.parse(store().getItem(TOKEN_KEY));
+      if (t && t.expiresAt > Date.now() + 60_000) { token = t; return t.email; }
+    } catch { /* ignore */ }
+  }
   return null;
 }
 

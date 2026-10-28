@@ -18,10 +18,10 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 );
 
-// The start screen (index.html, installed app only) stays long enough for the name and the
-// tagline to be read, counted from when it actually appeared (not from launch: the phone's own
-// icon-only splash uses up part of that). A tap dismisses it sooner.
-const SPLASH_MS = 3500;
+// The start screen (index.html, installed app only) shows only briefly: the inbox matters more
+// than the name. Counted from when it actually appeared (the phone's own icon-only splash uses
+// up part of that); a tap dismisses it sooner.
+const SPLASH_MS = 800;
 const splash = document.getElementById('splash');
 if (splash) {
   const shown = getComputedStyle(splash).display !== 'none';
