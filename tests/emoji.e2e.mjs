@@ -42,6 +42,11 @@ await pop.getByRole('searchbox').fill('coeur');
 await pop.locator('.emo').first().click();
 await pop.locator('.emo').nth(2).click();
 must(/Thanks 🙏🥰❤️/.test(await text()), `French search, two clicks: ${await text()}`);
+// General words find a whole group, then a second pick after a search still goes in.
+await pop.getByRole('searchbox').fill('fruit');
+must((await pop.locator('.emo').count()) >= 10, '"fruit" finds the fruit');
+await pop.locator('.emo', { hasText: '🍌' }).click();
+must((await text()).includes('❤️🍌'), `second search, emoji added: ${await text()}`);
 await pop.getByRole('searchbox').fill('xyzzy');
 await pop.getByText('No emoji found.').waitFor();
 log('French search works; picker stays open for several emoji; empty result explained');
