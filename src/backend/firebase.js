@@ -1,5 +1,6 @@
 // Real backend: Firebase Auth + Cloud Firestore.
 import { busy } from '../busy.js';
+import { cut } from '../lib.js';
 import { initializeApp } from 'firebase/app';
 import {
   getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup,
@@ -202,7 +203,7 @@ async function createMessage_(user, { recipients, subject, body, allowForward = 
     withdrawn: false,
     allowForward: !!allowForward,
   };
-  if (user.name) data.senderName = user.name.slice(0, 120);
+  if (user.name) data.senderName = cut(user.name, 120);
   if (enc) data.enc = 1; // end-to-end encrypted: subject, body and attachment names are ciphertext
   const edition = { edition: 1, subject, body, savedAt: serverTimestamp() };
   if (!attachments.length) {

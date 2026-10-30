@@ -59,3 +59,11 @@ export function peopleLabel(t, list, myEmail) {
 }
 
 export const fmtSize = (n) => (!n ? '0 KB' : n >= 1073741824 ? `${+(n / 1073741824).toFixed(1)} GB` : n > 1048576 ? `${+(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+
+// Shortens text to at most n UTF-16 units without cutting an emoji (or any other
+// character outside the basic plane) in half, which would show as "�".
+export function cut(s, n) {
+  if (!s || s.length <= n) return s;
+  const c = s.charCodeAt(n - 1);
+  return s.slice(0, c >= 0xd800 && c <= 0xdbff ? n - 1 : n);
+}

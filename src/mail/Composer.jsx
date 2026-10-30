@@ -6,7 +6,7 @@ import {
   buildRaw, parseMessage, parseAddressList, isEmail, replySubject, forwardSubject,
   htmlToText, bytesToB64, b64ToBytes, b64urlToB64, escapeHtml, CONTENT_POINTER, CONTENT_KEY, displayName,
 } from '../gmail/mime.js';
-import { messageUrl, fmtSize } from '../lib.js';
+import { messageUrl, fmtSize, cut } from '../lib.js';
 import { createEcs, openEcs, getEcsAttachment } from '../ecs.js';
 import { useAuth } from '../auth.jsx';
 import { useMail } from './context.jsx';
@@ -122,7 +122,7 @@ export default function Composer() {
         if (!live) return;
         const subj = parsed[0]?.subject || '';
         setSubject(forwardSubject(subj));
-        const base = (subj || 'message').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) || 'message';
+        const base = cut((subj || 'message').replace(/[\\/:*?"<>|]+/g, ' ').trim(), 80).trim() || 'message';
         setOrig(parsed[parsed.length - 1] || {});
         setFiles(real.map((x, i) => ({ name: real.length > 1 ? `${base} (${i + 1}).eml` : `${base}.eml`, type: 'message/rfc822', size: x.sizeEstimate || 0, eml: { messageId: x.id } })));
         return;

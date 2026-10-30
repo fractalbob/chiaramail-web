@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n.jsx';
 import { sanitizeRich } from '../richtext.js';
 import { escapeHtml } from '../gmail/mime.js';
 
+// The emoji list is only downloaded the first time someone opens the picker.
+const EmojiPicker = lazy(() => import('./EmojiPicker.jsx'));
+
 // A message editor with a small formatting toolbar: bold, italic, underline,
-// lists, links. `value` and `onChange` carry HTML (see richtext.js).
+// lists, links, emoji. `value` and `onChange` carry HTML (see richtext.js).
 const CMDS = [
   { cmd: 'bold', key: 'fmtBold', label: 'B', cls: 'fmt-b', kbd: 'B' },
   { cmd: 'italic', key: 'fmtItalic', label: 'I', cls: 'fmt-i', kbd: 'I' },
@@ -28,6 +31,8 @@ export default function RichEditor({ id, label, value, onChange, editorRef, minR
   const el = useRef(null);
   const last = useRef(null);
   const [active, setActive] = useState({});
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const caret = useRef(null);
 
   // Outside changes (a reply being prefilled, a draft loading) replace the content.
   useLayoutEffect(() => {
@@ -63,6 +68,34 @@ export default function RichEditor({ id, label, value, onChange, editorRef, minR
     else run('insertHTML', `<a href="${escapeHtml(url)}">${escapeHtml(url.replace(/^mailto:/i, ''))}</a>&nbsp;`);
   };
 
+  // Emoji go where the cursor was when the picker opened (or at the end, if the
+  // cursor wasn't in the message); the picker stays open for picking several.
+  const openEmoji = () => {
+    if (emojiOpen) { setEmojiOpen(false); return; }
+    const sel = window.getSelection();
+    caret.current = sel.rangeCount && el.current.contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null;
+    setEmojiOpen(true);
+  };
+  const insertEmoji = (emoji) => {
+    const back = document.activeElement; // the emoji just picked, so the next one is a keypress away
+    const sel = window.getSelection();
+    el.current.focus({ preventScroll: true });
+    let r = caret.current;
+    if (!r) { r = document.createRange(); r.selectNodeContents(el.current); r.collapse(false); }
+    sel.removeAllRanges(); sel.addRange(r);
+    run('insertText', emoji);
+    caret.current = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+    if (back?.closest?.('.emoji-pop')) back.focus({ preventScroll: true });
+  };
+  const closeEmoji = useCallback((refocus) => {
+    setEmojiOpen(false);
+    if (refocus && el.current) {
+      el.current.focus();
+      const r = caret.current;
+      if (r) { const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+    }
+  }, []);
+
   const onKeyDown = (e) => {
     if (!(isMac ? e.metaKey : e.ctrlKey) || e.altKey) return;
     const k = e.key.toLowerCase();
@@ -96,7 +129,15 @@ export default function RichEditor({ id, label, value, onChange, editorRef, minR
             onMouseDown={(e) => e.preventDefault()} onClick={addLink}>🔗</button>
           <button type="button" className="fmt fmt-clear" title={t('fmtClear')} aria-label={t('fmtClear')}
             onMouseDown={(e) => e.preventDefault()} onClick={() => { run('removeFormat'); run('unlink'); }}>T̸</button>
+          <button type="button" className="fmt fmt-emoji" title={t('fmtEmoji')} aria-label={t('fmtEmoji')}
+            aria-haspopup="dialog" aria-expanded={emojiOpen}
+            onMouseDown={(e) => e.preventDefault()} onClick={openEmoji}>☺</button>
         </div>
+        {emojiOpen && (
+          <Suspense fallback={<div className="emoji-pop emoji-loading" role="status">…</div>}>
+            <EmojiPicker onPick={insertEmoji} onClose={closeEmoji} />
+          </Suspense>
+        )}
         <div id={id} ref={el} className="letter-input rich-input" contentEditable suppressContentEditableWarning
           role="textbox" aria-multiline="true" aria-labelledby={`${id}-label`} spellCheck
           style={{ minHeight: `${minRows * 1.65}em` }}
