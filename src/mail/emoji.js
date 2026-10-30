@@ -587,6 +587,47 @@ const RAW = {
 `,
 };
 
+// General words, so a search like "fruit", "animal" or "boisson" finds the whole group.
+const GROUPS = [
+  ['fruit fruits', '🍎🍐🍊🍋🍌🍉🍇🍓🍒🍑🥭🍍🥥🥝🍅🥑'],
+  ['vegetable vegetables veggie légume légumes', '🍅🍆🥑🥦🥕🌽🌶️🧄🧅🥔🍄'],
+  ['animal animals pet animaux bête', '🐶🐱🐭🐹🐰🦊🐻🐼🐨🐯🦁🐮🐷🐸🐵🐔🐧🐦🦆🦅🦉🐴🦄🐝🦋🐌🐞🐢🐍🐙🐬🐳🐟🦈🐘🦒🐑🐐🐈🐕'],
+  ['bird oiseau', '🐔🐧🐦🦆🦅🦉'],
+  ['sea ocean mer océan', '🐙🐬🐳🐟🦈🌊🐢🦀'],
+  ['flower plant fleur plante', '🌸🌹🌻🌷🌼💐🌱🌿🍀🌳🌲🌴🌵'],
+  ['weather météo temps', '☀️🌤️⛅☁️🌧️⛈️❄️☃️🌈☔'],
+  ['drink beverage boisson', '☕🍵🥛🍷🍾🥂🍺🍻🍸🧃'],
+  ['alcohol alcool', '🍷🍾🥂🍺🍻🍸'],
+  ['dessert sweet sucré', '🍦🍰🎂🧁🍫🍬🍪🍯🥞'],
+  ['meal food dish repas plat', '🍳🥞🍔🍟🍕🌭🥪🌮🥗🍝🍜🍣🍽️🥐🥖🍞🧀'],
+  ['sport sports ball balle ballon', '⚽🏀🏈⚾🎾🏐🏉🎱🏓🏸⛳🎿🚴🏊'],
+  ['music musique', '🎤🎧🎵🎶🎹🎸🎻🥁'],
+  ['celebration party fête', '🥳🎉🎊🎈🎁🎂🍾🥂🎆'],
+  ['vehicle transport véhicule', '🚗🚕🚌🚑🚒🚓🚚🚜🏍️🚲🛴🚆🚄🚇✈️🚀🚁⛵🚢'],
+  ['building bâtiment', '🏠🏡🏢🏥🏦🏨🏫🏛️⛪🏰'],
+  ['holiday vacation vacances voyage', '✈️🧳🏖️🏝️🏕️🗺️🌅'],
+  ['face visage', '😀😃😄😁😆😅😂🤣🙂🙃😉😊😇🥰😍🤩😘😋😛😜🤪🤔😐😏😒🙄😬😌😔😴😎🤓😕😟😮😲😳🥺😢😭😱😡😠'],
+  ['happy joy content joie', '😀😃😄😁😆😂🤣🙂😊🥰😍🤩🥳'],
+  ['sad triste', '😔😕😟🙁😞😢😭😥😩'],
+  ['angry colère', '😤😡😠🤬👿💢'],
+  ['love amour', '❤️💕💞💓💗💖💘💝💌💋🥰😍😘💑'],
+  ['hand gesture main geste', '👋🤚✋🖐️🖖👌🤏✌️🤞🤟🤘🤙👈👉👆👇☝️👍👎✊👊🤛🤜👏🙌👐🤲🤝🙏✍️'],
+  ['yes ok agree oui accord', '👍👌✅✔️🆗🙆'],
+  ['no non', '👎❌🚫⛔🙅'],
+  ['person people personne gens', '👶🧒👦👧🧑👨👩🧓👴👵👪'],
+  ['work job travail bureau', '💼🧑‍💻💻🖥️📁📊📈📅📝🏢'],
+  ['office supplies stationery fournitures', '📝✏️🖊️📎📌✂️📁📂📋'],
+  ['money argent', '💰💶💵💳🧾🤑🏦'],
+  ['time temps heure', '⏰⏳⌛🕐⌚📅'],
+  ['phone téléphone', '📱☎️📞'],
+  ['computer ordinateur', '💻🖥️⌨️🖨️💾'],
+  ['symbol symbole', '✅❌❓❗⚠️🚫⭐✨🔥💯➕➖'],
+  ['arrow flèche', '➡️⬅️⬆️⬇️↩️🔁'],
+  ['color colour couleur circle rond', '🔴🟠🟡🟢🔵🟣⚫⚪'],
+  ['christmas noël', '🎄🎁⛄☃️❄️🕯️🎅'],
+  ['halloween', '🎃👻💀🦇🕷️'],
+];
+
 export const CATEGORIES = [
   { id: 'smileys', icon: '😀' },
   { id: 'people', icon: '👋' },
@@ -608,14 +649,28 @@ export const EMOJI = Object.fromEntries(Object.entries(RAW).map(([cat, text]) =>
     return { e: line.slice(0, sp), en, fr, words: fold(`${en} ${fr}`) };
   })]));
 
+// Each emoji also answers to its category's name and its groups' general words.
+const CAT_WORDS = {
+  smileys: 'smiley smileys emotion émotion', people: 'people gesture personnes gestes', hearts: 'heart symbol coeur symbole',
+  nature: 'nature', food: 'food nourriture cuisine', activities: 'activity activité loisir',
+  travel: 'travel place voyage lieu', objects: 'object objet',
+};
+for (const [cat, list] of Object.entries(EMOJI)) list.forEach((x) => { x.cat = fold(CAT_WORDS[cat]); });
+const plain = (e) => e.replace(/\uFE0F/g, '');
+const index = new Map(Object.values(EMOJI).flat().map((x) => [plain(x.e), x]));
+GROUPS.forEach(([words, list]) => {
+  for (const { segment } of new Intl.Segmenter().segment(list)) { const x = index.get(plain(segment)); if (x) x.words += ` ${fold(words)}`; }
+});
+
 export const ALL = Object.values(EMOJI).flat();
 
-// Every word of the query must start a word of the emoji's keywords.
+// Every word of the query must start a word of the emoji's keywords (or its
+// category's name). Emoji whose own keywords match come first.
+const hit = (q, words) => { const w = words.split(/[\s'-]+/); return q.every((p) => w.some((k) => k.startsWith(p))); };
 export function searchEmoji(query) {
   const q = fold(query).split(/\s+/).filter(Boolean);
   if (!q.length) return [];
-  return ALL.filter((x) => {
-    const w = x.words.split(/[\s'-]+/);
-    return q.every((p) => w.some((k) => k.startsWith(p)));
-  });
+  const own = ALL.filter((x) => hit(q, x.words));
+  const byCat = ALL.filter((x) => !own.includes(x) && hit(q, `${x.words} ${x.cat}`));
+  return [...own, ...byCat];
 }
