@@ -199,9 +199,14 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .emoji-loading { height: auto; padding: 16px; text-align: center; }
 .emoji-search { margin: 8px 8px 4px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: var(--radius-s); background: var(--sky, transparent); color: inherit; font: 0.9375rem var(--sans); }
 .emoji-search:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
-.emoji-tabs { display: flex; gap: 0; padding: 0 4px; border-bottom: 1px solid var(--rule); overflow-x: auto; }
-.emoji-tab { flex: 1 0 auto; min-width: 34px; height: 34px; border: 0; background: none; font-size: 1.15rem; cursor: pointer; border-radius: var(--radius-s); }
-.emoji-tab:hover { background: color-mix(in srgb, var(--focus) 12%, transparent); }
+/* Category tabs: small, grey, underlined when current, so they don't look like emoji to pick. */
+.emoji-tabs { display: flex; gap: 0; padding: 0 4px; border-bottom: 1px solid var(--rule); background: color-mix(in srgb, var(--sky) 60%, var(--paper)); overflow-x: auto; }
+.emoji-tab {
+  flex: 1 0 auto; min-width: 30px; height: 30px; border: 0; border-bottom: 2px solid transparent; border-radius: 0;
+  background: none; font-size: 0.9rem; cursor: pointer; filter: grayscale(1); opacity: .5;
+}
+.emoji-tab:hover { opacity: .85; }
+.emoji-tab[aria-current] { filter: none; opacity: 1; border-bottom-color: var(--focus); }
 .emoji-tab:focus-visible, .emo:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .emoji-scroll { overflow-y: auto; padding: 0 6px 8px; overscroll-behavior: contain; }
 .emoji-h { position: sticky; top: 0; margin: 0; padding: 8px 4px 4px; background: var(--paper); color: var(--slate); font: 600 0.75rem var(--sans); letter-spacing: .02em; text-transform: uppercase; }
