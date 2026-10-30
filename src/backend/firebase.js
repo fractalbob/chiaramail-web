@@ -3,14 +3,22 @@ import { busy } from '../busy.js';
 import { cut } from '../lib.js';
 import { initializeApp } from 'firebase/app';
 import {
-  getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup,
+  getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
   sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
   signOut as fbSignOut, connectAuthEmulator, signInWithCredential,
 } from 'firebase/auth';
 
+// On app.chiaramail.com, Google sign-in runs through app.chiaramail.com itself
+// (Firebase Hosting serves its /__/auth/handler page there too). Through
+// chiaramail-15119.firebaseapp.com, a different site, phone browsers that keep
+// sites' storage apart (Chrome, Safari, the Gmail app's browser) could never
+// finish signing in: they stopped on a blank page.
+const AUTH_DOMAIN = typeof location !== 'undefined' && location.hostname === 'app.chiaramail.com'
+  ? location.hostname : import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
+
 const app = initializeApp({
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  authDomain: AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
@@ -73,10 +81,32 @@ export function onUserChanged(cb) {
   return onAuthStateChanged(auth, (u) => cb(toUser(u)));
 }
 
+// Phones (and the browsers built into apps like Gmail) handle a full-page
+// redirect better than a pop-up window, so they get that; computers keep the
+// pop-up, and fall back to the redirect if pop-ups can't open.
+const PHONE = typeof window !== 'undefined'
+  && (window.matchMedia?.('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
 export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  await signInWithPopup(auth, provider);
+  if (PHONE) { await signInWithRedirect(auth, provider); return; }
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (e) {
+    if (['auth/popup-blocked', 'auth/operation-not-supported-in-environment', 'auth/web-storage-unsupported'].includes(e?.code)) {
+      await signInWithRedirect(auth, provider);
+      return;
+    }
+    throw e;
+  }
+}
+
+// After a redirect sign-in, the page reloads where it was; if Google or
+// Firebase refused, this says why (once), so the sign-in screen can show it.
+let redirectOutcome = null;
+export function redirectSignInError() {
+  redirectOutcome ||= getRedirectResult(auth).then(() => null, (e) => e);
+  return redirectOutcome;
 }
 
 // Used by the mail client: the same Google sign-in that grants Gmail access
