@@ -239,3 +239,6 @@ export const withdraw = (...a) => busy(() => withdraw_(...a));
 export const deleteMessage = (...a) => busy(() => deleteMessage_(...a));
 export const listEditions = (...a) => busy(() => listEditions_(...a));
 export { notify as refreshUser };
+
+// Sign-in by redirect is only used by the Firebase backend.
+export const redirectSignInError = async () => null;

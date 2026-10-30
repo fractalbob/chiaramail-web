@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as backend from '@backend';
 import { useI18n } from '../i18n.jsx';
 import { isEmail } from '../lib.js';
@@ -73,6 +73,15 @@ function WebSignIn({ returnPath }) {
   const [error, setError] = useState('');
 
   const [googleBusy, setGoogleBusy] = useState(false);
+  // Coming back from a sign-in by redirect (phones): show why it failed, if it did.
+  useEffect(() => {
+    let live = true;
+    backend.redirectSignInError?.().then((e) => {
+      const quiet = ['auth/user-cancelled', 'auth/redirect-cancelled-by-user'];
+      if (live && e && !quiet.includes(e.code)) setError(t('errorGeneric', { msg: e.message }));
+    });
+    return () => { live = false; };
+  }, [t]);
   const google = async () => {
     if (googleBusy) return;
     setError(''); setGoogleBusy(true);

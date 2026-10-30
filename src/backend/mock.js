@@ -247,3 +247,6 @@ export async function isEcsUser(email) {
   if (!me()) return false;
   return !!(load().ecsUsers || {})[(email || '').toLowerCase()];
 }
+
+// Sign-in by redirect is only used by the Firebase backend.
+export const redirectSignInError = async () => null;
