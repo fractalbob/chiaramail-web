@@ -32,6 +32,7 @@ export default function EmojiPicker({ onPick, onClose }) {
   const root = useRef(null);
   const search = useRef(null);
   const scroller = useRef(null);
+  const [current, setCurrent] = useState(null);
 
   // Phones and tablets: don't pop the on-screen keyboard up over the emoji.
   useEffect(() => {
@@ -95,6 +96,15 @@ export default function EmojiPicker({ onPick, onClose }) {
   };
 
   const pick = (e) => { rememberEmoji(e); onPick(e); };
+  // The tab of the section in view is highlighted, so the row reads as navigation, not emoji.
+  const onScroll = () => {
+    const sc = scroller.current;
+    if (!sc || query.trim()) return;
+    let id = null;
+    sc.querySelectorAll('section[data-sec]').forEach((sec) => { if (sec.offsetTop - sc.offsetTop <= sc.scrollTop + 8) id = sec.dataset.sec; });
+    setCurrent(id);
+  };
+  const shown = query.trim() ? null : (current || sections[0]?.id);
   const jump = (id) => {
     setQuery('');
     requestAnimationFrame(() => {
@@ -109,12 +119,12 @@ export default function EmojiPicker({ onPick, onClose }) {
       <input ref={search} type="search" className="emoji-search" placeholder={t('emojiSearch')} aria-label={t('emojiSearch')}
         value={query} onChange={(e) => { setQuery(e.target.value); if (scroller.current) scroller.current.scrollTop = 0; }} />
       <div className="emoji-tabs" role="toolbar" aria-label={t('emojiCategories')}>
-        {recent.length > 0 && <button type="button" className="emoji-tab" title={t('emojiRecent')} aria-label={t('emojiRecent')} onClick={() => jump('recent')}>🕘</button>}
+        {recent.length > 0 && <button type="button" className="emoji-tab" aria-current={shown === 'recent' || undefined} title={t('emojiRecent')} aria-label={t('emojiRecent')} onClick={() => jump('recent')}>🕘</button>}
         {CATEGORIES.map((c) => (
-          <button key={c.id} type="button" className="emoji-tab" title={t(`emoji_${c.id}`)} aria-label={t(`emoji_${c.id}`)} onClick={() => jump(c.id)}>{c.icon}</button>
+          <button key={c.id} type="button" className="emoji-tab" aria-current={shown === c.id || undefined} title={t(`emoji_${c.id}`)} aria-label={t(`emoji_${c.id}`)} onClick={() => jump(c.id)}>{c.icon}</button>
         ))}
       </div>
-      <div ref={scroller} className="emoji-scroll">
+      <div ref={scroller} className="emoji-scroll" onScroll={onScroll}>
         {sections.map((s) => (
           <section key={s.id} data-sec={s.id} aria-label={title(s.id)}>
             <h3 className="emoji-h">{title(s.id)}</h3>
