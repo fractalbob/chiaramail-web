@@ -95,6 +95,14 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
   refreshed daily and kept in your browser only.
 - **Gmail rate limits.** Requests are retried automatically with increasing
   waits, and you get a plain-language message if Gmail is still busy.
+- **Emoji.** The ☺ button on the editor's toolbar (new messages, replies,
+  editing an ECS message, the signature) opens a picker: search in English or
+  French ("heart", "coeur", "merci"), browse by category, or pick from the
+  ones you used last. Arrow keys, Enter and Escape work; it stays open so you
+  can add several. The list (`src/mail/emoji.js`) loads only when first
+  opened. It leaves out flags and emoji newer than Unicode 12.1 because Windows
+  doesn't draw them. Emoji travel as UTF-8 in subjects, text, HTML and file
+  names (`tests/mime.test.js`); `tests/emoji.e2e.mjs` checks the picker.
 - **Busy cursor and bar.** While something you started is still working
   (opening, deleting, sending, switching folders), the pointer shows the busy
   cursor and a thin bar moves along the top of the screen, which is the sign

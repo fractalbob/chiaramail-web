@@ -4,6 +4,7 @@
 // decrypted in their browser with the key from the link (#k=…). The same
 // functions as firebase.js and desktop.js, over HTTPS to the same server.
 import { busy } from '../busy.js';
+import { cut } from '../lib.js';
 
 export const mode = 'reader';
 export let ecsReady = false;
@@ -115,7 +116,7 @@ export async function getUsage() {
 async function createMessage_(u, { recipients, subject, body, allowForward = false, attachments = [], enc = 0 }) {
   if (!ecsReady) throw notReady();
   try {
-    const r = await api('POST', '/messages', { json: { recipients, subject, body, allowForward, enc: enc ? 1 : 0, ...(u?.name ? { senderName: u.name.slice(0, 120) } : {}), ...(attachments.length ? { attachments: attachments.map((a) => ({ name: a.name, type: a.type || 'application/octet-stream', size: a.size })) } : {}) } });
+    const r = await api('POST', '/messages', { json: { recipients, subject, body, allowForward, enc: enc ? 1 : 0, ...(u?.name ? { senderName: cut(u.name, 120) } : {}), ...(attachments.length ? { attachments: attachments.map((a) => ({ name: a.name, type: a.type || 'application/octet-stream', size: a.size })) } : {}) } });
     return r.id;
   } catch (e) {
     if (e.code === 'quota') throw new QuotaError(e.used, e.need, e.quota || QUOTA);

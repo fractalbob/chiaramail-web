@@ -13,6 +13,7 @@ import PlainBody from './PlainBody.jsx';
 import { useIsEcsUser } from './ecsCheck.js';
 import { markSpamHandled } from './prefs.js';
 import Icon from './icons.jsx';
+import { cut } from '../lib.js';
 import { ContextMenu, IconButton, Menu, MenuItem } from './Menu.jsx';
 import LabelPicker from './LabelPicker.jsx';
 import AttachmentCards from './AttachmentCards.jsx';
@@ -79,7 +80,7 @@ function DraftCard({ m }) {
   return (
     <li className="mcard mcard-draft">
       <p className="mdraft-head"><span className="draft-tag">{t('draft')}</span> <span className="mdate">{formatMail(m.date)}</span></p>
-      <p className="msnip">{m.text ? m.text.slice(0, 200) : m.snippet}</p>
+      <p className="msnip">{m.text ? cut(m.text, 200) : m.snippet}</p>
       <div className="actions">
         <button type="button" className="btn btn-primary" onClick={open}>{t('continueEditing')}</button>
         <button type="button" className="btn btn-quiet" onClick={remove}>{t('deleteDraft')}</button>

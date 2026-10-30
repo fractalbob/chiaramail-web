@@ -162,3 +162,22 @@ test('widenQuery: underscore words also match the spaced phrase, like Gmail on t
     assert.equal(widenQuery(q), q);
   }
 });
+
+test('emoji survive the round trip: subject, sender name, text, HTML and file name', async () => {
+  const raw = buildRaw({
+    from: { name: 'Bob 🌀', email: 'ruomini@gmail.com' },
+    to: [{ name: '', email: 'e@example.fr' }],
+    subject: 'Bravo 🎉 et merci 🙏 — ❤️ 👍🏽 🧑‍💻',
+    text: 'Coucou 👋\nÀ bientôt ❤️ 🧑‍💻',
+    html: '<div>Coucou 👋</div><div>À bientôt ❤️ 🧑‍💻</div>',
+    attachments: [{ filename: 'photo 📷.txt', mimeType: 'text/plain', base64: utf8ToB64('🍕') }],
+  });
+  assert.ok(/^[\x00-\x7f]*$/.test(raw), 'the email itself is plain ASCII');
+  const p = await PostalMime.parse(raw);
+  assert.equal(p.subject, 'Bravo 🎉 et merci 🙏 — ❤️ 👍🏽 🧑‍💻');
+  assert.equal(p.from.name, 'Bob 🌀');
+  assert.equal(p.text.trim(), 'Coucou 👋\nÀ bientôt ❤️ 🧑‍💻');
+  assert.ok(p.html.includes('À bientôt ❤️ 🧑‍💻'));
+  assert.equal(p.attachments[0].filename, 'photo 📷.txt');
+  assert.equal(new TextDecoder().decode(p.attachments[0].content), '🍕');
+});
