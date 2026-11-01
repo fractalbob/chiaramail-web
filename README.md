@@ -19,7 +19,7 @@ Storage, project `chiaramail-15119`).
 
 ## ECS messages
 
-Tick **ECS message** when writing.
+Tick **ECS message** when writing (it sits just under the subject).
 
 - **Encrypted end to end.** Subject, text, attachment names and files are
   encrypted in the sender's browser (AES-256-GCM, a fresh key per message)
@@ -89,7 +89,8 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
   **Always show images**, under the search bar, shows them everywhere except
   in Spam.
 - **Drafts.** They save automatically, can be resumed and discarded, and
-  show inside conversations.
+  show inside conversations. While writing, **Send**, **Discard** and
+  **📎 Attach files** stay at the bottom of the window.
 - **Recipients.** To, Cc and Bcc use Gmail-style chips, with suggestions
   drawn from your own Gmail. The suggestion list is built when you connect,
   refreshed daily and kept in your browser only.
@@ -126,7 +127,9 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
   - As in Gmail, each message has a **reply arrow** and a **⋮ menu** (Reply,
     Reply all, Forward, Forward as attachment) beside its date, so any earlier
     message can be answered or forwarded. One row of big **Reply / Reply all /
-    Forward** buttons sits under the last message. Forwarding is greyed out on
+    Forward** buttons sits under the last message, and stays at the bottom of
+    the window while that message is on screen, so a long message needn't be
+    scrolled to the end. Forwarding is greyed out on
     ECS messages whose sender doesn't allow it.
   - **Right-click a conversation** in the list for Gmail's menu: Reply,
     Reply all, Forward, **Forward as attachment** (each message as an .eml
@@ -164,7 +167,9 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
   full-screen on a phone. The installed app uses the plain logo on white
   (`icon-192.png`, `icon-512.png`, `icon-maskable-512.png`,
   `apple-touch-icon.png`). The browser tab uses the logo on a white envelope
-  (`favicon.ico`, `favicon-32.png`).
+  (`favicon.ico`, `favicon-32.png`). There is no start screen of its own: the
+  phone shows the icon while the app loads. If the app hasn't started after
+  8 seconds, a "Tap to reload" button appears.
 
 ### What is kept in the browser only
 
@@ -180,7 +185,7 @@ The app keeps a few things in your browser and nowhere else:
 | Keys of ECS messages opened from a link | `chiaramail.ecsKey.{id}` |
 | Language | `chiaramail.lang` |
 | The address you last connected with, to pre-select it at sign-in | `chiaramail.lastAccount` |
-| Google's hour-long Gmail permission (this tab only, sessionStorage) | `chiaramail.gmailToken` |
+| Google's hour-long Gmail permission, so reopening within the hour goes straight to the inbox (removed when it expires or at sign-out) | `chiaramail.gmailToken` |
 
 ## Installing it on a phone or computer
 
