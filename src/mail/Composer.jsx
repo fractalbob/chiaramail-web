@@ -16,6 +16,7 @@ import RichEditor, { focusStart } from './RichEditor.jsx';
 import { bodyHtml, textToRich, fromEmailHtml, storeRich, richToText, richIsEmpty, emailHtml } from '../richtext.js';
 import { cachedContacts, refreshContacts, rememberRecipients } from './contacts.js';
 import { useSignature, signatureBlock } from './signature.js';
+import Icon from './icons.jsx';
 
 const MAX_TOTAL = 24 * 1024 * 1024; // what Gmail lets an ordinary email (or a draft) carry
 const MAX_ECS_FILE = backend.MAX_FILE; // ECS attachments skip the email: per-file limit (see storage.rules)
@@ -411,7 +412,7 @@ export default function Composer() {
         <RichEditor id="body" label={t('message')} value={body} onChange={setBody} editorRef={bodyRef} />
       </div>
 
-      <div className="field">
+      {(files.length > 0 || (changeable && usage && usage.used > 0)) && <div className="field">
         <span className="field-label">{t('attachments')}</span>
         {files.length > 0 && (
           <ul className="attachments">
@@ -427,17 +428,18 @@ export default function Composer() {
         {changeable && usage && (files.length > 0 || usage.used > 0) && (
           <p className="help ecs-usage">{t('ecsUsage', { used: fmtSize(usage.used), quota: fmtSize(usage.quota), max: fmtSize(MAX_ECS_FILE) })}</p>
         )}
-        <label className="btn filebtn">
-          {t('attachFiles')}
-          <input type="file" multiple onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
-        </label>
-      </div>
+      </div>}
 
       {forwardBlocked && <p className="error" role="alert">{t('forwardBlocked')}</p>}
       {error && <p className="error" role="alert">{error}</p>}
       <div className="actions compose-actions">
         <button type="submit" className="btn btn-primary" disabled={busy || preparing || forwardBlocked}>{busy ? (progress !== null && progress < 100 ? t('uploading', { n: progress }) : t('sending')) : preparing ? t('loading') : t('send')}</button>
         <button type="button" className="btn btn-quiet" onClick={discard}>{t('discard')}</button>
+        {/* Next to Send, as in Gmail, so it is always in reach. */}
+        <label className="btn btn-quiet btn-icon filebtn" title={t('attachFiles')}>
+          <Icon name="attach" size={18} />{t('attachFiles')}
+          <input type="file" multiple onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
+        </label>
         <span className="savestate" role="status" aria-live="polite">
           {saveState === 'saving' && t('draftSaving')}
           {saveState === 'saved' && t('draftSaved')}
