@@ -26,5 +26,23 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) { hiddenAt = Date.now(); return; }
   const away = hiddenAt ? Date.now() - hiddenAt : 0;
   hiddenAt = 0;
-  if (away > STALE_MS && matchMedia('(display-mode: standalone)').matches && !/^\/compose|\/edit$/.test(location.pathname)) location.reload();
+  const writing = /^\/compose|\/edit$/.test(location.pathname);
+  if (away > STALE_MS && matchMedia('(display-mode: standalone)').matches && !writing) { location.reload(); return; }
+  if (!writing) checkForUpdate();
 });
+
+// A new version deployed while this copy was open (a phone keeps the app in memory for days):
+// each time it comes back on screen, compare its own code with the site's, and if they differ,
+// start the new one, unless a message is being written.
+const myCode = document.querySelector('script[type="module"][src*="/assets/"]')?.getAttribute('src');
+let lastCheck = 0;
+async function checkForUpdate() {
+  if (!myCode || Date.now() - lastCheck < 60 * 1000) return;
+  lastCheck = Date.now();
+  try {
+    const html = await (await fetch('/', { cache: 'no-store' })).text();
+    const live = html.match(/<script[^>]+type="module"[^>]+src="([^"]*\/assets\/[^"]+)"/)?.[1]
+      || html.match(/<script[^>]+src="([^"]*\/assets\/[^"]+)"[^>]+type="module"/)?.[1];
+    if (live && live !== myCode && !/^\/compose|\/edit$/.test(location.pathname)) location.reload();
+  } catch { /* offline: try next time */ }
+}
