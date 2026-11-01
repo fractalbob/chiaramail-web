@@ -163,6 +163,8 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 
 /* compose */
 .compose { max-width: 720px; display: grid; gap: 18px; padding-top: 16px; }
+/* Send stays at the bottom of the window while writing a long message. */
+.compose-actions { position: sticky; bottom: 0; z-index: 2; background: var(--sky); padding: 10px 0 12px; }
 .page-title { font: 400 2rem/1.15 var(--serif); margin: 0; letter-spacing: -0.01em; }
 .field { display: grid; gap: 6px; }
 .field label { font-size: 0.875rem; color: var(--slate); font-weight: 500; }
@@ -463,7 +465,9 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .pcard-actions { display: flex; align-items: center; gap: 4px; border-top: 1px solid var(--rule); padding-top: 8px; }
 .pcard-copied { font-size: 0.8125rem; color: var(--slate); margin-left: 6px; }
 .mbody { margin-top: 16px; }
-.mactions { margin-top: 18px; }
+/* Reply / Forward stay at the bottom of the window while the last message is on screen
+   (Gmail does the same), instead of waiting at the end of a long message. */
+.mactions { margin-top: 18px; position: sticky; bottom: 0; z-index: 2; background: var(--paper); padding: 10px 0 12px; }
 .mhead-row { display: flex; align-items: flex-start; gap: 4px; }
 .mhead-row .mcard-toggle { flex: 1; min-width: 0; }
 .mhead-actions { display: inline-flex; flex: none; margin: -8px -10px 0 0; }

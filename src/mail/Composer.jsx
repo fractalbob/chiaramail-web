@@ -388,10 +388,7 @@ export default function Composer() {
         <label htmlFor="subject">{t('subject')}</label>
         <input id="subject" type="text" maxLength={300} value={subject} onChange={(e) => setSubject(e.target.value)} />
       </div>
-      <div className="field">
-        <RichEditor id="body" label={t('message')} value={body} onChange={setBody} editorRef={bodyRef} />
-      </div>
-
+      {/* Above the message, so the choice is in view from the start. */}
       {!backend.ecsReady && <p className="help ecs-soon">{t(backend.ecsPending ? 'ecsConnecting' : 'ecsSoon')}</p>}
       {backend.ecsReady && <label className={changeable ? 'livetoggle livetoggle-on' : 'livetoggle'}>
         <input type="checkbox" checked={changeable} onChange={(e) => setChangeable(e.target.checked)} />
@@ -409,6 +406,10 @@ export default function Composer() {
           </span>
         </label>
       )}
+
+      <div className="field">
+        <RichEditor id="body" label={t('message')} value={body} onChange={setBody} editorRef={bodyRef} />
+      </div>
 
       <div className="field">
         <span className="field-label">{t('attachments')}</span>
@@ -434,7 +435,7 @@ export default function Composer() {
 
       {forwardBlocked && <p className="error" role="alert">{t('forwardBlocked')}</p>}
       {error && <p className="error" role="alert">{error}</p>}
-      <div className="actions">
+      <div className="actions compose-actions">
         <button type="submit" className="btn btn-primary" disabled={busy || preparing || forwardBlocked}>{busy ? (progress !== null && progress < 100 ? t('uploading', { n: progress }) : t('sending')) : preparing ? t('loading') : t('send')}</button>
         <button type="button" className="btn btn-quiet" onClick={discard}>{t('discard')}</button>
         <span className="savestate" role="status" aria-live="polite">
