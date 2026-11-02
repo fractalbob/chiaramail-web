@@ -26,7 +26,16 @@ test('keeps paths, queries and ports', () => {
 test('ignores half-typed or non-addresses', () => {
   assert.deepEqual(links('type https:// then'), []);
   assert.deepEqual(links('www. alone'), []);
-  assert.deepEqual(links('a.b.c is not a site, nor is p3nto.com without www'), []);
+  assert.deepEqual(links('a.b.c, e.g. this, file.txt, Node.js and 3.14 are not sites'), []);
+  assert.deepEqual(links('write to bob@p3nto.com'), []);
+});
+
+test('finds bare addresses with a known ending', () => {
+  assert.deepEqual(links('play.p3nto.com'), [['play.p3nto.com', 'https://play.p3nto.com']]);
+  assert.deepEqual(links('Try p3nto.com/help, or chiaramail.fr.'), [
+    ['p3nto.com/help', 'https://p3nto.com/help'], ['chiaramail.fr', 'https://chiaramail.fr'],
+  ]);
+  assert.equal(linkAtEnd('see play.p3nto.com')?.href, 'https://play.p3nto.com');
 });
 
 test('text pieces join back to the original', () => {

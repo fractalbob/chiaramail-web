@@ -1,7 +1,12 @@
 // Finding web addresses in plain text, so they can be turned into real links.
 // No DOM here, so it can be unit-tested in Node (tests/linkify.test.js).
 
-const FIND = /\b(?:https?:\/\/|www\.)[^\s<>"]+/gi;
+// Addresses without "https://" or "www." (play.p3nto.com) are only recognised
+// with a common domain ending, so "e.g." or "file.txt" never become links.
+const TLDS = 'com|org|net|edu|gov|int|info|biz|io|app|dev|ai|co|me|tv|eu|fr|uk|de|it|es|ch|be|nl|lu|at|pt|ie|se|no|dk|fi|pl|cz|gr|ca|us|au|nz|jp|cn|in|br|mx|ar|ru|xyz|online|site|tech|store|blog|news|shop|page|web|cloud|email|link|live';
+const BARE = `(?<![@\\w./:-])(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+(?:${TLDS})(?![a-z0-9@-])(?::\\d+)?(?:[/?#][^\\s<>"]*)?`;
+const FIND = new RegExp(`\\b(?:https?:\\/\\/|www\\.)[^\\s<>"]+|${BARE}`, 'gi');
+export const MAYBE = /https?:\/\/|www\.|\.[a-z]{2,}/i; // cheap check before the full search
 const TRAIL = /[.,;:!?'"’”*]$/;
 
 // The end of a match that isn't part of the address: closing punctuation, and a
@@ -16,7 +21,7 @@ function trim(url) {
   }
 }
 
-export const hrefFor = (url) => (/^www\./i.test(url) ? `https://${url}` : url);
+export const hrefFor = (url) => (/^https?:\/\//i.test(url) ? url : `https://${url}`);
 
 // Is this a whole address worth linking? ("https://" alone or "www." alone isn't.)
 function usable(url) {

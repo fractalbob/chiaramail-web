@@ -4,7 +4,7 @@
 // before formatting existed are still read as plain text.
 import DOMPurify from 'dompurify';
 import { escapeHtml } from './gmail/mime.js';
-import { splitLinks } from './linkify.js';
+import { splitLinks, MAYBE } from './linkify.js';
 
 export const RICH_MARK = '<!--cm-rich-->';
 const TAGS = ['b', 'strong', 'i', 'em', 'u', 's', 'strike', 'a', 'ul', 'ol', 'li', 'p', 'div', 'br', 'blockquote'];
@@ -35,7 +35,7 @@ export const bodyHtml = (body) => (isRich(body) ? sanitizeRich(body.slice(RICH_M
 function linkifyDoc(doc) {
   const texts = [];
   const tw = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
-  while (tw.nextNode()) if (!tw.currentNode.parentElement.closest('a') && /https?:\/\/|www\./i.test(tw.currentNode.nodeValue)) texts.push(tw.currentNode);
+  while (tw.nextNode()) if (!tw.currentNode.parentElement.closest('a') && MAYBE.test(tw.currentNode.nodeValue)) texts.push(tw.currentNode);
   texts.forEach((t) => {
     const parts = splitLinks(t.nodeValue);
     if (!parts.some((p) => p.href)) return;
@@ -48,7 +48,7 @@ function linkifyDoc(doc) {
   });
 }
 export function linkifyHtml(html) {
-  if (!/https?:\/\/|www\./i.test(html || '')) return html || '';
+  if (!MAYBE.test(html || '')) return html || '';
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
   linkifyDoc(doc);
   return doc.body.innerHTML;
