@@ -4,6 +4,7 @@
 // before formatting existed are still read as plain text.
 import DOMPurify from 'dompurify';
 import { escapeHtml } from './gmail/mime.js';
+import { splitLinks } from './linkify.js';
 
 export const RICH_MARK = '<!--cm-rich-->';
 const TAGS = ['b', 'strong', 'i', 'em', 'u', 's', 'strike', 'a', 'ul', 'ol', 'li', 'p', 'div', 'br', 'blockquote'];
@@ -29,8 +30,32 @@ export function textToRich(text) {
 // A stored ECS body → HTML for the editor or the reader.
 export const bodyHtml = (body) => (isRich(body) ? sanitizeRich(body.slice(RICH_MARK.length)) : textToRich(body));
 
+// Web addresses typed or pasted as plain text become real links (text already
+// inside a link is left alone). Runs on everything we send or store.
+function linkifyDoc(doc) {
+  const texts = [];
+  const tw = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+  while (tw.nextNode()) if (!tw.currentNode.parentElement.closest('a') && /https?:\/\/|www\./i.test(tw.currentNode.nodeValue)) texts.push(tw.currentNode);
+  texts.forEach((t) => {
+    const parts = splitLinks(t.nodeValue);
+    if (!parts.some((p) => p.href)) return;
+    const frag = doc.createDocumentFragment();
+    parts.forEach((p) => {
+      if (!p.href) { frag.appendChild(doc.createTextNode(p.text)); return; }
+      const a = doc.createElement('a'); a.href = p.href; a.textContent = p.text; frag.appendChild(a);
+    });
+    t.replaceWith(frag);
+  });
+}
+export function linkifyHtml(html) {
+  if (!/https?:\/\/|www\./i.test(html || '')) return html || '';
+  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+  linkifyDoc(doc);
+  return doc.body.innerHTML;
+}
+
 // Editor HTML → what an ECS body stores.
-export const storeRich = (html) => RICH_MARK + sanitizeRich(html);
+export const storeRich = (html) => RICH_MARK + sanitizeRich(linkifyHtml(html));
 
 // Formatted HTML → readable plain text (for the text part of an email, quoting, checks).
 export function richToText(html) {
@@ -88,23 +113,13 @@ export function fromEmailHtml(html) {
 export const richIsEmpty = (html) => !richToText(html).trim();
 
 // The HTML part of an email: quotes styled the way mail programs show them.
-export const emailHtml = (html) => `<div dir="auto">${sanitizeRich(html)
+export const emailHtml = (html) => `<div dir="auto">${sanitizeRich(linkifyHtml(html))
   .replace(/<blockquote>/g, '<blockquote style="margin:0 0 0 .8ex;border-left:1px solid #ccc;padding-left:1ex">')}</div>`;
 
 // For display: links open in a new tab, and bare web addresses become links.
-const URL_RE = /(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])/g;
 export function displayHtml(body) {
   const doc = new DOMParser().parseFromString(`<body>${bodyHtml(body)}</body>`, 'text/html');
-  const texts = [];
-  const tw = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
-  while (tw.nextNode()) if (!tw.currentNode.parentElement.closest('a') && /https?:\/\//.test(tw.currentNode.nodeValue)) texts.push(tw.currentNode);
-  texts.forEach((t) => {
-    const frag = doc.createDocumentFragment();
-    t.nodeValue.split(URL_RE).forEach((chunk, i) => {
-      if (i % 2) { const a = doc.createElement('a'); a.href = chunk; a.textContent = chunk; frag.appendChild(a); } else if (chunk) frag.appendChild(doc.createTextNode(chunk));
-    });
-    t.replaceWith(frag);
-  });
+  linkifyDoc(doc);
   doc.querySelectorAll('a').forEach((a) => { a.setAttribute('target', '_blank'); a.setAttribute('rel', 'noopener noreferrer nofollow'); });
   return doc.body.innerHTML;
 }

@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { useI18n } from '../i18n.jsx';
 import { sanitizeRich } from '../richtext.js';
 import { escapeHtml } from '../gmail/mime.js';
+import { linkAtEnd, splitLinks } from '../linkify.js';
 
 // The emoji list is only downloaded the first time someone opens the picker.
 const EmojiPicker = lazy(() => import('./EmojiPicker.jsx'));
@@ -16,6 +17,9 @@ const CMDS = [
   { cmd: 'insertOrderedList', key: 'fmtNumbers', label: '1.', cls: 'fmt-list' },
 ];
 const exec = (cmd, arg) => document.execCommand(cmd, false, arg);
+// One pasted line of plain text → HTML, with its web addresses as links.
+const linkLine = (line) => splitLinks(line).map((p) => (p.href
+  ? `<a href="${escapeHtml(p.href)}">${escapeHtml(p.text)}</a>` : escapeHtml(p.text))).join('');
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
 export function focusStart(el) {
@@ -96,7 +100,41 @@ export default function RichEditor({ id, label, value, onChange, editorRef, minR
     }
   }, []);
 
+  // A web address becomes a link as soon as it's finished: when a space, Enter or
+  // Tab follows it. Done with createLink so ⌘Z/Ctrl+Z undoes it; the cursor is
+  // then put after the link so what's typed next isn't part of it.
+  const linkifyBeforeCaret = () => {
+    const sel = window.getSelection();
+    if (!sel.rangeCount || !sel.isCollapsed) return;
+    const node = sel.anchorNode;
+    if (!node || node.nodeType !== 3 || !el.current.contains(node) || node.parentElement.closest('a')) return;
+    const before = node.nodeValue.slice(0, sel.anchorOffset);
+    const word = before.slice(before.search(/\S*$/));
+    const hit = word && linkAtEnd(word);
+    if (!hit) return;
+    const base = sel.anchorOffset - word.length;
+    const caretAt = sel.anchorOffset;
+    const r = document.createRange();
+    r.setStart(node, base + hit.start); r.setEnd(node, base + hit.end);
+    sel.removeAllRanges(); sel.addRange(r);
+    exec('createLink', hit.href);
+    const a = sel.anchorNode?.parentElement?.closest('a') || sel.focusNode?.parentElement?.closest('a');
+    const after = document.createRange();
+    const rest = caretAt - (base + hit.end); // punctuation typed after the address
+    const next = a?.nextSibling;
+    if (a && el.current.contains(a) && rest && next?.nodeType === 3) after.setStart(next, Math.min(rest, next.nodeValue.length));
+    else if (a && el.current.contains(a)) after.setStartAfter(a);
+    else after.setStart(r.endContainer, r.endOffset);
+    after.collapse(true);
+    sel.removeAllRanges(); sel.addRange(after);
+    emit();
+  };
+
   const onKeyDown = (e) => {
+    if ((e.key === ' ' || e.key === 'Enter' || e.key === 'Tab') && !e.ctrlKey && !e.metaKey && !e.altKey && !e.isComposing) {
+      linkifyBeforeCaret();
+      return;
+    }
     if (!(isMac ? e.metaKey : e.ctrlKey) || e.altKey) return;
     const k = e.key.toLowerCase();
     if (k === 'k') { e.preventDefault(); addLink(); return; }
@@ -110,7 +148,7 @@ export default function RichEditor({ id, label, value, onChange, editorRef, minR
     const text = e.clipboardData.getData('text/plain');
     e.preventDefault();
     if (html) run('insertHTML', sanitizeRich(html));
-    else if (text.includes('\n')) run('insertHTML', text.replace(/\r\n/g, '\n').split('\n').map(escapeHtml).join('<br>'));
+    else if (text.includes('\n') || splitLinks(text).some((p) => p.href)) run('insertHTML', text.replace(/\r\n/g, '\n').split('\n').map(linkLine).join('<br>'));
     else run('insertText', text);
   };
 
