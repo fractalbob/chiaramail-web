@@ -189,6 +189,20 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .fmt-u { text-decoration: underline; }
 .fmt-link, .fmt-clear, .fmt-emoji { font-weight: 400; }
 .fmt-emoji { font-size: 1.15rem; }
+.fmt-color-a { display: inline-block; padding: 0 1px; border-bottom: 3px solid currentColor; line-height: 1.1; font-family: var(--serif); }
+
+/* colour menu: background on the left, text on the right (as in Gmail) */
+.color-pop {
+  position: absolute; z-index: 60; top: 44px; left: 4px; display: flex; gap: 14px; padding: 10px 12px;
+  max-width: calc(100vw - 24px); flex-wrap: wrap;
+  background: var(--paper); color: var(--ink); border: 1px solid var(--rule); border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .22); font-family: var(--sans);
+}
+.color-h { margin: 0 0 6px; color: var(--slate); font: 600 0.75rem var(--sans); letter-spacing: .02em; text-transform: uppercase; }
+.swatches { display: grid; grid-template-columns: repeat(8, 20px); gap: 3px; }
+.swatch { width: 20px; height: 20px; padding: 0; border: 1px solid rgba(0, 0, 0, .18); border-radius: 3px; cursor: pointer; }
+.swatch:hover { transform: scale(1.15); }
+.swatch:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 
 /* emoji picker (opens under the formatting toolbar) */
 .rich-box { position: relative; }

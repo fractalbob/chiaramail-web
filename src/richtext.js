@@ -7,17 +7,44 @@ import { escapeHtml } from './gmail/mime.js';
 import { splitLinks, MAYBE } from './linkify.js';
 
 export const RICH_MARK = '<!--cm-rich-->';
-const TAGS = ['b', 'strong', 'i', 'em', 'u', 's', 'strike', 'a', 'ul', 'ol', 'li', 'p', 'div', 'br', 'blockquote'];
+const TAGS = ['b', 'strong', 'i', 'em', 'u', 's', 'strike', 'a', 'ul', 'ol', 'li', 'p', 'div', 'br', 'blockquote', 'span'];
 const BLOCKS = new Set(['DIV', 'P', 'LI', 'UL', 'OL', 'BLOCKQUOTE']);
 
-export function sanitizeRich(html) {
-  return DOMPurify.sanitize(html || '', {
-    ALLOWED_TAGS: TAGS,
-    ALLOWED_ATTR: ['href'],
-    ALLOWED_URI_REGEXP: /^(?:https?:|mailto:)/i,
-    KEEP_CONTENT: true,
-  });
+// Text and background colours (from the editor's colour menu) are the only styles
+// kept: a style attribute is cut down to color/background-color with plain values.
+// The hook only acts while sanitizeRich runs, so other DOMPurify uses are untouched.
+let styleMode = null; // null: not ours · 'colors': keep colours · 'none': no styles at all
+const COLOR_PROPS = new Set(['color', 'background-color']);
+const SAFE_COLOR = /^(#[0-9a-f]{3,8}|rgba?\(\s*[\d.]+%?\s*,\s*[\d.]+%?\s*,\s*[\d.]+%?\s*(,\s*[\d.]+%?\s*)?\)|[a-z]{3,20})$/i;
+export function onlyColors(style) {
+  return (style || '').split(';').map((d) => {
+    const i = d.indexOf(':');
+    if (i < 0) return '';
+    const prop = d.slice(0, i).trim().toLowerCase();
+    const val = d.slice(i + 1).trim();
+    return COLOR_PROPS.has(prop) && SAFE_COLOR.test(val) ? `${prop}: ${val}` : '';
+  }).filter(Boolean).join('; ');
 }
+DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
+  if (!styleMode || data.attrName !== 'style') return;
+  const v = styleMode === 'colors' ? onlyColors(data.attrValue) : '';
+  if (v) data.attrValue = v; else data.keepAttr = false;
+});
+
+function sanitizeWith(html, mode) {
+  styleMode = mode;
+  try {
+    return DOMPurify.sanitize(html || '', {
+      ALLOWED_TAGS: TAGS,
+      ALLOWED_ATTR: ['href', 'style'],
+      ALLOWED_URI_REGEXP: /^(?:https?:|mailto:)/i,
+      KEEP_CONTENT: true,
+    });
+  } finally { styleMode = null; }
+}
+export const sanitizeRich = (html) => sanitizeWith(html, 'colors');
+// What a paste may bring in: basic formatting, but none of the source page's colours.
+export const sanitizePaste = (html) => sanitizeWith(html, 'none');
 
 export const isRich = (body) => typeof body === 'string' && body.startsWith(RICH_MARK);
 

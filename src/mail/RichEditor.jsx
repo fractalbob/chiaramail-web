@@ -1,11 +1,12 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n.jsx';
-import { sanitizeRich } from '../richtext.js';
+import { sanitizePaste } from '../richtext.js';
 import { escapeHtml } from '../gmail/mime.js';
 import { linkAtEnd, splitLinks } from '../linkify.js';
 
 // The emoji list is only downloaded the first time someone opens the picker.
 const EmojiPicker = lazy(() => import('./EmojiPicker.jsx'));
+const ColorPicker = lazy(() => import('./ColorPicker.jsx'));
 
 // A message editor with a small formatting toolbar: bold, italic, underline,
 // lists, links, emoji. `value` and `onChange` carry HTML (see richtext.js).
@@ -36,6 +37,8 @@ export default function RichEditor({ id, label, value, onChange, editorRef, minR
   const last = useRef(null);
   const [active, setActive] = useState({});
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [colorOpen, setColorOpen] = useState(false);
+  const colorRange = useRef(null);
   const caret = useRef(null);
 
   // Outside changes (a reply being prefilled, a draft loading) replace the content.
@@ -76,6 +79,7 @@ export default function RichEditor({ id, label, value, onChange, editorRef, minR
   // cursor wasn't in the message); the picker stays open for picking several.
   const openEmoji = () => {
     if (emojiOpen) { setEmojiOpen(false); return; }
+    setColorOpen(false);
     const sel = window.getSelection();
     caret.current = sel.rangeCount && el.current.contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null;
     setEmojiOpen(true);
@@ -142,12 +146,49 @@ export default function RichEditor({ id, label, value, onChange, editorRef, minR
     if (c) { e.preventDefault(); run(c.cmd); }
   };
 
-  // Pasted text keeps its basic formatting but nothing else (no fonts, colours, scripts).
+  // Chrome's insertHTML can re-add the source page's look (colours, fonts) as
+  // inline styles on new <span>/<font> wrappers. Those are taken back out after a
+  // paste; colours the writer set before the paste are marked first and kept.
+  const KEEP = 'data-cm-keep';
+  const markOwnStyles = () => el.current.querySelectorAll('span[style]').forEach((n) => n.setAttribute(KEEP, ''));
+  const scrubPasted = () => {
+    el.current.querySelectorAll(`[style]:not([${KEEP}])`).forEach((n) => n.removeAttribute('style'));
+    el.current.querySelectorAll(`span:not([${KEEP}]), font`).forEach((n) => n.replaceWith(...n.childNodes));
+    el.current.querySelectorAll(`[${KEEP}]`).forEach((n) => n.removeAttribute(KEEP));
+  };
+
+  // Colours, from the colour menu: background ("highlight") or text.
+  const openColor = () => {
+    if (colorOpen) { setColorOpen(false); return; }
+    setEmojiOpen(false);
+    const sel = window.getSelection();
+    colorRange.current = sel.rangeCount && el.current.contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null;
+    setColorOpen(true);
+  };
+  const pickColor = (kind, color) => {
+    el.current.focus({ preventScroll: true });
+    const r = colorRange.current;
+    if (r) { const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+    exec('styleWithCSS', true);
+    exec(kind === 'back' ? 'hiliteColor' : 'foreColor', color);
+    exec('styleWithCSS', false);
+    emit(); refresh();
+    setColorOpen(false);
+  };
+  const closeColor = useCallback((refocus) => {
+    setColorOpen(false);
+    if (refocus && el.current) {
+      el.current.focus();
+      const r = colorRange.current;
+      if (r) { const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+    }
+  }, []);
+
   const onPaste = (e) => {
     const html = e.clipboardData.getData('text/html');
     const text = e.clipboardData.getData('text/plain');
     e.preventDefault();
-    if (html) run('insertHTML', sanitizeRich(html));
+    if (html) { markOwnStyles(); run('insertHTML', sanitizePaste(html)); scrubPasted(); emit(); }
     else if (text.includes('\n') || splitLinks(text).some((p) => p.href)) run('insertHTML', text.replace(/\r\n/g, '\n').split('\n').map(linkLine).join('<br>'));
     else run('insertText', text);
   };
@@ -163,6 +204,9 @@ export default function RichEditor({ id, label, value, onChange, editorRef, minR
               title={c.kbd ? `${t(c.key)} (${mod}${c.kbd})` : t(c.key)} aria-label={t(c.key)}
               onMouseDown={(e) => e.preventDefault()} onClick={() => run(c.cmd)}>{c.label}</button>
           ))}
+          <button type="button" className="fmt fmt-color" title={t('fmtColor')} aria-label={t('fmtColor')}
+            aria-haspopup="dialog" aria-expanded={colorOpen}
+            onMouseDown={(e) => e.preventDefault()} onClick={openColor}><span className="fmt-color-a">A</span></button>
           <button type="button" className="fmt fmt-link" title={`${t('fmtLink')} (${mod}K)`} aria-label={t('fmtLink')}
             onMouseDown={(e) => e.preventDefault()} onClick={addLink}>🔗</button>
           <button type="button" className="fmt fmt-clear" title={t('fmtClear')} aria-label={t('fmtClear')}
@@ -171,6 +215,11 @@ export default function RichEditor({ id, label, value, onChange, editorRef, minR
             aria-haspopup="dialog" aria-expanded={emojiOpen}
             onMouseDown={(e) => e.preventDefault()} onClick={openEmoji}>☺</button>
         </div>
+        {colorOpen && (
+          <Suspense fallback={<div className="color-pop emoji-loading" role="status">…</div>}>
+            <ColorPicker onPick={pickColor} onClose={closeColor} />
+          </Suspense>
+        )}
         {emojiOpen && (
           <Suspense fallback={<div className="emoji-pop emoji-loading" role="status">…</div>}>
             <EmojiPicker onPick={insertEmoji} onClose={closeEmoji} />
