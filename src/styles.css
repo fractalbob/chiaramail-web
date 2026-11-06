@@ -168,11 +168,13 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .compose-actions { position: sticky; bottom: 0; z-index: 2; background: var(--sky); padding: 10px 0 12px; }
 .compose-actions .ca-icon { display: none; }
 /* On a phone, as in the Gmail app: the bar sits at the top, under the search bar, with
-   icons for Attach and Send at the right. */
+   icons for Send and Attach. */
 @media (max-width: 860px) {
-  .compose-actions { order: -1; top: var(--search-h); bottom: auto; z-index: 24; padding: 6px 0; justify-content: flex-end; gap: 4px; flex-wrap: nowrap; }
-  .compose-actions .savestate { order: -1; margin-right: auto; font-size: .8125rem; }
-  .compose-actions .btn-primary { order: 3; }
+  /* At the left edge, so nothing can push them off the screen: Send, Attach, Discard. */
+  .compose-actions { order: -1; top: var(--search-h); bottom: auto; z-index: 24; padding: 6px 0; justify-content: flex-start; gap: 4px; flex-wrap: nowrap; }
+  .compose-actions .btn-primary { order: -2; }
+  .compose-actions .filebtn { order: -1; }
+  .compose-actions .savestate { margin-left: auto; font-size: .8125rem; }
   .compose-actions .btn-primary .ca-icon { display: inline-flex; }
   .compose-actions .ca-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .compose-actions .btn-primary, .compose-actions .filebtn { min-width: 44px; padding-left: 10px; padding-right: 10px; }
@@ -413,6 +415,8 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .dlg-wide { width: min(620px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
 .dlg-note { margin: 0; font-size: 0.875rem; color: var(--slate); }
 .mail-main { grid-area: main; min-width: 0; }
+/* The page never scrolls sideways on a phone (the viewport takes html's overflow; sticky bars still work). */
+@media (max-width: 860px) { html { overflow-x: hidden; } }
 /* Anything still too wide (a long name, a newsletter's table) is cut at the screen's edge: on a
    phone, one too-wide element would otherwise make the browser show the whole page wider,
    pushing the toolbar buttons off the right edge. clip, unlike hidden, keeps the toolbars sticky. */
