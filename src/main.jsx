@@ -28,7 +28,7 @@ document.addEventListener('visibilitychange', () => {
   hiddenAt = 0;
   const writing = /^\/compose|\/edit$/.test(location.pathname);
   if (away > STALE_MS && matchMedia('(display-mode: standalone)').matches && !writing) { location.reload(); return; }
-  if (!writing) checkForUpdate();
+  checkForUpdate(); // while writing, the update waits until the message is left
 });
 
 // A new version deployed while this copy was open (a phone keeps the app in memory for days):
@@ -43,6 +43,15 @@ async function checkForUpdate() {
     const html = await (await fetch('/', { cache: 'no-store' })).text();
     const live = html.match(/<script[^>]+type="module"[^>]+src="([^"]*\/assets\/[^"]+)"/)?.[1]
       || html.match(/<script[^>]+src="([^"]*\/assets\/[^"]+)"[^>]+type="module"/)?.[1];
-    if (live && live !== myCode && !/^\/compose|\/edit$/.test(location.pathname)) location.reload();
+    if (live && live !== myCode) updateWaiting = true;
+    reloadIfFree();
   } catch { /* offline: try next time */ }
 }
+// Found while a message was being written: applied as soon as the person leaves it.
+let updateWaiting = false;
+function reloadIfFree() {
+  if (updateWaiting && !/^\/compose|\/edit$/.test(location.pathname)) location.reload();
+}
+setInterval(reloadIfFree, 2000);
+// And looked for every 10 minutes while the app stays open on screen.
+setInterval(() => { if (!document.hidden) checkForUpdate(); }, 10 * 60 * 1000);
