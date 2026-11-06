@@ -413,6 +413,10 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .dlg-wide { width: min(620px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
 .dlg-note { margin: 0; font-size: 0.875rem; color: var(--slate); }
 .mail-main { grid-area: main; min-width: 0; }
+/* Anything still too wide (a long name, a newsletter's table) is cut at the screen's edge: on a
+   phone, one too-wide element would otherwise make the browser show the whole page wider,
+   pushing the toolbar buttons off the right edge. clip, unlike hidden, keeps the toolbars sticky. */
+.mail-main { overflow-x: clip; overflow-clip-margin: 16px; } /* the phone toolbars reach 16px into the margins */
 .mail-search { position: sticky; top: 0; z-index: 26; height: var(--search-h); display: flex; align-items: center; background: var(--sky); }
 .mail-search .search { max-width: none; }
 
