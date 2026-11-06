@@ -88,6 +88,12 @@ Read, search, star, archive, delete, reply, forward and attach, as in Gmail:
   tell when you open their mail. "Show images" shows them for one message.
   **Always show images**, under the search bar, shows them everywhere except
   in Spam.
+- **Translation (computer only).** A message in another language gets a bar like
+  Gmail's: *This message is in Italian. Translate to English*; the ⋮ menu also has
+  **Translate message**. It uses Chrome's built-in translator, so the text never
+  leaves the computer (the first use of a language downloads its model once). Phones
+  and other browsers don't have the translator yet, so there it isn't offered. Not
+  for ECS messages yet.
 - **Drafts.** They save automatically, can be resumed and discarded, and
   show inside conversations. While writing, **Send**, **Discard** and
   **📎 Attach files** stay at the bottom of the window.

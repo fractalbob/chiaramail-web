@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import * as gmail from '@gmail';
 import { parseMessage, b64urlToBytes, displayName, deliveryInfo } from '../gmail/mime.js';
@@ -10,6 +10,8 @@ import { useI18n } from '../i18n.jsx';
 import HtmlBody from './HtmlBody.jsx';
 import LiveMessage from './LiveMessage.jsx';
 import PlainBody from './PlainBody.jsx';
+import { useTranslation } from './Translate.jsx';
+import { canTranslate } from './translate.js';
 import { useIsEcsUser } from './ecsCheck.js';
 import { markSpamHandled } from './prefs.js';
 import Icon from './icons.jsx';
@@ -99,6 +101,9 @@ function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
   const fromEmail = (m.from?.email || '').toLowerCase();
   const ecsSender = useIsEcsUser(fromEmail === me ? '' : fromEmail) && !live?.spoof;
   const [details, setDetails] = useState(false);
+  // Translation on this computer (Chrome's built-in translator).
+  const tr = useTranslation(m);
+  const shownMsg = useMemo(() => (tr.html ? { ...m, html: tr.html } : m), [m, tr.html]);
   const fromName = (
     <PersonHover name={displayName(m.from)} email={m.from?.email}>
       <span className={ecsSender ? 'ecs-user' : undefined} title={ecsSender ? t('ecsUserTitle') : undefined}>{displayName(m.from)}</span>
@@ -131,6 +136,7 @@ function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
               {(m.to.length + m.cc.length > 1) && <MenuItem icon={<Icon name="replyAll" size={18} />} onClick={() => nav(`${replyBase}&mode=replyAll`)}>{t('replyAll')}</MenuItem>}
               <MenuItem icon={<Icon name="forward" size={18} />} disabled={forwardBlocked} onClick={() => nav(`${replyBase}&mode=forward`)}>{t('forward')}</MenuItem>
               <MenuItem icon={<Icon name="attach" size={18} />} disabled={forwardBlocked} onClick={() => nav(`${replyBase}&mode=forwardAttach&one=1`)}>{t('forwardAttach')}</MenuItem>
+              {canTranslate() && !m.pointer && <MenuItem icon={<Icon name="translate" size={18} />} onClick={tr.start}>{t('trMenu')}</MenuItem>}
             </Menu>
           </span>
         </div>
@@ -148,7 +154,7 @@ function MessageCard({ m, expanded, onToggle, isLast, threadId, me }) {
       <div className="mbody">
         {m.pointer
           ? <LiveMessage pointer={m.pointer} message={m} threadId={threadId} onInfo={setLive} />
-          : m.html ? <HtmlBody message={m} /> : <PlainBody text={m.text} />}
+          : <>{tr.bar}{m.html ? <HtmlBody message={shownMsg} /> : <PlainBody text={tr.text ?? m.text} />}</>}
       </div>
       <Attachments message={m} />
       {isLast && (
