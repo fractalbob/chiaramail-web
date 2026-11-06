@@ -433,11 +433,14 @@ export default function Composer() {
       {forwardBlocked && <p className="error" role="alert">{t('forwardBlocked')}</p>}
       {error && <p className="error" role="alert">{error}</p>}
       <div className="actions compose-actions">
-        <button type="submit" className="btn btn-primary" disabled={busy || preparing || forwardBlocked}>{busy ? (progress !== null && progress < 100 ? t('uploading', { n: progress }) : t('sending')) : preparing ? t('loading') : t('send')}</button>
+        <button type="submit" className="btn btn-primary" disabled={busy || preparing || forwardBlocked} title={t('send')} aria-label={busy || preparing ? undefined : t('send')}>
+          {busy || preparing ? (busy ? (progress !== null && progress < 100 ? t('uploading', { n: progress }) : t('sending')) : t('loading'))
+            : <><span className="ca-icon"><Icon name="send" size={20} /></span><span className="ca-label">{t('send')}</span></>}
+        </button>
         <button type="button" className="btn btn-quiet" onClick={discard}>{t('discard')}</button>
-        {/* Next to Send, as in Gmail, so it is always in reach. */}
+        {/* Next to Send, as in Gmail, so it is always in reach (at the top on a phone). */}
         <label className="btn btn-quiet btn-icon filebtn" title={t('attachFiles')}>
-          <Icon name="attach" size={18} />{t('attachFiles')}
+          <Icon name="attach" size={18} /><span className="ca-label">{t('attachFiles')}</span>
           <input type="file" multiple onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
         </label>
         <span className="savestate" role="status" aria-live="polite">

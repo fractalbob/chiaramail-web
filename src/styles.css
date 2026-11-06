@@ -165,6 +165,17 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .compose { max-width: 720px; display: grid; gap: 18px; padding-top: 16px; }
 /* Send stays at the bottom of the window while writing a long message. */
 .compose-actions { position: sticky; bottom: 0; z-index: 2; background: var(--sky); padding: 10px 0 12px; }
+.compose-actions .ca-icon { display: none; }
+/* On a phone, as in the Gmail app: the bar sits at the top, under the search bar, with
+   icons for Attach and Send at the right. */
+@media (max-width: 860px) {
+  .compose-actions { order: -1; top: var(--search-h); bottom: auto; z-index: 24; padding: 6px 0; justify-content: flex-end; gap: 4px; flex-wrap: nowrap; }
+  .compose-actions .savestate { order: -1; margin-right: auto; font-size: .8125rem; }
+  .compose-actions .btn-primary { order: 3; }
+  .compose-actions .btn-primary .ca-icon { display: inline-flex; }
+  .compose-actions .ca-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .compose-actions .btn-primary, .compose-actions .filebtn { min-width: 44px; padding-left: 10px; padding-right: 10px; }
+}
 .page-title { font: 400 2rem/1.15 var(--serif); margin: 0; letter-spacing: -0.01em; }
 .field { display: grid; gap: 6px; }
 .field label { font-size: 0.875rem; color: var(--slate); font-weight: 500; }
