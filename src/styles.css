@@ -162,7 +162,8 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .empty { padding: 48px 8px; display: grid; gap: 16px; justify-items: start; color: var(--slate); }
 
 /* compose */
-.compose { max-width: 720px; display: grid; gap: 18px; padding-top: 16px; }
+.compose { max-width: 720px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; padding-top: 16px; }
+.compose > * { min-width: 0; }
 /* Send stays at the bottom of the window while writing a long message. */
 .compose-actions { position: sticky; bottom: 0; z-index: 2; background: var(--sky); padding: 10px 0 12px; }
 .compose-actions .ca-icon { display: none; }
@@ -177,14 +178,14 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
   .compose-actions .btn-primary, .compose-actions .filebtn { min-width: 44px; padding-left: 10px; padding-right: 10px; }
 }
 .page-title { font: 400 2rem/1.15 var(--serif); margin: 0; letter-spacing: -0.01em; }
-.field { display: grid; gap: 6px; }
+.field { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .field label { font-size: 0.875rem; color: var(--slate); font-weight: 500; }
 .help { margin: 0; font-size: 0.875rem; color: var(--slate); }
 .static { margin: 0; padding: 10px 0; }
 .letter-input { font: 1.0625rem/1.65 var(--serif); min-height: 18rem; resize: vertical; }
 
 /* formatting editor */
-.rich { display: grid; gap: 6px; }
+.rich { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .rich > label { font-size: 0.875rem; color: var(--slate); font-weight: 500; }
 .rich-box { border: 1px solid var(--rule); border-radius: var(--radius-s); background: var(--paper); }
 .rich-box:focus-within { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent); }
@@ -242,6 +243,12 @@ input:focus, textarea:focus { border-color: var(--focus); outline: none; box-sha
 .emo:hover { background: color-mix(in srgb, var(--focus) 14%, transparent); }
 .emoji-none { margin: 8px 4px; color: var(--slate); font-size: 0.9375rem; }
 .rich-input { padding: 10px 12px; color: var(--ink); outline: none; overflow-wrap: anywhere; resize: none; cursor: text; }
+/* A quoted newsletter's wide tables, pictures or code scroll inside the message box instead of
+   stretching the whole page past the edge of a phone's screen. */
+.rich-input { overflow-x: auto; }
+.rich-input img { max-width: 100%; height: auto; }
+.rich-input table { max-width: 100%; }
+.rich-input pre { white-space: pre-wrap; }
 .rich-input blockquote, .richbody blockquote { margin: 0.4em 0 0.4em 0.2em; padding-left: 0.9em; border-left: 3px solid var(--rule); color: var(--slate); }
 .rich-input ul, .rich-input ol, .richbody ul, .richbody ol { margin: 0.3em 0; padding-left: 1.6em; }
 .rich-input a, .richbody a { color: var(--link, #1d58b5); }
