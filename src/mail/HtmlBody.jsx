@@ -78,11 +78,12 @@ export default function HtmlBody({ message }) {
 
   const { out, css, blocked } = useMemo(() => clean(message.html, allow, inline), [message.html, allow, inline]);
   // break-word, not anywhere: anywhere lets a table squeeze a column down to a letter or two
-  // wide on a phone (a newsletter's text column read one syllable per line).
+  // wide on a phone (a newsletter's text column read one syllable per line). And a picture
+  // that isn't shown keeps its description (alt text) in whole words, not "Fa ce bo ok".
   const doc = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"><style>
     html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
     html,body{margin:0;padding:0;background:#fff;color:#1d2a30;font:15px/1.5 -apple-system,'Segoe UI',Helvetica,Arial,sans-serif;overflow-wrap:break-word}
-    body{padding:4px 2px} img{max-width:100%;height:auto} table{max-width:100%} a{color:#1d58b5}
+    body{padding:4px 2px} img{max-width:100%;height:auto;overflow-wrap:normal;word-break:keep-all} table{max-width:100%} a{color:#1d58b5}
   </style><style>${css.text}</style></head><body>${out}</body></html>`;
 
   useEffect(() => {
