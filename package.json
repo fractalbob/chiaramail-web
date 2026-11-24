@@ -11,6 +11,8 @@
     "emulators": "firebase emulators:start --only auth,firestore,storage --project demo-chiaramail",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-chiaramail \"node --test tests/rules.test.js\"",
     "deploy": "npm run build && firebase deploy --only hosting:mail,firestore:rules,firestore:indexes,storage",
+    "deploy:functions": "firebase deploy --only functions",
+    "test:functions": "cd functions && npm test",
     "dev:mock": "vite --mode mock",
     "build:mock": "vite build --mode mock",
     "test:unit": "node --test tests/mime.test.js tests/linkify.test.js",

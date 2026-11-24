@@ -111,6 +111,9 @@ export function redirectSignInError() {
 
 // Used by the mail client: the same Google sign-in that grants Gmail access
 // also signs in to ChiaraMail.
+/** The signed-in user's Firebase ID token (for the app's own server functions), or null. */
+export const idToken = async () => (auth.currentUser ? auth.currentUser.getIdToken() : null);
+
 export async function signInWithGoogleAccessToken(accessToken) {
   const res = await signInWithCredential(auth, GoogleAuthProvider.credential(null, accessToken));
   return toUser(res.user);
@@ -148,7 +151,7 @@ export async function completeEmailLink(emailIfAsked) {
 // folders, the remote-images choice, and the flag that makes the next sign-in
 // show Google's account chooser).
 const KEEP_ON_SIGN_OUT = new Set([
-  'chiaramail.lang', 'chiaramail.folded', 'chiaramail.alwaysImages', 'chiaramail.chooseAccount',
+  'chiaramail.lang', 'chiaramail.folded', 'chiaramail.alwaysImages', 'chiaramail.chooseAccount', 'chiaramail.keepAsked',
 ]);
 function clearBrowserStorage() {
   for (const store of [globalThis.localStorage, globalThis.sessionStorage]) {

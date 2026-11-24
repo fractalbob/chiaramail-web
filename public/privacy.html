@@ -12,7 +12,7 @@
 
 <section id="en">
 <h1>Privacy policy</h1>
-<p class="meta">Effective 12 November 2026 · The Fractal Images Company (Robert Uomini), France</p>
+<p class="meta">Effective 24 November 2026 · The Fractal Images Company (Robert Uomini), France</p>
 
 <h2>What ChiaraMail is</h2>
 <p>ChiaraMail is a web mail app for Gmail accounts that lets you send ECS messages (Envelope-Content Splitting). Only an ECS message’s envelope (sender, recipients, subject) travels by email; its text and attachments are stored separately, where only its recipients can read them, and you can update or withdraw them after sending.</p>
@@ -21,7 +21,7 @@
 <p>When you connect Gmail, you allow ChiaraMail to read, send and organise your mail (Google’s <code>gmail.modify</code> permission). ChiaraMail uses this permission only to show your mailbox to you and to carry out the actions you choose: reading, searching, sending, saving drafts, replying, forwarding, starring, archiving, deleting and restoring messages, and marking them as spam.</p>
 <ul>
 <li>Your Gmail messages are fetched directly from Google into your browser. They are <strong>not</strong> copied to, stored on or processed by any ChiaraMail server.</li>
-<li>The access Google grants lasts about an hour and is kept only in your browser. You can revoke it at any time at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
+<li>The access Google grants lasts about an hour and is kept in your browser. If you tick <strong>Keep me signed in</strong>, ChiaraMail also keeps a Google <em>refresh token</em> for your account on its server (see below), which it uses only to give your browser a new hour of access when the previous one ends. You can revoke ChiaraMail’s access at any time at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
 <li>No person at The Fractal Images Company reads your Gmail.</li>
 </ul>
 
@@ -33,6 +33,7 @@
 <li><strong>Your attachment total:</strong> the combined size of the attachments of your ECS messages that are still stored, so that each sender stays within 1 GB. Only you can read it.</li>
 <li><strong>The ECS directory:</strong> the address you connect with, so that mail from you can be marked as coming from someone who uses ECS. Anyone signed in to ChiaraMail can check whether a given address is listed; nobody can browse the list.</li>
 <li><strong>Read receipts:</strong> when a recipient opens an ECS message, the time and which edition they saw. Senders can see this, and readers are told so on the message.</li>
+<li><strong>If you chose “Keep me signed in”:</strong> a Google refresh token for your account, with your address, <strong>encrypted</strong> (AES-256-GCM, with a key held separately in Google Cloud Secret Manager). No browser can read it: only ChiaraMail’s own server functions use it, and only to obtain a new access token for you, after you have signed in to ChiaraMail. It is never used to read your mail on the server.</li>
 </ul>
 <p>Ordinary (non-ECS) messages are not stored by ChiaraMail at all. To suggest recipients as you type, ChiaraMail keeps a list of the names and addresses you’ve recently exchanged mail with <strong>in your browser only</strong>; it never leaves your device. The same goes for your “Always show images” setting and a note of which deleted conversations came from your Inbox, so Restore can put them back there.</p>
 
@@ -44,19 +45,21 @@
 <li>Every connection between your browser, Google and ChiaraMail is encrypted (HTTPS/TLS).</li>
 <li>The text and attachments of ECS messages are encrypted in the sender’s browser with a separate random 256-bit AES-GCM key for each message, before they are stored. The key travels only inside the email to the recipients, so the stored content cannot be read by ChiaraMail, by Google or by anyone with access to the database.</li>
 <li>Stored data is held in Google Firebase, which encrypts it at rest. Access rules enforced by Firebase let only the sender and the listed recipients of an ECS message read it, and only the sender change, withdraw or delete it.</li>
-<li>Your Gmail access token is kept only in your browser’s local storage, so that reopening ChiaraMail within the hour takes you straight to your inbox. It expires after about an hour, is deleted when you sign out, and is never sent to a ChiaraMail server.</li>
+<li>Your Gmail access token is kept in your browser’s local storage, so that reopening ChiaraMail within the hour takes you straight to your inbox. It expires after about an hour, is deleted when you sign out, and is never sent to a ChiaraMail server.</li>
+<li>With “Keep me signed in”, the Google refresh token is stored encrypted, as described above. Signing out has Google revoke it and deletes it from ChiaraMail’s server; so does signing in again without “Keep me signed in”. If you revoke ChiaraMail’s access at Google, the stored token stops working and is deleted the next time it’s needed.</li>
 </ul>
 
 <h2>How long data is kept, and how to delete it</h2>
 <ul>
 <li><strong>Gmail messages:</strong> never stored by ChiaraMail, so there is nothing to keep or delete.</li>
+<li><strong>“Keep me signed in” token:</strong> kept until you sign out, sign in without that option, or revoke ChiaraMail’s access at Google.</li>
 <li><strong>ECS messages:</strong> kept until the sender withdraws them (their text and attachments are erased) or deletes them (the message, its attachments, editions and read receipts are removed). You can do both yourself in the app at any time.</li>
 <li><strong>Your account and ECS directory entry:</strong> kept while you use ChiaraMail. To have them deleted, together with all your ECS messages, write to <a href="mailto:ruomini@gmail.com">ruomini@gmail.com</a>; this is done within 30 days.</li>
 <li><strong>Data in your browser</strong> (recent contacts, settings): stays on your device until you clear this site’s data in your browser.</li>
 </ul>
 
 <h2>Google API Services User Data Policy</h2>
-<p>ChiaraMail’s use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. Gmail data is used only to provide the user-facing features described above. It is not used for advertising, not sold, not transferred to others (except as necessary to provide the service, to comply with law, or with your consent), and not used to train artificial intelligence models. ChiaraMail shares no Google user data with any third party; the only other party involved is Google itself, whose Firebase service hosts the data described above on our behalf.</p>
+<p>ChiaraMail’s use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. Gmail data is used only to provide the user-facing features described above. It is not used for advertising, not sold, not transferred to others (except as necessary to provide the service, to comply with law, or with your consent), and not used to train artificial intelligence models. ChiaraMail shares no Google user data with any third party; the only other party involved is Google itself, whose Firebase and Google Cloud services host the data described above on our behalf.</p>
 
 <h2>No tracking, no ads</h2>
 <p>ChiaraMail shows no advertising and uses no analytics or tracking cookies. Images in emails are held back until you choose to show them, so senders can’t tell when you open their mail. If you switch on “Always show images”, images load automatically (except in Spam), and senders can then see when you open their mail.</p>

@@ -856,3 +856,4 @@ html.busy body::before {
 /* The row of the conversation just left, for a moment, when coming back to the list. */
 .trow-back { animation: trow-back 1.5s ease-out; }
 @keyframes trow-back { from { background: color-mix(in srgb, var(--lumen) 45%, transparent); } to { background: transparent; } }
+.signin .keep-signed-in { margin: 12px 0 0; }

@@ -134,6 +134,12 @@ service cloud.firestore {
 
     // ---- ChiaraMail web ------------------------------------------------------
 
+    // "Keep me signed in": Google refresh tokens, encrypted. Only the app's
+    // server functions (functions/keep.js) use them; no client may read or write.
+    match /gmailKeep/{sub} {
+      allow read, write: if false;
+    }
+
     // The ECS directory: addresses that have signed in to ChiaraMail, so mail
     // from them can be marked as coming from an ECS user. One address can be
     // looked up at a time; the list can't be browsed.

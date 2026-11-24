@@ -39,9 +39,23 @@ export function MailProvider({ children }) {
   const [error, setError] = useState('');
   const [grantFor, setGrantFor] = useState(null); // account signed in without Gmail access
   const [failure, setFailure] = useState(null); // desktop app: why the last sign-in failed (code, settings…)
+  // "Keep me signed in": on opening, a fresh Gmail token from the server instead of the sign-in screen.
+  const [resuming, setResuming] = useState(() => !account && !!gmail.keepsSignedIn?.());
+
+  useEffect(() => {
+    if (!resuming || user === undefined) return;
+    if (!user) return; // signed out: the sign-in screen (status ignores resuming without a user)
+    let live = true;
+    gmail.resume().then((email) => {
+      if (!live) return;
+      if (email) { setAccount(email); setExpired(false); }
+      setResuming(false);
+    });
+    return () => { live = false; };
+  }, [resuming, user]);
 
   let status = 'checking';
-  if (user !== undefined) {
+  if (user !== undefined && !(resuming && user)) {
     if (account && user && user.email === account && !expired) status = 'connected';
     else if (user) status = 'reconnect';
     else status = 'disconnected';
@@ -107,6 +121,7 @@ export function MailProvider({ children }) {
         if (gmail.mode === 'desktop') { setFailure(e); return; }
         const quiet = ['popup_closed', 'popup_failed_to_open', 'access_denied'];
         if (e.code === 'scope-denied') { setError(e.email ? 'scopeDeniedFor' : 'scopeDenied'); setGrantFor(e.email || ''); }
+        else if (e.code === 'keep-again') setError('keepAgain');
         else if (e.code === 'popup_failed_to_open') setError('popupBlocked');
         else if (!quiet.includes(e.code)) setError(e.message);
       } finally { setBusy(false); }

@@ -16,6 +16,27 @@
     ],
     "rewrites": [
       {
+        "source": "/api/gmail/keep",
+        "function": {
+          "functionId": "gmailKeep",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/gmail/token",
+        "function": {
+          "functionId": "gmailToken",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/gmail/forget",
+        "function": {
+          "functionId": "gmailForget",
+          "region": "us-central1"
+        }
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
@@ -62,6 +83,21 @@
     "ui": {
       "enabled": false
     },
-    "singleProjectMode": true
-  }
+    "singleProjectMode": true,
+    "functions": {
+      "port": 5001
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "*.test.js",
+        "*.local"
+      ]
+    }
+  ]
 }

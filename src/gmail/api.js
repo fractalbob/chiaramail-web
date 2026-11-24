@@ -1,6 +1,7 @@
 // Real Gmail: Google sign-in for a Gmail access token (Google Identity
-// Services), then the Gmail REST API, straight from the browser. Nothing is
-// stored on any server except the content of ChiaraMail's own ECS messages.
+// Services), then the Gmail REST API, straight from the browser. Mail is never
+// stored on any server; ChiaraMail stores only its own ECS messages and, with
+// "Keep me signed in", an encrypted Google refresh token (functions/keep.js).
 import * as backend from '@backend';
 import { busy } from '../busy.js';
 import { widenQuery } from './query.js';
@@ -13,6 +14,7 @@ const UPLOAD = 'https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/s
 const TOKEN_KEY = 'chiaramail.gmailToken';
 const HINT_KEY = 'chiaramail.lastAccount';
 const CHOOSE_KEY = 'chiaramail.chooseAccount'; // set by Sign out: next sign-in shows Google's account chooser
+const KEEP_KEY = 'chiaramail.keepSignedIn'; // '1': the server keeps a refresh token for this account
 
 let token = null; // { accessToken, expiresAt, email }
 let gisLoaded = null;
@@ -35,7 +37,8 @@ function loadGis() {
 
 // The access token (Google gives it for an hour) is kept in this browser until it
 // expires, so reopening the app within the hour goes straight to the inbox. Signing
-// out removes it. (Never a refresh token: there is none in the browser.)
+// out removes it. (Never a refresh token: with "Keep me signed in" it stays on the
+// server, which hands out fresh access tokens; see refreshFromServer.)
 function saveToken(t) {
   token = t;
   try {
@@ -62,16 +65,105 @@ export const lastAccount = () => { try { return localStorage.getItem(HINT_KEY) |
 const flag = (k) => { try { return localStorage.getItem(k) === '1'; } catch { return false; } };
 const setFlag = (k, on) => { try { if (on) localStorage.setItem(k, '1'); else localStorage.removeItem(k); } catch { /* ignore */ } };
 
+// ---- Keep me signed in -------------------------------------------------------
+/** Whether this browser asked to stay signed in (the sign-in screen's checkbox starts from it). */
+export const keepsSignedIn = () => flag(KEEP_KEY);
+
+// The app's own server functions (Hosting rewrites /api/gmail/* to them).
+async function api(path, body, idToken) {
+  const res = await fetch(`/api/gmail/${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XmlHttpRequest', // Google's code model (popup): the server checks it
+      ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+    },
+    body: JSON.stringify(body || {}),
+  });
+  let json = {};
+  try { json = await res.json(); } catch { /* ignore */ }
+  if (!res.ok) throw Object.assign(new Error(json.error || res.statusText), { status: res.status, code: json.error });
+  return json;
+}
+
+let refreshing = null;
+/**
+ * A fresh access token from the server, for the ChiaraMail user signed in in
+ * this browser, if they chose to stay signed in. Returns the address or null.
+ */
+export function refreshFromServer() {
+  if (!flag(KEEP_KEY)) return Promise.resolve(null);
+  refreshing ||= (async () => {
+    try {
+      const id = await backend.idToken();
+      if (!id) return null;
+      const r = await api('token', {}, id);
+      saveToken({ accessToken: r.access_token, expiresAt: Date.now() + Number(r.expires_in) * 1000, email: r.email });
+      return r.email;
+    } catch (e) {
+      if (e.status === 404 || e.status === 403) setFlag(KEEP_KEY, false); // no longer kept (revoked, or Gmail access removed)
+      return null;
+    } finally { refreshing = null; }
+  })();
+  return refreshing;
+}
+
+/** On opening the app: carry on without a tap when the server keeps this account signed in. */
+export const resume = () => refreshFromServer();
+
+async function ensureToken() {
+  if (token && token.expiresAt > Date.now() + 30_000) return;
+  if (await refreshFromServer()) return;
+  throw reconnectError();
+}
+
+// Google's code model: a one-time code that only the server can exchange (it
+// holds the client secret), for an access token now and a refresh token kept there.
+async function connectKept({ pick, hint, clientId }) {
+  const code = await new Promise((resolve, reject) => {
+    const client = window.google.accounts.oauth2.initCodeClient({
+      client_id: clientId,
+      scope: SCOPES,
+      ux_mode: 'popup',
+      include_granted_scopes: true,
+      select_account: pick,
+      login_hint: hint || (pick ? undefined : (lastAccount() || undefined)),
+      callback: (r) => (r.error ? reject(Object.assign(new Error(r.error_description || r.error), { code: r.error })) : resolve(r.code)),
+      error_callback: (e) => reject(Object.assign(new Error(e.message || e.type), { code: e.type })),
+    });
+    client.requestCode();
+  });
+  let r;
+  try { r = await api('keep', { code }); } catch (e) {
+    if (e.code === 'scope-denied') throw Object.assign(new Error('Gmail access was not granted'), { code: 'scope-denied', email: '' });
+    throw e;
+  }
+  const user = await backend.signInWithGoogleAccessToken(r.access_token);
+  try { localStorage.setItem(HINT_KEY, user.email); } catch { /* ignore */ }
+  setFlag(CHOOSE_KEY, false);
+  if (!r.kept) {
+    // This account had allowed ChiaraMail before, without letting it stay signed in,
+    // so Google gave no refresh token. Have Google forget that permission; the next
+    // tap asks again, and this time Google gives one.
+    await new Promise((res) => window.google.accounts.oauth2.revoke(r.access_token, res));
+    throw Object.assign(new Error('Confirm once more'), { code: 'keep-again' });
+  }
+  saveToken({ accessToken: r.access_token, expiresAt: Date.now() + Number(r.expires_in) * 1000, email: user.email });
+  setFlag(KEEP_KEY, true);
+  return user.email;
+}
+
 /**
  * Opens Google's window (must be called from a click). Normally Google reuses
  * the last account without asking; after Sign out, or with { choose: true },
  * it shows the account chooser so another account can be picked.
  */
-export async function connect({ choose = false, consent = false, hint = '' } = {}) {
+export async function connect({ choose = false, consent = false, hint = '', keep = false } = {}) {
   const pick = !consent && (choose || flag(CHOOSE_KEY));
   await loadGis();
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   if (!clientId) throw new Error('VITE_GOOGLE_CLIENT_ID is not set in .env.local');
+  if (keep) return connectKept({ pick, hint, clientId });
   const resp = await new Promise((resolve, reject) => {
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
@@ -96,6 +188,7 @@ export async function connect({ choose = false, consent = false, hint = '' } = {
   }
   // Sign in to ChiaraMail (Firebase) with the same Google account.
   const user = await backend.signInWithGoogleAccessToken(resp.access_token);
+  await forgetKept(); // signed in without "Keep me signed in": the server keeps nothing any more
   saveToken({ accessToken: resp.access_token, expiresAt: Date.now() + Number(resp.expires_in) * 1000, email: user.email });
   try { localStorage.setItem(HINT_KEY, user.email); } catch { /* ignore */ }
   setFlag(CHOOSE_KEY, false);
@@ -109,9 +202,17 @@ export async function connect({ choose = false, consent = false, hint = '' } = {
  * myaccount.google.com/permissions. The next sign-in lets you choose the account.
  */
 export async function disconnect() {
+  await forgetKept();
   saveToken(null);
   setFlag(CHOOSE_KEY, true);
   await backend.signOut();
+}
+
+// Sign out, or signing in without "Keep me signed in": Google and the server forget the refresh token.
+async function forgetKept() {
+  if (!flag(KEEP_KEY)) return;
+  setFlag(KEEP_KEY, false);
+  try { const id = await backend.idToken(); if (id) await api('forget', {}, id); } catch { /* best effort */ }
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -121,10 +222,13 @@ const isRateLimit = (status, msg) => status === 429 || (status === 403 && /rate 
 
 function call(path, opts = {}) {
   return busy(async () => {
+    let renewed = false;
     for (let attempt = 0; ; attempt += 1) {
       try {
         return await callOnce(path, opts);
       } catch (e) {
+        // Google refused the token before its hour was up (e.g. revoked): one fresh try.
+        if (e.code === 'reconnect' && !renewed && flag(KEEP_KEY)) { renewed = true; if (await refreshFromServer()) continue; }
         if (!e.rateLimited || attempt >= 4) throw e;
         await sleep(2000 * 2 ** attempt + Math.random() * 1000); // 2s, 4s, 8s, 16s
       }
@@ -133,7 +237,7 @@ function call(path, opts = {}) {
 }
 
 async function callOnce(path, { method = 'GET', query, body, url } = {}) {
-  if (!token || token.expiresAt < Date.now() + 30_000) throw reconnectError();
+  await ensureToken();
   const u = new URL(url || BASE + path);
   if (query) Object.entries(query).forEach(([k, v]) => {
     if (v === undefined || v === null || v === '') return;
@@ -252,7 +356,7 @@ export async function untrashThread(id) {
 const b64url = (raw) => btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 function upload(...args) { return busy(() => uploadOnce(...args)); }
 async function uploadOnce(path, method, meta, raw) {
-  if (!token || token.expiresAt < Date.now() + 30_000) throw reconnectError();
+  await ensureToken();
   const b = `cm_${Date.now()}`;
   const res = await fetch(`https://gmail.googleapis.com/upload/gmail/v1/users/me${path}?uploadType=multipart`, {
     method,
@@ -306,7 +410,7 @@ export async function sendRaw(raw, threadId) {
     `--${b}`, 'Content-Type: application/json; charset=UTF-8', '', JSON.stringify(threadId ? { threadId } : {}),
     `--${b}`, 'Content-Type: message/rfc822', '', raw, `--${b}--`, '',
   ].join('\r\n');
-  if (!token || token.expiresAt < Date.now() + 30_000) throw reconnectError();
+  await ensureToken();
   const res = await fetch(UPLOAD, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token.accessToken}`, 'Content-Type': `multipart/related; boundary=${b}` },

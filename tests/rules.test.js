@@ -164,6 +164,13 @@ test('old ChiaraMail users/ collection is closed to everyone', async () => {
   await assertFails(getDoc(doc(ctx(ALICE), 'users/device1')));
 });
 
+test('kept Gmail sign-ins (gmailKeep/) are closed to every client', async () => {
+  const anon = env.unauthenticatedContext().firestore();
+  await assertFails(getDoc(doc(anon, 'gmailKeep/123')));
+  await assertFails(getDoc(doc(ctx(ALICE), 'gmailKeep/123')));
+  await assertFails(setDoc(doc(ctx(ALICE), 'gmailKeep/123'), { rt: 'x' }));
+});
+
 test('forwarding permission: set at sending, switched by the sender only', async () => {
   await assertSucceeds(setDoc(doc(ctx(ALICE), 'messages/f1'), newMessage({ allowForward: false })));
   await assertFails(setDoc(doc(ctx(ALICE), 'messages/f2'), newMessage({ allowForward: 'yes' })));
